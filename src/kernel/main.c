@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "dodo/arch/x86_64/interrupts.h"
 #include "dodo/boot/limine_protocol.h"
 #include "dodo/mm/phys.h"
 
@@ -51,6 +52,42 @@ static struct dodo_phys_allocator physical_allocator;
  * Later page-table bootstrap code can use them; they are not returned to pool.
  */
 static uint64_t bootstrap_reserved_frames[DODO_BOOT_TEST_FRAME_COUNT];
+static volatile uint64_t breakpoint_selftest_armed = 0;
+
+static const char *const exception_names[32] = {
+    "Divide Error",
+    "Debug",
+    "Non-Maskable Interrupt",
+    "Breakpoint",
+    "Overflow",
+    "Bound Range",
+    "Invalid Opcode",
+    "Device Not Available",
+    "Double Fault",
+    "Coprocessor Segment Overrun",
+    "Invalid TSS",
+    "Segment Not Present",
+    "Stack Segment Fault",
+    "General Protection Fault",
+    "Page Fault",
+    "Reserved Exception",
+    "x87 Floating-Point Exception",
+    "Alignment Check",
+    "Machine Check",
+    "SIMD Floating-Point Exception",
+    "Virtualization Exception",
+    "Control Protection Exception",
+    "Reserved Exception",
+    "Reserved Exception",
+    "Reserved Exception",
+    "Reserved Exception",
+    "Reserved Exception",
+    "Reserved Exception",
+    "Hypervisor Injection Exception",
+    "VMM Communication Exception",
+    "Security Exception",
+    "Reserved Exception"
+};
 
 static inline void outb(uint16_t port, uint8_t value) {
     __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
@@ -110,6 +147,14 @@ static void serial_write_u64(uint64_t value) {
     }
 }
 
+static void serial_write_hex64(uint64_t value) {
+    static const char hex_digits[] = "0123456789ABCDEF";
+    serial_write("0x");
+    for (int shift = 60; shift >= 0; shift -= 4) {
+        serial_putc(hex_digits[(value >> (uint32_t)shift) & UINT64_C(0x0f)]);
+    }
+}
+
 __attribute__((noreturn))
 static void kernel_halt(void) {
     for (;;) {
@@ -123,6 +168,42 @@ static void report_boot_error(const char *message) {
     serial_write(message);
     serial_write("\n");
     kernel_halt();
+}
+
+int dodo_x86_64_exception_handler(
+    const struct dodo_x86_64_exception_frame *frame) {
+    if (frame == NULL || frame->vector >= 32u) {
+        serial_write("DODO: FATAL: invalid exception frame\n");
+        return 0;
+    }
+
+    if (frame->vector == 3u && breakpoint_selftest_armed != 0u) {
+        breakpoint_selftest_armed = 0;
+        serial_write("DODO: IDT breakpoint self-check passed; RIP=");
+        serial_write_hex64(frame->rip);
+        serial_write("\n");
+        return 1;
+    }
+
+    serial_write("DODO: FATAL exception: ");
+    serial_write(exception_names[frame->vector]);
+    serial_write(" (vector ");
+    serial_write_u64(frame->vector);
+    serial_write(")\nDODO: error code = ");
+    serial_write_hex64(frame->error_code);
+    serial_write("\nDODO: instruction pointer = ");
+    serial_write_hex64(frame->rip);
+    serial_write("\n");
+
+    if (frame->vector == 14u) {
+        uint64_t fault_address;
+        __asm__ volatile ("mov %%cr2, %0" : "=r"(fault_address));
+        serial_write("DODO: page-fault address = ");
+        serial_write_hex64(fault_address);
+        serial_write("\n");
+    }
+
+    return 0;
 }
 
 static void inspect_memory_map(void) {
@@ -181,14 +262,27 @@ static void inspect_memory_map(void) {
     serial_write("\n");
 }
 
+static void test_exception_handler(void) {
+    breakpoint_selftest_armed = 1;
+    __asm__ volatile ("int3" : : : "memory");
+
+    if (breakpoint_selftest_armed != 0u) {
+        report_boot_error("breakpoint exception self-test did not resume");
+    }
+
+    serial_write("DODO: exception handler resumed after INT3\n");
+}
+
 /*
  * Limine transfers control in x86-64 long mode at the ELF entry point.
- * This milestone validates the handoff and exercises DODO's own page-frame
- * allocator. Virtual-memory mappings, interrupts, and scheduling are pending.
+ * This milestone validates the handoff, installs the early exception IDT,
+ * exercises the physical page-frame allocator, and tests INT3 recovery.
  */
 __attribute__((noreturn))
 void kernel_main(void) {
     serial_init();
+    dodo_x86_64_idt_init();
+
     serial_write("\nDODO OS: kernel reached entry point\n");
 
     if (limine_base_revision[2] != 0u) {
@@ -197,7 +291,9 @@ void kernel_main(void) {
 
     serial_write("DODO: Limine base revision accepted\n");
     serial_write("DODO: COM1 serial diagnostics ready\n");
+    serial_write("DODO: exception IDT loaded\n");
     inspect_memory_map();
-    serial_write("DODO: milestone M2-prep reached; virtual memory manager pending\n");
+    test_exception_handler();
+    serial_write("DODO: all kernel bootstrap self-checks passed\n");
     kernel_halt();
 }
