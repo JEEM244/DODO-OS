@@ -2,9 +2,10 @@
 #include <stdint.h>
 
 #include "dodo/boot/limine_protocol.h"
+#include "dodo/mm/phys.h"
 
 #define COM1_PORT 0x3F8u
-#define DODO_MAX_MEMMAP_ENTRIES UINT64_C(4096)
+#define DODO_BOOT_TEST_FRAME_COUNT 4u
 
 /*
  * Limine protocol markers and base revision 3.
@@ -43,6 +44,13 @@ static volatile uint64_t limine_requests_end_marker[2] = {
     0xadc0e0531bb10d03,
     0x9572709f31764c62
 };
+
+static struct dodo_phys_allocator physical_allocator;
+/*
+ * These four frames are deliberately retained after the bootstrap self-test.
+ * Later page-table bootstrap code can use them; they are not returned to pool.
+ */
+static uint64_t bootstrap_reserved_frames[DODO_BOOT_TEST_FRAME_COUNT];
 
 static inline void outb(uint16_t port, uint8_t value) {
     __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
@@ -124,41 +132,59 @@ static void inspect_memory_map(void) {
         report_boot_error("Limine did not provide a memory map");
     }
 
-    if (response->entry_count > DODO_MAX_MEMMAP_ENTRIES) {
-        report_boot_error("memory-map entry count exceeds the bootstrap limit");
-    }
-
-    if (response->entry_count != 0u && response->entries == NULL) {
-        report_boot_error("memory-map entry array is null");
-    }
-
-    uint64_t usable_bytes = 0u;
-    for (uint64_t i = 0; i < response->entry_count; ++i) {
-        struct dodo_limine_memmap_entry *entry = response->entries[i];
-
-        if (entry == NULL) {
-            report_boot_error("memory map contains a null entry");
-        }
-
-        if (entry->type == DODO_LIMINE_MEMMAP_USABLE) {
-            if (UINT64_MAX - usable_bytes < entry->length) {
-                report_boot_error("usable-memory total overflowed");
-            }
-            usable_bytes += entry->length;
-        }
-    }
-
-    serial_write("DODO: memory map accepted; entries = ");
+    serial_write("DODO: memory map received; entries = ");
     serial_write_u64(response->entry_count);
-    serial_write("\nDODO: usable memory bytes = ");
-    serial_write_u64(usable_bytes);
+    serial_write("\n");
+
+    const enum dodo_phys_status status =
+        dodo_phys_init(&physical_allocator, response);
+    if (status != DODO_PHYS_OK) {
+        serial_write("DODO: physical allocator rejected map; code = ");
+        serial_write_u64((uint64_t)status);
+        serial_write("\n");
+        report_boot_error("physical memory map validation failed");
+    }
+
+    const uint64_t initial_pages = physical_allocator.free_pages;
+    if (initial_pages < DODO_BOOT_TEST_FRAME_COUNT) {
+        report_boot_error("not enough usable frames for the bootstrap self-test");
+    }
+
+    serial_write("DODO: usable whole pages = ");
+    serial_write_u64(initial_pages);
+    serial_write("\n");
+
+    for (uint64_t i = 0; i < DODO_BOOT_TEST_FRAME_COUNT; ++i) {
+        uint64_t physical_address = 0;
+        if (dodo_phys_alloc_page(&physical_allocator, &physical_address) !=
+            DODO_PHYS_OK) {
+            report_boot_error("physical page allocation failed");
+        }
+
+        if ((physical_address % DODO_PHYS_PAGE_SIZE) != 0) {
+            report_boot_error("allocator returned an unaligned physical page");
+        }
+
+        for (uint64_t previous = 0; previous < i; ++previous) {
+            if (bootstrap_reserved_frames[previous] == physical_address) {
+                report_boot_error("allocator returned a duplicate physical page");
+            }
+        }
+
+        bootstrap_reserved_frames[i] = physical_address;
+    }
+
+    serial_write("DODO: physical allocator self-check passed; reserved pages = ");
+    serial_write_u64(DODO_BOOT_TEST_FRAME_COUNT);
+    serial_write("\nDODO: remaining whole pages = ");
+    serial_write_u64(physical_allocator.free_pages);
     serial_write("\n");
 }
 
 /*
  * Limine transfers control in x86-64 long mode at the ELF entry point.
- * This milestone validates the handoff and reads the firmware memory map;
- * general memory management, interrupts, and scheduling are still pending.
+ * This milestone validates the handoff and exercises DODO's own page-frame
+ * allocator. Virtual-memory mappings, interrupts, and scheduling are pending.
  */
 __attribute__((noreturn))
 void kernel_main(void) {
@@ -172,6 +198,6 @@ void kernel_main(void) {
     serial_write("DODO: Limine base revision accepted\n");
     serial_write("DODO: COM1 serial diagnostics ready\n");
     inspect_memory_map();
-    serial_write("DODO: milestone K1 reached; own memory manager pending\n");
+    serial_write("DODO: milestone M2-prep reached; virtual memory manager pending\n");
     kernel_halt();
 }
