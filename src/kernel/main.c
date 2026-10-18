@@ -417,6 +417,15 @@ static void reclaim_bootloader_memory(void) {
     serial_write("\nDODO: bootloader reclaimable pages returned to allocator = ");
     serial_write_u64(reclaimed_pages);
     serial_write("\n");
+
+    /*
+     * These protocol responses lived in the reclaimable regions we just added.
+     * Null the references as a guard against accidentally using freed metadata.
+     * The HHDM offset has already been copied into the paging subsystem.
+     */
+    limine_memmap_request.response = NULL;
+    limine_hhdm_request.response = NULL;
+    serial_write("DODO: Limine boot response pointers invalidated\n");
 }
 
 static void test_virtual_mapping(void) {
