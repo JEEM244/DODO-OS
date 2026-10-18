@@ -30,14 +30,16 @@ DODO's bootstrap frame allocator lives in include/dodo/mm/phys.h and src/mm/phys
 - It only accepts ranges explicitly marked usable by the Limine memory map.
 - It selects complete 4 KiB frames by aligning range start upward and end downward.
 - It rejects malformed maps, overflow, duplicate/overlapping usable ranges, and capacity violations.
-- Host-side tests cover alignment, exclusion of reserved ranges, invalid responses, overflow, overlaps, and exhaustion.
-- The allocator returns physical addresses. It does not make them directly dereferenceable or map/free/reclaim them.
+- Host-side tests cover alignment, exclusion of reserved ranges, invalid responses, overflow, overlaps, exhaustion, freeing, reuse, double-free rejection, unknown-frame rejection, and the tracking cap.
+- A compact live-allocation ledger tracks up to 16,384 outstanding frames. A LIFO free stack recycles returned pages before the allocator advances to new ranges.
+- Freeing a frame only returns it to the allocator; callers must prove no page table, device, or other live object still references it.
+- The allocator is single-CPU bootstrap code with no lock or SMP-safe synchronization yet, and it does not map or dereference physical addresses.
 
-The current bootstrap reserves five page frames: three for intermediate page tables, one for a writable test page, and one for a read-only/NX protection page. These frames remain allocated during the test.
+The current bootstrap reserves five page frames for mapping/protection tests. The page-table tree clone allocates additional frames through the same ledger; a failed clone attempts to release all recorded temporary frames before returning.
 
 ## Virtual memory and permissions
 
-The x86-64 paging helper first reads the CR3 root provided by Limine and uses the higher-half direct map to access table pages. During bootstrap, DODO recursively clones the active four-level page-table tree into newly allocated physical frames, preserving leaf physical targets and permissions while redirecting intermediate entries to the cloned tables. Shared table references and recursive root mappings are preserved through an old-to-new table cache; 1 GiB and 2 MiB huge-page leaves are copied without descending into them. DODO activates the cloned root with CR3 only after cloning completes. The old table frames are not reclaimed because their ownership and lifetime are not yet tracked. The mapper refuses unsupported five-level paging, invalid addresses, unknown flags, huge-page collisions, conflicting parent permissions, existing leaf mappings, and reused or unaligned table frames.
+The x86-64 paging helper first reads the CR3 root provided by Limine and uses the higher-half direct map to access table pages. During bootstrap, DODO recursively clones the active four-level page-table tree into newly allocated physical frames, preserving leaf physical targets and permissions while redirecting intermediate entries to the cloned tables. Shared table references and recursive root mappings are preserved through an old-to-new table cache; 1 GiB and 2 MiB huge-page leaves are copied without descending into them. DODO activates the cloned root with CR3 only after cloning completes. If the clone fails before activation, it walks the clone cache backward and attempts to return every temporary frame through the allocator's release callback. A QEMU fault-injection check forces allocation to fail partway through cloning and compares free/live page counts before and after rollback. The old Limine table frames are not reclaimed because their ownership and lifetime are not yet tracked. The mapper refuses unsupported five-level paging, invalid addresses, unknown flags, huge-page collisions, conflicting parent permissions, existing leaf mappings, and reused or unaligned table frames.
 
 It maps a test page into an unused kernel PML4 slot. The QEMU self-test verifies that the direct-map alias and the new virtual alias see the same contents.
 
@@ -51,7 +53,7 @@ Unhandled page faults remain fatal. These tests cover particular paths in QEMU; 
 Current limitations:
 - DODO owns a cloned four-level page-table tree and retains the inherited leaf mappings to the same physical pages.
 - DODO still relies on the Limine-provided HHDM layout and does not reclaim the old tree or manage per-process address spaces.
-- There is no virtual-memory area manager, allocation reclamation, demand paging, copy-on-write, per-process address space, or guard-page stack allocator.
+- There is no virtual-memory area manager, demand paging, copy-on-write, per-process address space, or guard-page stack allocator. Frame release is limited to tracked physical pages and requires external proof that a frame is no longer referenced.
 - DODO adds test mappings only in an unused kernel PML4 slot; the mapper intentionally never overwrites a present leaf. The initial clone is bounded to 8192 table frames and fails closed if that limit is reached.
 
 ## Exception handling
