@@ -371,6 +371,9 @@ static void reclaim_bootloader_memory(void) {
     const uint64_t free_pages_before = physical_allocator.free_pages;
     uint64_t reclaimed_pages = 0;
     uint64_t reclaimed_regions = 0;
+    uint64_t first_reclaimed_region_index = UINT64_MAX;
+    uint64_t first_reclaimed_region_base = 0;
+    uint64_t first_reclaimed_region_end = 0;
 
     /*
      * Do this only after switching to DODO's cloned page-table tree and
@@ -387,6 +390,12 @@ static void reclaim_bootloader_memory(void) {
         if (entry->type != DODO_LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE ||
             entry->length == 0u) {
             continue;
+        }
+
+        if (first_reclaimed_region_index == UINT64_MAX) {
+            first_reclaimed_region_index = physical_allocator.region_count;
+            first_reclaimed_region_base = entry->base;
+            first_reclaimed_region_end = entry->base + entry->length;
         }
 
         const enum dodo_phys_status status = dodo_phys_add_region(
@@ -411,6 +420,36 @@ static void reclaim_bootloader_memory(void) {
         physical_allocator.free_pages != free_pages_before + reclaimed_pages) {
         report_boot_error("bootloader memory reclamation count did not validate");
     }
+
+    /*
+     * Prove the new range isn't only being counted: allocate one page directly
+     * from the first adopted region, then return it. The normal allocator's
+     * free stack should be able to reuse that frame afterward.
+     */
+    const uint64_t free_pages_before_probe = physical_allocator.free_pages;
+    const uint64_t allocated_pages_before_probe = physical_allocator.allocated_pages;
+    uint64_t reclaimed_probe_page = UINT64_MAX;
+    const enum dodo_phys_status probe_status =
+        dodo_phys_alloc_page_from_region(
+            &physical_allocator, first_reclaimed_region_index,
+            &reclaimed_probe_page);
+    if (probe_status != DODO_PHYS_OK ||
+        reclaimed_probe_page < first_reclaimed_region_base ||
+        reclaimed_probe_page >= first_reclaimed_region_end ||
+        (reclaimed_probe_page & (DODO_PHYS_PAGE_SIZE - 1u)) != 0u) {
+        report_boot_error("reclaimed region failed its direct allocation self-check");
+    }
+
+    if (dodo_phys_free_page(&physical_allocator, reclaimed_probe_page) !=
+        DODO_PHYS_OK ||
+        physical_allocator.free_pages != free_pages_before_probe ||
+        physical_allocator.allocated_pages != allocated_pages_before_probe) {
+        report_boot_error("reclaimed region probe failed to restore allocator counts");
+    }
+
+    serial_write("DODO: reclaimed region allocation self-check passed; page = ");
+    serial_write_hex64(reclaimed_probe_page);
+    serial_write("\n");
 
     serial_write("DODO: bootloader reclaimable regions adopted = ");
     serial_write_u64(reclaimed_regions);
