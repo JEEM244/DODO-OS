@@ -138,6 +138,7 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "DODO: begin own GDT installation" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: own GDT load instruction returned" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: own GDT loaded; kernel and user selectors verified" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: reclaimed region allocation self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: bootloader reclaimable regions adopted =" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: bootloader reclaimable pages returned to allocator =" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: Limine boot response pointers invalidated" $(BUILD_DIR)/qemu-serial.log; \
