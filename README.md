@@ -4,7 +4,7 @@
 
 The goal is not to create another Linux distribution or a collection of security utilities. DODO aims to become a practical daily-use desktop operating system whose architecture limits what programs can access, makes their actions explainable, and allows risky work to happen in isolated environments.
 
-> **Current status:** DODO has a freestanding x86-64 kernel, a pinned Limine boot path, a BIOS/UEFI test ISO, a bootstrap physical page allocator, an initial exception IDT, and a checked extension of the active page tables. GitHub Actions runs host allocator tests and boots the ISO in QEMU, including read-only and NX protection tests. This remains an early kernel prototype, not a desktop OS. Check the latest CI run before treating any milestone as verified.
+> **Current status:** DODO has a freestanding x86-64 kernel, a pinned Limine boot path, a BIOS/UEFI test ISO, a bootstrap physical page allocator, an initial exception IDT, and a cloned, DODO-owned four-level page-table tree. GitHub Actions runs host allocator tests and boots the ISO in QEMU, including read-only and NX protection tests. This remains an early kernel prototype, not a desktop OS. Check the latest CI run before treating any milestone as verified.
 
 ## Project principles
 
@@ -30,7 +30,7 @@ This is a research hypothesis, not a claim of unprecedented invention. Existing 
 - **Boot path:** Limine protocol base revision 3, using a pinned upstream binary release verified by SHA-256.
 - **Implementation:** freestanding C and x86-64 assembly.
 - **Physical memory:** validates the bootloader map and allocates complete 4 KiB physical frames from usable ranges.
-- **Virtual memory:** allocates and activates a DODO-owned PML4 root while copying the current entries, then maps test pages in an unused kernel PML4 slot. The lower-level tables are still inherited from Limine.
+- **Virtual memory:** clones the active four-level page-table tree into DODO-owned frames, switches CR3 to the new root, and preserves the existing leaf mappings. QEMU currently reports ten cloned table frames for its test memory map.
 - **Page protections:** explicitly enables CR0.WP; when supported, enables EFER.NXE. QEMU tests verify read-only/NX faults, rejection of non-canonical addresses, and refusal to overwrite a present mapping.
 - **Exceptions:** IDT entries for vectors 0–31, fatal exception diagnostics, page-fault CR2 reporting, and tested recovery for intentionally triggered faults.
 - **Diagnostics:** COM1 serial output.
@@ -57,7 +57,7 @@ The prototype prints diagnostic messages over COM1 serial output and eventually 
 See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/BUILDING.md](docs/BUILDING.md), and [docs/BOOT-AND-ENTRY.md](docs/BOOT-AND-ENTRY.md).
 
 1. **Kernel bring-up:** repeatable boot, serial diagnostics, and exception handling.
-2. **Memory:** physical frames and an owned PML4 root are in place; next are independent lower-level tables, a full virtual-memory manager, and guard pages.
+2. **Memory:** DODO owns a cloned four-level page-table tree; next are frame reclamation/ownership, a full virtual-memory manager, and guard pages.
 3. **Isolation primitives:** user/kernel separation, IPC, scheduler, and capability enforcement.
 4. **SOMBRA prototype:** isolated workload, change journal, review, and discard tests.
 5. **Useful system services:** storage, networking, input, graphics, and update/recovery.
