@@ -215,3 +215,48 @@ enum dodo_phys_status dodo_phys_free_page(
     allocator->free_pages++;
     return DODO_PHYS_OK;
 }
+
+
+enum dodo_phys_status dodo_phys_add_region(
+    struct dodo_phys_allocator *allocator,
+    uint64_t base,
+    uint64_t length) {
+    if (allocator == 0 || allocator->initialized == 0) {
+        return DODO_PHYS_INVALID_ARGUMENT;
+    }
+
+    if (length == 0 ||
+        (base & DODO_PAGE_MASK) != 0u ||
+        (length & DODO_PAGE_MASK) != 0u) {
+        return DODO_PHYS_INVALID_ARGUMENT;
+    }
+
+    if (length > UINT64_MAX - base) {
+        return DODO_PHYS_INVALID_MAP;
+    }
+
+    if (allocator->region_count >= DODO_PHYS_MAX_REGIONS) {
+        return DODO_PHYS_CAPACITY_EXCEEDED;
+    }
+
+    const uint64_t end = base + length;
+    for (uint64_t i = 0; i < allocator->region_count; ++i) {
+        const struct dodo_phys_region *existing = &allocator->regions[i];
+        if (base < existing->end && existing->start < end) {
+            return DODO_PHYS_REGION_OVERLAP;
+        }
+    }
+
+    const uint64_t page_count = length / DODO_PHYS_PAGE_SIZE;
+    if (page_count > UINT64_MAX - allocator->free_pages) {
+        return DODO_PHYS_INVALID_MAP;
+    }
+
+    struct dodo_phys_region *region = &allocator->regions[allocator->region_count];
+    region->start = base;
+    region->cursor = base;
+    region->end = end;
+    allocator->region_count++;
+    allocator->free_pages += page_count;
+    return DODO_PHYS_OK;
+}
