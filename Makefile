@@ -165,6 +165,7 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "DODO: ring-3 read of supervisor memory was blocked" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: ring-3 supervisor-isolation self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: independent user-root isolation self-check passed" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: user-root teardown/reclaim self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: exception IDT loaded" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: IDT breakpoint self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: exception handler resumed after INT3" $(BUILD_DIR)/qemu-serial.log; \
