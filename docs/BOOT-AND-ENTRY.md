@@ -22,11 +22,13 @@ The test is deliberately small and single-threaded:
 
 - GDT selectors for user code/data and a 64-bit TSS descriptor are installed by DODO. TSS.RSP0 points to a dedicated ring-0 interrupt stack.
 - A DPL3 interrupt gate at vector 128 permits only the intentional software interrupt test; the handler checks a one-shot armed flag, CPL3, and the expected marker in RAX.
-- A small, page-aligned user code page and user stack are mapped in a low-half PML4 slot with U/S permissions. The code executes the software interrupt and is returned to the kernel through a trampoline that restores the original kernel stack plus SysV callee-saved registers.
+- DODO allocates a separate user PML4 root. Its low-half entries start empty; the kernel-half entries are copied with U/S cleared at the PML4 level so CPL3 cannot access any high-half address through those entries. The user code page and user stack are mapped only into this root.
+- A boot self-check confirms that the chosen user PML4 slot is still empty in the kernel root but present and U/S-enabled in the user root.
+- The code executes the software interrupt and is returned to the kernel through a trampoline that restores the kernel CR3, original kernel stack, and SysV callee-saved registers.
 - The same user page is then filled with a short read instruction targeting 0xffffffff80000000. The page-fault handler only returns to the kernel when CR2, saved CPL, and error-code access bits match the expected supervisor-page read fault.
 - The QEMU smoke test requires serial markers for successful ring-3 entry/return and supervisor-memory access denial.
 
-This is not a general syscall ABI. User test state and saved kernel RSP are global one-shot values; no scheduler, SMP safety, independent process address spaces, per-process kernel stacks, user-page cleanup, syscall argument validation, or capability enforcement is implemented. Unexpected faults remain fatal.
+This is not a general syscall ABI. User test state and saved kernel RSP/CR3 are global one-shot values; no scheduler, SMP safety, multiple simultaneous user address spaces, per-process kernel stacks, user-page cleanup, syscall argument validation, or capability enforcement is implemented. The test root shares supervisor-only higher-half table entries with the kernel; only its lower half is private for this prototype. Unexpected faults remain fatal.
 
 ## Protocol contract
 
