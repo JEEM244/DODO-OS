@@ -354,13 +354,13 @@ static void test_virtual_mapping(void) {
     if (status != DODO_PAGING_OK) {
         serial_write("DODO: PML4 root handoff error code = ");
         serial_write_u64((uint64_t)status);
-        serial_write("\\n");
+        serial_write("\n");
         report_boot_error("could not activate DODO's PML4 root");
     }
 
     serial_write("DODO: previous PML4 root = ");
     serial_write_hex64(previous_root_physical);
-    serial_write("\\nDODO: DODO-owned PML4 root installed = ");
+    serial_write("\nDODO: DODO-owned PML4 root installed = ");
     serial_write_hex64(new_root_physical);
     serial_write("\\n");
 
