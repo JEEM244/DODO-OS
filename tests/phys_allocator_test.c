@@ -58,6 +58,104 @@ static void test_basic_allocation(void) {
     assert(allocator.allocated_pages == 12);
 }
 
+static void test_free_reallocate_and_duplicate_free(void) {
+    const struct dodo_limine_memmap_entry usable = {
+        .base = UINT64_C(0x1000),
+        .length = UINT64_C(0x4000),
+        .type = DODO_LIMINE_MEMMAP_USABLE
+    };
+    struct dodo_limine_memmap_entry *entries[] = {
+        (struct dodo_limine_memmap_entry *)&usable
+    };
+    const struct dodo_limine_memmap_response map = {
+        .revision = 0,
+        .entry_count = 1,
+        .entries = entries
+    };
+
+    struct dodo_phys_allocator allocator;
+    assert(dodo_phys_init(&allocator, &map) == DODO_PHYS_OK);
+    assert(allocator.free_pages == 4);
+    assert(allocator.allocated_pages == 0);
+
+    uint64_t first = 0;
+    uint64_t second = 0;
+    uint64_t third = 0;
+    assert(dodo_phys_alloc_page(&allocator, &first) == DODO_PHYS_OK);
+    assert(dodo_phys_alloc_page(&allocator, &second) == DODO_PHYS_OK);
+    assert(dodo_phys_alloc_page(&allocator, &third) == DODO_PHYS_OK);
+    assert(first != second && second != third && first != third);
+    assert(allocator.free_pages == 1);
+    assert(allocator.allocated_pages == 3);
+
+    assert(dodo_phys_free_page(&allocator, second) == DODO_PHYS_OK);
+    assert(allocator.free_pages == 2);
+    assert(allocator.allocated_pages == 2);
+
+    assert(dodo_phys_free_page(&allocator, second) == DODO_PHYS_DOUBLE_FREE);
+    assert(allocator.free_pages == 2);
+    assert(allocator.allocated_pages == 2);
+
+    assert(dodo_phys_free_page(&allocator, UINT64_C(0x9000)) ==
+           DODO_PHYS_PAGE_NOT_ALLOCATED);
+    assert(dodo_phys_free_page(&allocator, first + 1u) ==
+           DODO_PHYS_INVALID_ARGUMENT);
+    assert(allocator.free_pages == 2);
+    assert(allocator.allocated_pages == 2);
+
+    uint64_t reused = 0;
+    assert(dodo_phys_alloc_page(&allocator, &reused) == DODO_PHYS_OK);
+    assert(reused == second);
+    assert(allocator.free_pages == 1);
+    assert(allocator.allocated_pages == 3);
+
+    assert(dodo_phys_free_page(&allocator, reused) == DODO_PHYS_OK);
+    assert(dodo_phys_free_page(&allocator, first) == DODO_PHYS_OK);
+    assert(dodo_phys_free_page(&allocator, third) == DODO_PHYS_OK);
+    assert(allocator.free_pages == 4);
+    assert(allocator.allocated_pages == 0);
+
+    /* All four frames can be allocated again without creating duplicate live pages. */
+    uint64_t pages[4] = { 0, 0, 0, 0 };
+    for (uint64_t i = 0; i < 4; ++i) {
+        assert(dodo_phys_alloc_page(&allocator, &pages[i]) == DODO_PHYS_OK);
+        assert(pages[i] % DODO_PHYS_PAGE_SIZE == 0);
+        for (uint64_t j = 0; j < i; ++j) {
+            assert(pages[i] != pages[j]);
+        }
+    }
+    assert(allocator.free_pages == 0);
+    assert(allocator.allocated_pages == 4);
+    assert(dodo_phys_alloc_page(&allocator, &first) == DODO_PHYS_NO_MEMORY);
+}
+
+static void test_zero_physical_page_can_be_allocated_and_freed(void) {
+    const struct dodo_limine_memmap_entry usable = {
+        .base = 0,
+        .length = DODO_PHYS_PAGE_SIZE,
+        .type = DODO_LIMINE_MEMMAP_USABLE
+    };
+    struct dodo_limine_memmap_entry *entries[] = {
+        (struct dodo_limine_memmap_entry *)&usable
+    };
+    const struct dodo_limine_memmap_response map = {
+        .revision = 0,
+        .entry_count = 1,
+        .entries = entries
+    };
+
+    struct dodo_phys_allocator allocator;
+    uint64_t page = UINT64_MAX;
+    assert(dodo_phys_init(&allocator, &map) == DODO_PHYS_OK);
+    assert(dodo_phys_alloc_page(&allocator, &page) == DODO_PHYS_OK);
+    assert(page == 0);
+    assert(dodo_phys_alloc_page(&allocator, &page) == DODO_PHYS_NO_MEMORY);
+    assert(dodo_phys_free_page(&allocator, 0) == DODO_PHYS_OK);
+    assert(dodo_phys_free_page(&allocator, 0) == DODO_PHYS_DOUBLE_FREE);
+    assert(dodo_phys_alloc_page(&allocator, &page) == DODO_PHYS_OK);
+    assert(page == 0);
+}
+
 static void test_invalid_arguments_and_map(void) {
     struct dodo_phys_allocator allocator;
     assert(dodo_phys_init(0, 0) == DODO_PHYS_INVALID_ARGUMENT);
@@ -126,6 +224,8 @@ static void test_overlap_rejected(void) {
 
 int main(void) {
     test_basic_allocation();
+    test_free_reallocate_and_duplicate_free();
+    test_zero_physical_page_can_be_allocated_and_freed();
     test_invalid_arguments_and_map();
     test_overlap_rejected();
     puts("DODO physical allocator tests: PASS");
