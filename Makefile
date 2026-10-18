@@ -159,6 +159,7 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "DODO: read-only page protection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: NX instruction fetch was blocked" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: NX execution protection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: separate user root mapping self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: ring-3 software interrupt reached kernel handler" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: ring-3 entry and controlled return self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: ring-3 read of supervisor memory was blocked" $(BUILD_DIR)/qemu-serial.log; \
