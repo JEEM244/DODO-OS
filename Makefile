@@ -135,9 +135,12 @@ qemu-smoke: $(ISO_IMAGE)
 	fi; \
 	grep -Fq "DODO OS: kernel reached entry point" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: Limine base revision accepted" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: begin own GDT installation" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: own GDT load instruction returned" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: own GDT loaded; kernel and user selectors verified" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: bootloader reclaimable regions adopted =" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: bootloader reclaimable pages returned to allocator =" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: Limine boot response pointers invalidated" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: memory map received" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: physical allocator self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: page-table clone rollback self-check passed" $(BUILD_DIR)/qemu-serial.log; \
