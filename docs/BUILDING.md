@@ -26,7 +26,8 @@ These host-side tests exercise the physical page allocator with synthetic memory
 - invalid pointers, malformed memory maps, integer overflow, and overlapping usable ranges;
 - returning a page, reusing the same frame, and rejecting double frees or pages that were never allocated;
 - the valid physical frame at address zero;
-- the fixed limit of 16,384 live allocations and confirming a capacity error does not corrupt allocator counters.
+- the fixed limit of 16,384 live allocations and confirming a capacity error does not corrupt allocator counters;
+- 20,000 deterministic allocate/free operations with uniqueness and page-count invariants checked after every operation.
 
 These tests check allocator logic separately from hardware boot. They do not prove that every physical memory map emitted by every firmware is valid, and the allocator is not yet safe for concurrent SMP use.
 
