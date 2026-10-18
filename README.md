@@ -4,7 +4,7 @@
 
 The goal is not to create another Linux distribution or a collection of security utilities. DODO aims to become a practical daily-use desktop operating system whose architecture limits what programs can access, makes their actions explainable, and allows risky work to happen in isolated environments.
 
-> **Current status:** DODO has a freestanding x86-64 kernel, a pinned Limine boot path, a BIOS/UEFI test ISO, a tracked physical page allocator with free/reuse and double-free checks, an initial exception IDT, a project-owned GDT, and a cloned DODO-owned four-level page-table tree. A successful QEMU run verified the GDT handoff and reclaimed four bootloader-reclaimable regions (247 pages in that configuration) after invalidating the Limine response pointers. The current CI run also verifies it can allocate a page from one of the reclaimed regions and return it without changing allocator counts. This remains an early kernel prototype, not a desktop OS.
+> **Current status:** DODO has a freestanding x86-64 kernel, a pinned Limine boot path, a BIOS/UEFI test ISO, a tracked physical page allocator, a project-owned GDT/TSS/IDT, and a cloned DODO-owned four-level page-table tree. The latest successful QEMU run also verifies a controlled CPL3 round trip: tiny user code invokes a DPL3 interrupt, returns to the kernel stack, and then fails to read a supervisor-only kernel address as expected. Bootloader-reclaimable memory is adopted only after its response pointers are no longer needed. This remains an early kernel prototype, not a desktop OS or a complete process-isolation system.
 
 ## Project principles
 
@@ -27,12 +27,12 @@ This is a research hypothesis, not a claim of unprecedented invention. Existing 
 ## Current kernel milestone
 
 - **Architecture:** x86-64 long mode, 4-level page tables.
-- **Boot path:** Limine protocol base revision 3, using a pinned upstream binary release verified by SHA-256. DODO installs its own GDT while preserving the selector layout expected at Limine entry, including reserved ring-3 code/data selectors for later privilege transitions.
+- **Boot path:** Limine protocol base revision 3, using a pinned upstream binary release verified by SHA-256. DODO installs its own GDT/TSS while preserving Limine's entry selector layout, provides a dedicated ring-0 interrupt stack, and reserves ring-3 code/data selectors.
 - **Implementation:** freestanding C and x86-64 assembly.
 - **Physical memory:** validates the bootloader map and allocates complete 4 KiB physical frames from usable ranges. A bounded ownership ledger tracks live frames; the allocator can release/reuse them, reject double frees and unknown pages, and add checked, non-overlapping reclaimed regions. After switching to DODO-owned tables and GDT/IDT, the kernel adds Limine's reclaimable regions, proves it can allocate and return a frame from one, and clears response pointers so freed metadata isn't reused accidentally.
 - **Virtual memory:** clones the active four-level page-table tree into DODO-owned frames, switches CR3 to the new root, preserves leaf mappings, and attempts rollback if cloning fails before activation. QEMU currently reports ten cloned table frames for its test memory map.
 - **Page protections:** explicitly enables CR0.WP; when supported, enables EFER.NXE. QEMU tests verify read-only/NX faults, rejection of non-canonical addresses, and refusal to overwrite a present mapping.
-- **Exceptions:** IDT entries for vectors 0–31, fatal exception diagnostics, page-fault CR2 reporting, and tested recovery for intentionally triggered faults.
+- **Exceptions and privilege levels:** IDT entries for vectors 0–31 plus a DPL3 test gate. In QEMU, controlled ring-3 code reaches the kernel through `int 0x80`, returns through a dedicated kernel-stack trampoline, and is blocked from reading supervisor-only kernel memory. This is a single-threaded architecture test, not a scheduler or a production user-process boundary.
 - **Diagnostics:** COM1 serial output.
 - **Test environment:** QEMU before physical hardware.
 - **Safety boundary:** no disk installation, no privileged host access, and no real network tools.
@@ -47,7 +47,7 @@ Read [docs/BUILDING.md](docs/BUILDING.md) before building.
 make test            # host-side physical allocator, free/reuse and capacity tests
 make clean all       # build kernel and bootable test ISO
 make run             # launch the ISO in QEMU
-make qemu-smoke      # verify boot, page protections, and exception recovery
+make qemu-smoke      # verify boot, memory protections, and the CPL3 test
 ~~~
 
 The prototype prints diagnostic messages over COM1 serial output and eventually halts after its self-tests. A blank graphical display is expected: DODO does not yet have graphics support or a desktop.
@@ -58,7 +58,7 @@ See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE
 
 1. **Kernel bring-up:** repeatable boot, serial diagnostics, and exception handling.
 2. **Memory:** DODO owns a cloned four-level page-table tree; next are frame reclamation/ownership, a full virtual-memory manager, and guard pages.
-3. **Isolation primitives:** user/kernel separation, IPC, scheduler, and capability enforcement.
+3. **Isolation primitives:** the first CPL3 transition and supervisor-memory denial are verified; next are independent process address spaces, controlled syscalls, IPC, a scheduler, and capability enforcement.
 4. **SOMBRA prototype:** isolated workload, change journal, review, and discard tests.
 5. **Useful system services:** storage, networking, input, graphics, and update/recovery.
 6. **Daily-use evaluation:** hardware support, reliability, usability, application strategy, and independent testing.
