@@ -76,10 +76,12 @@ static volatile uint64_t expected_page_fault_kind = 0;
 static volatile uint64_t user_mode_test_armed = 0;
 static volatile uint64_t user_mode_return_marker = 0;
 static volatile uint64_t user_supervisor_read_test_passed = 0;
+static volatile uint64_t user_cross_root_isolation_passed = 0;
 
 #define DODO_EXPECT_WRITE_FAULT UINT64_C(1)
 #define DODO_EXPECT_EXECUTE_FAULT UINT64_C(2)
 #define DODO_EXPECT_USER_SUPERVISOR_FAULT UINT64_C(3)
+#define DODO_EXPECT_USER_UNMAPPED_FAULT UINT64_C(4)
 
 static const char *const exception_names[32] = {
     "Divide Error",
@@ -315,6 +317,15 @@ int dodo_x86_64_exception_handler(
                 page_fault_selftest_armed = 0;
                 user_supervisor_read_test_passed = 1;
                 serial_write("DODO: ring-3 read of supervisor memory was blocked\\n");
+                return DODO_EXCEPTION_RETURN_TO_KERNEL;
+            }
+
+            if (expected_page_fault_kind == DODO_EXPECT_USER_UNMAPPED_FAULT &&
+                (frame->cs & UINT64_C(3)) == UINT64_C(3) &&
+                (error & UINT64_C(0x7)) == UINT64_C(0x4)) {
+                page_fault_selftest_armed = 0;
+                user_cross_root_isolation_passed = 1;
+                serial_write("DODO: second user root could not read first root mapping\\n");
                 return DODO_EXCEPTION_RETURN_TO_KERNEL;
             }
         }
