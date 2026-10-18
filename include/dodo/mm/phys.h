@@ -66,4 +66,14 @@ enum dodo_phys_status dodo_phys_free_page(
     struct dodo_phys_allocator *allocator,
     uint64_t physical_address);
 
+/*
+ * Add a page-aligned region that the kernel has independently proven safe
+ * to reclaim (for example, Limine bootloader-reclaimable memory after all
+ * response pointers and bootloader tables are no longer used).
+ */
+enum dodo_phys_status dodo_phys_add_region(
+    struct dodo_phys_allocator *allocator,
+    uint64_t base,
+    uint64_t length);
+
 #endif
