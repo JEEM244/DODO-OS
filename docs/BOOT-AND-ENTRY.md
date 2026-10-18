@@ -35,7 +35,7 @@ include/dodo/mm/phys.h exposes the bootstrap allocator interface; src/mm/phys.c 
 
 include/dodo/arch/x86_64/paging.h and src/arch/x86_64/paging.c provide a deliberately small x86-64 mapping primitive.
 
-- Copies the current CR3 PML4 into a new frame allocated by DODO, activates that root, and uses the Limine HHDM to access the inherited lower-level table frames.
+- Recursively clones the four-level table hierarchy into DODO-owned frames, preserves leaf mappings, handles shared references and recursive root mappings, and activates the new root only after the copy succeeds. Uses the Limine HHDM to access source and destination tables during bootstrap.
 - Supports four-level paging only; rejects LA57 (five-level paging).
 - Maps one aligned 4 KiB page in an unused kernel PML4 slot and never overwrites an existing leaf mapping.
 - Rejects unsupported flags, invalid/unaligned addresses, huge-page conflicts, conflicting parent permissions and repeated table frames.
@@ -49,7 +49,7 @@ The QEMU smoke test proves the specific assertions in this path:
 - instruction fetch through an NX mapping is blocked when NX is supported;
 - the handler resumes only the intentionally triggered faults.
 
-DODO owns the active PML4 root but still inherits the subordinate page-table hierarchy. This is not a complete virtual-memory system: no full subordinate-table ownership, user-mode spaces, allocation reclamation, demand paging, copy-on-write, or guard-page stack allocator exists yet.
+DODO owns a clone of the four-level page-table hierarchy, but retains the same leaf physical mappings and does not reclaim the previous tree. This is not a complete virtual-memory system: no frame reclamation, per-process spaces, demand paging, copy-on-write, or guard-page stack allocator exists yet.
 
 ## Early exception IDT
 
@@ -73,6 +73,6 @@ These segment flags are defense in depth. Later memory-management work must pres
 
 - COM1 is used for diagnostics; there is no terminal service.
 - There is no timer or external interrupt delivery.
-- DODO owns the top-level PML4 root but preserves Limine's current subordinate mappings; it does not yet own a fully independent page-table tree.
+- DODO owns the cloned page-table structure but preserves Limine's leaf mappings and HHDM layout; it does not yet maintain its own physical-frame reclamation or per-process mapping policy.
 - There is no user mode, scheduler, IPC, capability enforcement, filesystem, network stack, or GUI.
 - The QEMU smoke test covers the tested paths only; it does not establish that DODO is secure or suitable for daily use.
