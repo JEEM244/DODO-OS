@@ -110,14 +110,32 @@ static const char *const exception_names[32] = {
     "Reserved Exception"
 };
 
+struct dodo_paging_frame_context {
+    struct dodo_phys_allocator *allocator;
+    uint64_t allocation_limit;
+    uint64_t successful_allocations;
+};
+
 static int allocate_paging_frame(void *context, uint64_t *physical_address) {
     if (context == NULL || physical_address == NULL) {
         return 0;
     }
 
-    struct dodo_phys_allocator *allocator =
-        (struct dodo_phys_allocator *)context;
-    return dodo_phys_alloc_page(allocator, physical_address) == DODO_PHYS_OK;
+    struct dodo_paging_frame_context *frame_context =
+        (struct dodo_paging_frame_context *)context;
+    if (frame_context->allocator == NULL ||
+        frame_context->successful_allocations >=
+            frame_context->allocation_limit) {
+        return 0;
+    }
+
+    if (dodo_phys_alloc_page(frame_context->allocator, physical_address) !=
+        DODO_PHYS_OK) {
+        return 0;
+    }
+
+    frame_context->successful_allocations++;
+    return 1;
 }
 
 static int release_paging_frame(void *context, uint64_t physical_address) {
@@ -125,9 +143,14 @@ static int release_paging_frame(void *context, uint64_t physical_address) {
         return 0;
     }
 
-    struct dodo_phys_allocator *allocator =
-        (struct dodo_phys_allocator *)context;
-    return dodo_phys_free_page(allocator, physical_address) == DODO_PHYS_OK;
+    struct dodo_paging_frame_context *frame_context =
+        (struct dodo_paging_frame_context *)context;
+    if (frame_context->allocator == NULL) {
+        return 0;
+    }
+
+    return dodo_phys_free_page(frame_context->allocator, physical_address) ==
+        DODO_PHYS_OK;
 }
 
 static inline void outb(uint16_t port, uint8_t value) {
@@ -358,14 +381,44 @@ static void test_virtual_mapping(void) {
     serial_write(dodo_x86_64_nx_enabled() ? "enabled\n" : "not available\n");
 
     /*
+     * First inject a deterministic allocation failure into a disposable clone.
+     * The CR3 root must stay untouched and every temporary frame must return to
+     * the allocator before we try the real page-table clone.
+     */
+    const uint64_t free_pages_before_failure = physical_allocator.free_pages;
+    const uint64_t allocated_pages_before_failure =
+        physical_allocator.allocated_pages;
+    struct dodo_paging_frame_context failure_context = {
+        .allocator = &physical_allocator,
+        .allocation_limit = 2,
+        .successful_allocations = 0
+    };
+    uint64_t discarded_root = 0;
+    uint64_t discarded_tables = 0;
+    status = dodo_x86_64_paging_clone_tree(
+        allocate_paging_frame, release_paging_frame, &failure_context,
+        &discarded_root, &discarded_tables);
+    if (status != DODO_PAGING_NO_TABLE_FRAMES ||
+        physical_allocator.free_pages != free_pages_before_failure ||
+        physical_allocator.allocated_pages != allocated_pages_before_failure) {
+        report_boot_error("failed page-table clone did not roll back all frames");
+    }
+    serial_write("DODO: page-table clone rollback self-check passed\\n");
+
+    /*
      * Clone the complete page-table hierarchy into DODO-owned frames. The leaf
      * mappings keep their physical targets, so kernel text, stack, HHDM,
      * response structures and IDT remain reachable across the CR3 switch.
      */
+    struct dodo_paging_frame_context normal_context = {
+        .allocator = &physical_allocator,
+        .allocation_limit = UINT64_MAX,
+        .successful_allocations = 0
+    };
     uint64_t new_root_physical = 0;
     uint64_t tables_cloned = 0;
     status = dodo_x86_64_paging_clone_tree(
-        allocate_paging_frame, release_paging_frame, &physical_allocator,
+        allocate_paging_frame, release_paging_frame, &normal_context,
         &new_root_physical, &tables_cloned);
     if (status != DODO_PAGING_OK) {
         serial_write("DODO: page-table tree clone error code = ");
