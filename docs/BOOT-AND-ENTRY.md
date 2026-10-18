@@ -8,10 +8,11 @@
 4. The assembly entry disables maskable interrupts, installs DODO's bootstrap stack, clears the frame pointer, and calls kernel_main.
 5. The kernel initializes COM1 and loads a project-owned IDT for CPU exception vectors 0–31.
 6. The kernel validates the base protocol revision, memory-map response and HHDM response.
-7. DODO's physical allocator prepares complete usable 4 KiB frames. Five pages are reserved for page-table, mapping, and protection tests.
+7. DODO's physical allocator prepares complete usable 4 KiB frames. Five pages are reserved for table/mapping/protection self-tests, and another frame is allocated for DODO's PML4 root.
 8. The paging helpers read CR3, verify four-level paging (rejecting LA57), enable CR0.WP, and enable EFER.NXE when the CPU supports it.
-9. DODO creates a mapping in an unused kernel PML4 slot backed by reserved page frames. It verifies alias consistency, then intentionally tests read-only and NX enforcement.
-10. An INT3 test verifies exception dispatch and return through iretq. The kernel halts after successful bootstrap checks.
+9. DODO copies the current PML4 entries to its own allocated root frame and activates it with CR3. This preserves current mappings but continues to use the inherited lower-level tables.
+10. DODO creates mappings in an unused kernel PML4 slot. It verifies alias consistency, rejects an attempt to replace an existing mapping and a non-canonical address, then intentionally tests read-only and NX enforcement.
+11. An INT3 test verifies exception dispatch and return through iretq. The kernel halts after successful bootstrap checks.
 
 ## Protocol contract
 
@@ -34,7 +35,7 @@ include/dodo/mm/phys.h exposes the bootstrap allocator interface; src/mm/phys.c 
 
 include/dodo/arch/x86_64/paging.h and src/arch/x86_64/paging.c provide a deliberately small x86-64 mapping primitive.
 
-- Uses the active page-table root given by CR3 and physical table addresses via the Limine HHDM.
+- Copies the current CR3 PML4 into a new frame allocated by DODO, activates that root, and uses the Limine HHDM to access the inherited lower-level table frames.
 - Supports four-level paging only; rejects LA57 (five-level paging).
 - Maps one aligned 4 KiB page in an unused kernel PML4 slot and never overwrites an existing leaf mapping.
 - Rejects unsupported flags, invalid/unaligned addresses, huge-page conflicts, conflicting parent permissions and repeated table frames.
@@ -48,7 +49,7 @@ The QEMU smoke test proves the specific assertions in this path:
 - instruction fetch through an NX mapping is blocked when NX is supported;
 - the handler resumes only the intentionally triggered faults.
 
-The mapper extends Limine's existing page tables rather than creating DODO's own root. It is not a complete virtual-memory system: no page-table ownership, user-mode spaces, allocation reclamation, demand paging, copy-on-write, or guard-page stack allocator exists yet.
+DODO owns the active PML4 root but still inherits the subordinate page-table hierarchy. This is not a complete virtual-memory system: no full subordinate-table ownership, user-mode spaces, allocation reclamation, demand paging, copy-on-write, or guard-page stack allocator exists yet.
 
 ## Early exception IDT
 
@@ -72,6 +73,6 @@ These segment flags are defense in depth. Later memory-management work must pres
 
 - COM1 is used for diagnostics; there is no terminal service.
 - There is no timer or external interrupt delivery.
-- DODO does not yet own its page-table root and relies on the bootloader's mappings.
+- DODO owns the top-level PML4 root but preserves Limine's current subordinate mappings; it does not yet own a fully independent page-table tree.
 - There is no user mode, scheduler, IPC, capability enforcement, filesystem, network stack, or GUI.
 - The QEMU smoke test covers the tested paths only; it does not establish that DODO is secure or suitable for daily use.
