@@ -176,6 +176,9 @@ static struct dodo_page_table_clone_entry
     page_table_clone_cache[DODO_MAX_CLONED_TABLES];
 static uint64_t page_table_clone_count;
 
+/* Forward declaration: user-region discovery appears before the mapper helpers. */
+static enum dodo_paging_status get_root_table(volatile uint64_t **root_table);
+
 static enum dodo_paging_status clone_page_table(
     uint64_t old_physical,
     uint64_t level,
