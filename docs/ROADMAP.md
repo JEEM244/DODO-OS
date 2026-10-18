@@ -16,7 +16,8 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 ## M1 — CPU and diagnostics
 
 - [x] Install a project-owned GDT while preserving Limine's initial selector layout and reserve user-mode code/data descriptors.
-- [x] Install an initial IDT for CPU exception vectors 0–31.
+- [x] Install the TSS with a dedicated RSP0 stack for privilege transitions.
+- [x] Install an initial IDT for CPU exception vectors 0–31 and a controlled DPL3 interrupt gate.
 - [x] Normalize exception stack frames and report breakpoint/page-fault details.
 - [x] Add a QEMU breakpoint self-test which resumes through iretq.
 - [x] Test controlled read-only and NX page faults, resuming only explicitly armed test cases.
@@ -24,7 +25,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [ ] Add a timer interrupt and deterministic timer test hooks.
 - [ ] Add tests for more fatal exception paths, including an intentional page fault outside the armed self-test.
 
-**Acceptance:** tested INT3, read-only write, and NX instruction-fetch faults produce expected diagnostics; only the explicitly armed protection tests resume. Other exceptions remain fatal. This does not mean the entire exception model is complete.
+**Acceptance:** tested INT3, read-only write, NX instruction-fetch, and the armed ring-3 supervisor-read fault produce the expected results; only explicitly armed tests resume. Other exceptions remain fatal. This does not mean the entire exception model is complete.
 
 ## M2 — Memory
 
@@ -51,14 +52,15 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 
 ## M3 — Isolation primitives
 
-- [ ] Implement a verified privilege-level transition using the reserved ring-3 GDT selectors.
-- [ ] User/kernel privilege separation and user stack setup.
-- [ ] Process address spaces.
+- [x] Add a controlled, single-threaded CPL3 entry/return probe using the TSS RSP0 stack and reserved selectors.
+- [x] Verify CPL3 can reach only the armed DPL3 test gate and cannot read the tested supervisor-only kernel address.
+- [ ] Replace global one-shot test state with per-thread/per-process trap context and independent kernel stacks.
+- [ ] Build independent process address spaces and safe user-page allocation/reclamation.
 - [ ] Context switching and scheduler.
 - [ ] IPC with validated message boundaries.
 - [ ] Capability table and deny-by-default resource access.
 
-**Acceptance:** a test process cannot read another process's memory or use a resource without a capability.
+**Acceptance:** independent test processes cannot read each other's mappings or use a resource without an explicit capability. The current CPL3 probe is only a first ring-transition proof and does not yet meet this acceptance criterion.
 
 ## M4 — DODO SOMBRA prototype
 
