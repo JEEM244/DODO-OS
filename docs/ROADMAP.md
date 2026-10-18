@@ -64,7 +64,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [ ] IPC with validated message boundaries.
 - [ ] Capability table and deny-by-default resource access.
 
-**Acceptance:** independent test processes cannot read each other's mappings or use a resource without an explicit capability. QEMU now verifies a controlled cross-root read denial and test-specific frame cleanup, but there is no reusable per-process lifecycle, per-process kernel stack ownership, scheduler, or capability model yet.
+**Acceptance:** independent test processes cannot read each other's mappings or use a resource without an explicit capability. QEMU now verifies a controlled cross-root read denial and test-specific frame cleanup with allocator accounting restored to baseline, but there is no reusable per-process lifecycle, per-process kernel stack ownership, scheduler, or capability model yet.
 
 ## M4 — DODO SOMBRA prototype
 
