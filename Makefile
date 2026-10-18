@@ -23,11 +23,12 @@ LDFLAGS := -nostdlib -z max-page-size=0x1000 -T linker/x86_64.ld
 
 HEADERS := include/dodo/boot/limine_protocol.h \
            include/dodo/mm/phys.h \
+           include/dodo/arch/x86_64/gdt.h \
            include/dodo/arch/x86_64/interrupts.h \
            include/dodo/arch/x86_64/paging.h
-OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/idt.o \
-           $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o $(BUILD_DIR)/interrupts.o \
-           $(BUILD_DIR)/paging_test.o
+OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/gdt.o \
+           $(BUILD_DIR)/idt.o $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o \
+           $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/paging_test.o
 PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
 
 .PHONY: all kernel iso run qemu-smoke test-phys test clean check-tools
@@ -50,6 +51,9 @@ $(BUILD_DIR)/main.o: src/kernel/main.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/phys.o: src/mm/phys.c $(HEADERS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/gdt.o: src/arch/x86_64/gdt.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/idt.o: src/arch/x86_64/idt.c $(HEADERS) | $(BUILD_DIR)
@@ -131,6 +135,7 @@ qemu-smoke: $(ISO_IMAGE)
 	fi; \
 	grep -Fq "DODO OS: kernel reached entry point" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: Limine base revision accepted" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: own GDT loaded; kernel and user selectors verified" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: memory map received" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: physical allocator self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: page-table clone rollback self-check passed" $(BUILD_DIR)/qemu-serial.log; \
