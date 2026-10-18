@@ -5,7 +5,7 @@
 
 /*
  * Minimal DODO-owned declarations for the Limine boot protocol.
- * These types describe the documented wire/ABI layout; they are not a
+ * These types describe the documented request/response ABI; they are not a
  * vendored implementation of the Limine bootloader.
  */
 
@@ -27,6 +27,17 @@ struct dodo_limine_memmap_request {
     uint64_t id[4];
     uint64_t revision;
     struct dodo_limine_memmap_response *response;
+};
+
+struct dodo_limine_hhdm_response {
+    uint64_t revision;
+    uint64_t offset;
+};
+
+struct dodo_limine_hhdm_request {
+    uint64_t id[4];
+    uint64_t revision;
+    struct dodo_limine_hhdm_response *response;
 };
 
 #endif
