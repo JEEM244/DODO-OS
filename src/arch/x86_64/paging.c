@@ -368,12 +368,13 @@ enum dodo_paging_status dodo_x86_64_paging_create_user_root(
     zero_physical_page(user_root);
     for (uint64_t index = DODO_PML4_FIRST_KERNEL_SLOT;
          index < UINT64_C(512); ++index) {
-        user_root[index] = kernel_root[index];
-        if ((user_root[index] & DODO_PTE_USER) != 0u) {
-            /* A user-accessible top-level kernel mapping would defeat isolation. */
-            zero_physical_page(user_root);
-            return DODO_PAGING_PERMISSION_CONFLICT;
-        }
+        /*
+         * Force every PML4 entry in the higher half to supervisor-only.
+         * Even if the firmware's top-level entry permits U/S, clearing this
+         * bit ensures CPL3 cannot access any leaf reached through that slot.
+         * CPL0 can still use the inherited mappings normally.
+         */
+        user_root[index] = kernel_root[index] & ~DODO_PTE_USER;
     }
 
     return DODO_PAGING_OK;
