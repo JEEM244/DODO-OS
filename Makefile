@@ -7,12 +7,12 @@ KERNEL_ELF := $(BUILD_DIR)/dodo-kernel.elf
 ISO_IMAGE := $(BUILD_DIR)/dodo-os.iso
 ISO_ROOT := $(BUILD_DIR)/iso_root
 
-# Pin the bootloader release and its published binary archive checksum so builds
-# do not silently change when a new upstream release appears.
+# Pin the bootloader release and its published binary archive checksum.
 LIMINE_VERSION := 12.9.3
 LIMINE_SHA256 := 9f42fe9ea2e84d71056529969b1d5c24ba9a2287ffcc01bcce58b0ef8aa98b1d
 LIMINE_ARCHIVE := $(BUILD_DIR)/limine-binary.tar.gz
 LIMINE_DIR := $(BUILD_DIR)/limine-binary
+LIMINE_STAMP := $(LIMINE_DIR)/.extracted
 LIMINE_URL := https://github.com/Limine-Bootloader/Limine/releases/download/v$(LIMINE_VERSION)/limine-binary.tar.gz
 
 CFLAGS := -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -Iinclude \
@@ -54,25 +54,24 @@ $(LIMINE_ARCHIVE): | $(BUILD_DIR)
 	curl --fail --location --retry 3 --output $@ "$(LIMINE_URL)"
 	echo "$(LIMINE_SHA256)  $@" | sha256sum --check -
 
-$(LIMINE_DIR)/limine.c: $(LIMINE_ARCHIVE)
+# The archive preserves upstream timestamps. Use a stamp so make does not
+# delete/re-extract the bootloader on every subsequent invocation.
+$(LIMINE_STAMP): $(LIMINE_ARCHIVE)
 	rm -rf $(LIMINE_DIR)
 	tar -xzf $< -C $(BUILD_DIR)
-	test -f $@
+	test -f $(LIMINE_DIR)/limine.c
+	test -f $(LIMINE_DIR)/limine-bios.sys
+	test -f $(LIMINE_DIR)/limine-bios-cd.bin
+	test -f $(LIMINE_DIR)/limine-uefi-cd.bin
+	test -f $(LIMINE_DIR)/BOOTX64.EFI
+	test -f $(LIMINE_DIR)/BOOTIA32.EFI
+	touch $@
 
-# Extraction above provides all assets from the pinned archive.
-$(LIMINE_DIR)/limine-bios.sys $(LIMINE_DIR)/limine-bios-cd.bin \
-$(LIMINE_DIR)/limine-uefi-cd.bin $(LIMINE_DIR)/BOOTX64.EFI \
-$(LIMINE_DIR)/BOOTIA32.EFI: $(LIMINE_DIR)/limine.c
-	@test -f $@
-
-$(LIMINE_DIR)/limine: $(LIMINE_DIR)/limine.c
+$(LIMINE_DIR)/limine: $(LIMINE_STAMP)
 	$(MAKE) -C $(LIMINE_DIR) CC="$(HOST_CC)"
 	test -x $@
 
-$(ISO_IMAGE): $(KERNEL_ELF) config/limine.conf \
-              $(LIMINE_DIR)/limine $(LIMINE_DIR)/limine-bios.sys \
-              $(LIMINE_DIR)/limine-bios-cd.bin $(LIMINE_DIR)/limine-uefi-cd.bin \
-              $(LIMINE_DIR)/BOOTX64.EFI $(LIMINE_DIR)/BOOTIA32.EFI
+$(ISO_IMAGE): $(KERNEL_ELF) config/limine.conf $(LIMINE_STAMP) $(LIMINE_DIR)/limine
 	rm -rf $(ISO_ROOT)
 	mkdir -p $(ISO_ROOT)/boot/limine $(ISO_ROOT)/EFI/BOOT
 	cp $(KERNEL_ELF) $(ISO_ROOT)/boot/dodo-kernel.elf
@@ -103,7 +102,7 @@ qemu-smoke: $(ISO_IMAGE)
 	if [ $$status -ne 124 ] && [ $$status -ne 0 ]; then \
 		echo "QEMU exited unexpectedly with status $$status" >&2; exit $$status; \
 	fi; \
-	grep -Fq "DODO: kernel reached entry point" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO OS: kernel reached entry point" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: Limine base revision accepted" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: memory map accepted" $(BUILD_DIR)/qemu-serial.log
 
