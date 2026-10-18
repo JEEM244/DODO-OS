@@ -12,7 +12,7 @@ DODO is an original operating-system research project intended to become a daily
 - Build products: a kernel ELF with no host C runtime dependency and a bootable test ISO.
 - Initial diagnostics: COM1 serial console.
 - Boot protocol: Limine base revision 3, with a pinned binary release and SHA-256 verification. Limine is a bootstrap dependency; DODO's kernel is project-owned.
-- Current boot path: validate protocol and memory-map responses, initialize a bootstrap physical page allocator, install an initial exception IDT, and run controlled CPU/memory protection tests.
+- Current boot path: validate protocol and memory-map responses, initialize a bootstrap physical page allocator, install an initial exception IDT, take ownership of a copied PML4 root, and run controlled CPU/memory protection tests.
 
 ## Layers
 
@@ -37,7 +37,7 @@ The current bootstrap reserves five page frames: three for intermediate page tab
 
 ## Virtual memory and permissions
 
-The x86-64 paging helper reads the active CR3 root and uses the Limine higher-half direct map to inspect and initialize page-table pages. It refuses unsupported five-level paging, invalid addresses, unknown flags, huge-page collisions, conflicting parent permissions, existing leaf mappings, and reused or unaligned table frames.
+The x86-64 paging helper first reads the CR3 root provided by Limine and uses the higher-half direct map to access page-table pages. During bootstrap, DODO allocates a new physical frame, copies all 512 top-level entries, and activates that frame as DODO's own PML4 root. The previous root is not reclaimed. Lower-level tables are intentionally inherited until DODO has a complete ownership and reclamation policy. The mapper refuses unsupported five-level paging, invalid addresses, unknown flags, huge-page collisions, conflicting parent permissions, existing leaf mappings, and reused or unaligned table frames.
 
 It maps a test page into an unused kernel PML4 slot. The QEMU self-test verifies that the direct-map alias and the new virtual alias see the same contents.
 
@@ -49,10 +49,10 @@ Before enforcing supervisor read-only checks, DODO enables CR0.WP. If the CPU su
 Unhandled page faults remain fatal. These tests cover particular paths in QEMU; they are not a complete virtual-memory manager or a comprehensive security proof.
 
 Current limitations:
-- DODO does not yet create and own its own top-level page-table root.
-- The bootstrap still relies on Limine's active mappings and the higher-half direct map.
+- DODO now owns the active top-level PML4 root, but the lower-level page-table hierarchy is inherited from Limine.
+- The bootstrap still relies on inherited mappings and the higher-half direct map. It does not yet build a fully independent mapping hierarchy.
 - There is no virtual-memory area manager, allocation reclamation, demand paging, copy-on-write, per-process address space, or guard-page stack allocator.
-- Existing page tables are extended only in an empty kernel PML4 slot; the mapper intentionally never overwrites a present leaf.
+- DODO adds test mappings only in an unused kernel PML4 slot; the mapper intentionally never overwrites a present leaf.
 
 ## Exception handling
 
