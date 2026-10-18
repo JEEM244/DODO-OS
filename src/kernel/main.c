@@ -4,6 +4,7 @@
 #include "dodo/arch/x86_64/gdt.h"
 #include "dodo/arch/x86_64/interrupts.h"
 #include "dodo/arch/x86_64/paging.h"
+#include "dodo/arch/x86_64/user_mode.h"
 #include "dodo/boot/limine_protocol.h"
 #include "dodo/mm/phys.h"
 
@@ -72,9 +73,13 @@ static volatile uint64_t breakpoint_selftest_armed = 0;
 static volatile uint64_t page_fault_selftest_armed = 0;
 static volatile uint64_t expected_page_fault_address = 0;
 static volatile uint64_t expected_page_fault_kind = 0;
+static volatile uint64_t user_mode_test_armed = 0;
+static volatile uint64_t user_mode_return_marker = 0;
+static volatile uint64_t user_supervisor_read_test_passed = 0;
 
 #define DODO_EXPECT_WRITE_FAULT UINT64_C(1)
 #define DODO_EXPECT_EXECUTE_FAULT UINT64_C(2)
+#define DODO_EXPECT_USER_SUPERVISOR_FAULT UINT64_C(3)
 
 static const char *const exception_names[32] = {
     "Divide Error",
@@ -237,8 +242,35 @@ static void report_boot_error(const char *message) {
 
 int dodo_x86_64_exception_handler(
     struct dodo_x86_64_exception_frame *frame) {
-    if (frame == NULL || frame->vector >= 32u) {
-        serial_write("DODO: FATAL: invalid exception frame\n");
+    if (frame == NULL) {
+        serial_write("DODO: FATAL: null exception frame\\n");
+        return 0;
+    }
+
+    /*
+     * This DPL3 gate exists only for the ring-3 architecture self-test.
+     * Returning to CPL0 targets a trampoline that restores the saved kernel
+     * stack, because IRETQ to the same privilege level doesn't pop user RSP/SS.
+     */
+    if (frame->vector == DODO_X86_64_USER_TEST_VECTOR) {
+        if (user_mode_test_armed != 0u &&
+            (frame->cs & UINT64_C(3)) == UINT64_C(3) &&
+            frame->rax == DODO_X86_64_USER_TEST_MAGIC) {
+            user_mode_test_armed = 0;
+            user_mode_return_marker = frame->rax;
+            frame->rip = (uint64_t)(uintptr_t)dodo_x86_64_user_return_trampoline;
+            frame->cs = DODO_X86_64_KERNEL_CODE_SELECTOR;
+            frame->rflags = UINT64_C(2); /* Keep external interrupts disabled. */
+            serial_write("DODO: ring-3 software interrupt reached kernel handler\\n");
+            return 1;
+        }
+
+        serial_write("DODO: FATAL: unexpected vector-128 software interrupt\\n");
+        return 0;
+    }
+
+    if (frame->vector >= 32u) {
+        serial_write("DODO: FATAL: invalid exception vector\\n");
         return 0;
     }
 
@@ -246,14 +278,14 @@ int dodo_x86_64_exception_handler(
         breakpoint_selftest_armed = 0;
         serial_write("DODO: IDT breakpoint self-check passed; RIP=");
         serial_write_hex64(frame->rip);
-        serial_write("\n");
+        serial_write("\\n");
         return 1;
     }
 
     /*
-     * Only resume a page fault when the explicitly armed probe faulted at the
-     * exact expected address and the CPU error code matches the expected case.
-     * All other page faults remain fatal.
+     * Only resume a page fault when it occurred at the exact address and with
+     * access bits expected by the explicitly armed test. Every other fault is
+     * fatal, including any unexpected page fault while executing user code.
      */
     if (frame->vector == 14u && page_fault_selftest_armed != 0u) {
         uint64_t fault_address;
@@ -266,7 +298,7 @@ int dodo_x86_64_exception_handler(
                 page_fault_selftest_armed = 0;
                 frame->rip = (uint64_t)(uintptr_t)
                     dodo_x86_64_readonly_write_fault_resume;
-                serial_write("DODO: read-only page write was blocked\n");
+                serial_write("DODO: read-only page write was blocked\\n");
                 return 1;
             }
 
@@ -276,7 +308,19 @@ int dodo_x86_64_exception_handler(
                 page_fault_selftest_armed = 0;
                 frame->rip = (uint64_t)(uintptr_t)
                     dodo_x86_64_nx_execute_fault_resume;
-                serial_write("DODO: NX instruction fetch was blocked\n");
+                serial_write("DODO: NX instruction fetch was blocked\\n");
+                return 1;
+            }
+
+            if (expected_page_fault_kind == DODO_EXPECT_USER_SUPERVISOR_FAULT &&
+                (frame->cs & UINT64_C(3)) == UINT64_C(3) &&
+                (error & UINT64_C(0x7)) == UINT64_C(0x5)) {
+                page_fault_selftest_armed = 0;
+                user_supervisor_read_test_passed = 1;
+                frame->rip = (uint64_t)(uintptr_t)dodo_x86_64_user_return_trampoline;
+                frame->cs = DODO_X86_64_KERNEL_CODE_SELECTOR;
+                frame->rflags = UINT64_C(2);
+                serial_write("DODO: ring-3 read of supervisor memory was blocked\\n");
                 return 1;
             }
         }
@@ -286,18 +330,18 @@ int dodo_x86_64_exception_handler(
     serial_write(exception_names[frame->vector]);
     serial_write(" (vector ");
     serial_write_u64(frame->vector);
-    serial_write(")\nDODO: error code = ");
+    serial_write(")\\nDODO: error code = ");
     serial_write_hex64(frame->error_code);
-    serial_write("\nDODO: instruction pointer = ");
+    serial_write("\\nDODO: instruction pointer = ");
     serial_write_hex64(frame->rip);
-    serial_write("\n");
+    serial_write("\\n");
 
     if (frame->vector == 14u) {
         uint64_t fault_address;
         __asm__ volatile ("mov %%cr2, %0" : "=r"(fault_address));
         serial_write("DODO: page-fault address = ");
         serial_write_hex64(fault_address);
-        serial_write("\n");
+        serial_write("\\n");
     }
 
     return 0;
