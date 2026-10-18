@@ -1,17 +1,18 @@
-# DODO OS architecture (draft 0.1)
+# DODO OS architecture (draft 0.2)
 
 ## Goals
 
-DODO is an original operating-system research project intended to become a daily-use desktop with security integrated into its architecture. It is not currently a working OS. This document records design decisions and open questions, not implemented guarantees.
+DODO is an original operating-system research project intended to become a daily-use desktop with security integrated into its architecture. It is not currently a usable desktop OS. This document records design decisions and open questions, not implemented guarantees.
 
 ## Initial platform
 
 - CPU mode: x86-64 long mode.
-- First execution target: QEMU.
+- First execution target: QEMU; physical PCs come later.
 - Initial kernel language: freestanding C; assembly only for architecture-specific entry and low-level operations.
-- Build products: a kernel ELF with no host C runtime dependency.
-- Initial diagnostics: serial console (COM1).
-- Boot protocol: select and integrate a documented x86-64 boot protocol after the minimal kernel build is repeatable. The first scaffold is not yet a bootable image.
+- Build products: a kernel ELF with no host C runtime dependency and a bootable test ISO.
+- Initial diagnostics: COM1 serial console.
+- Boot protocol: Limine base revision 3, with a pinned binary release and SHA-256 verification. Limine is a bootstrap dependency; DODO's kernel is project-owned.
+- Current boot milestone: validate the protocol handoff and memory-map response, initialize a bootstrap physical page allocator, retain four allocated frames for the next memory-management steps, and halt.
 
 ## Layers
 
@@ -21,6 +22,12 @@ DODO is an original operating-system research project intended to become a daily
 4. **DODO SOMBRA (research):** isolated workloads, resource-access records, change review, and discard/commit workflows.
 5. **Desktop and applications:** daily-use workflows, settings, file manager, browser strategy, development tools, and accessibility.
 6. **DODO Web (future):** a browser-facing workspace or remote instance using shared APIs. It is not the native kernel running unrestricted inside a browser tab.
+
+## Memory ownership
+
+DODO does not yet own its page tables or virtual-memory mappings. Its bootstrap page allocator returns only physical addresses from complete 4 KiB pages inside ranges marked usable by the Limine memory map. It rejects malformed, overlapping, unaligned, and overflowing ranges instead of trying to guess.
+
+The allocator currently is intentionally simple: no page reclamation, allocation zones, NUMA policies, virtual mappings, zeroing, or ownership transfer. It is a bootstrap component and not an application-facing API.
 
 ## Security model principles
 
