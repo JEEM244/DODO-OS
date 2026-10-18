@@ -1,0 +1,377 @@
+#include <stddef.h>
+#include <stdint.h>
+
+#include "dodo/arch/x86_64/paging.h"
+
+#define DODO_PTE_PRESENT (UINT64_C(1) << 0)
+#define DODO_PTE_WRITABLE (UINT64_C(1) << 1)
+#define DODO_PTE_PAGE_SIZE (UINT64_C(1) << 7)
+#define DODO_PTE_NO_EXECUTE (UINT64_C(1) << 63)
+#define DODO_PTE_ADDRESS_MASK UINT64_C(0x000ffffffffff000)
+#define DODO_PTE_ALLOWED_FLAGS (DODO_PAGE_WRITABLE | DODO_PAGE_WRITE_THROUGH | \
+                                DODO_PAGE_CACHE_DISABLE | DODO_PAGE_GLOBAL | \
+                                DODO_PAGE_NO_EXECUTE)
+#define DODO_PML4_FIRST_KERNEL_SLOT UINT64_C(256)
+#define DODO_PML4_LAST_KERNEL_SLOT UINT64_C(510)
+#define DODO_PML4_SLOT_SHIFT 39u
+#define DODO_PML4_SLOT_SPAN (UINT64_C(1) << DODO_PML4_SLOT_SHIFT)
+#define DODO_HHDM_MINIMUM UINT64_C(0xffff800000000000)
+#define DODO_EFER_MSR UINT32_C(0xc0000080)
+#define DODO_EFER_NXE (UINT64_C(1) << 11)
+#define DODO_CR4_LA57 (UINT64_C(1) << 12)
+#define DODO_MAX_TABLE_FRAMES UINT64_C(3)
+
+static uint64_t hhdm_offset;
+static uint64_t root_table_physical;
+static int paging_initialized;
+static int nx_enabled;
+
+static int is_canonical(uint64_t address) {
+    return address <= UINT64_C(0x00007fffffffffff) ||
+           address >= UINT64_C(0xffff800000000000);
+}
+
+static int physical_to_hhdm(uint64_t physical_address,
+                            volatile uint64_t **virtual_pointer) {
+    if (virtual_pointer == 0 ||
+        physical_address > DODO_PTE_ADDRESS_MASK ||
+        physical_address > UINT64_MAX - hhdm_offset) {
+        return 0;
+    }
+
+    const uint64_t virtual_address = hhdm_offset + physical_address;
+    if (!is_canonical(virtual_address) ||
+        virtual_address < DODO_HHDM_MINIMUM) {
+        return 0;
+    }
+
+    *virtual_pointer = (volatile uint64_t *)(uintptr_t)virtual_address;
+    return 1;
+}
+
+static void zero_physical_page(volatile uint64_t *page) {
+    for (uint64_t i = 0; i < DODO_PAGE_SIZE / sizeof(uint64_t); ++i) {
+        page[i] = 0;
+    }
+}
+
+static uint64_t read_cr3(void) {
+    uint64_t value;
+    __asm__ volatile ("mov %%cr3, %0" : "=r"(value));
+    return value;
+}
+
+static uint64_t read_cr4(void) {
+    uint64_t value;
+    __asm__ volatile ("mov %%cr4, %0" : "=r"(value));
+    return value;
+}
+
+static void cpuid(uint32_t leaf, uint32_t subleaf, uint32_t *a,
+                  uint32_t *b, uint32_t *c, uint32_t *d) {
+    uint32_t eax = leaf;
+    uint32_t ebx;
+    uint32_t ecx = subleaf;
+    uint32_t edx;
+
+    __asm__ volatile ("cpuid"
+                      : "+a"(eax), "=b"(ebx), "+c"(ecx), "=d"(edx));
+    *a = eax;
+    *b = ebx;
+    *c = ecx;
+    *d = edx;
+}
+
+static int probe_and_enable_nx(void) {
+    uint32_t a, b, c, d;
+    cpuid(UINT32_C(1), 0, &a, &b, &c, &d);
+
+    /* EFER is an MSR; do not touch it if CPUID says MSRs are unavailable. */
+    if ((d & (UINT32_C(1) << 5)) == 0) {
+        return 0;
+    }
+
+    cpuid(UINT32_C(0x80000000), 0, &a, &b, &c, &d);
+    if (a < UINT32_C(0x80000001)) {
+        return 0;
+    }
+
+    cpuid(UINT32_C(0x80000001), 0, &a, &b, &c, &d);
+    if ((d & (UINT32_C(1) << 20)) == 0) {
+        return 0;
+    }
+
+    uint32_t low, high;
+    __asm__ volatile ("rdmsr"
+                      : "=a"(low), "=d"(high)
+                      : "c"(DODO_EFER_MSR));
+    uint64_t efer = ((uint64_t)high << 32) | low;
+    efer |= DODO_EFER_NXE;
+    low = (uint32_t)efer;
+    high = (uint32_t)(efer >> 32);
+    __asm__ volatile ("wrmsr"
+                      :
+                      : "c"(DODO_EFER_MSR), "a"(low), "d"(high)
+                      : "memory");
+
+    return 1;
+}
+
+enum dodo_paging_status dodo_x86_64_paging_init(uint64_t offset) {
+    paging_initialized = 0;
+    nx_enabled = 0;
+
+    if ((offset & (DODO_PAGE_SIZE - 1u)) != 0u ||
+        offset < DODO_HHDM_MINIMUM ||
+        !is_canonical(offset)) {
+        return DODO_PAGING_INVALID_HHDM;
+    }
+
+    /* This bootstrap mapper supports the 4-level page tables used by Limine. */
+    if ((read_cr4() & DODO_CR4_LA57) != 0u) {
+        return DODO_PAGING_UNSUPPORTED_MODE;
+    }
+
+    hhdm_offset = offset;
+    root_table_physical = read_cr3() & DODO_PTE_ADDRESS_MASK;
+
+    volatile uint64_t *root_table;
+    if (!physical_to_hhdm(root_table_physical, &root_table)) {
+        return DODO_PAGING_INVALID_HHDM;
+    }
+
+    nx_enabled = probe_and_enable_nx();
+    paging_initialized = 1;
+    return DODO_PAGING_OK;
+}
+
+int dodo_x86_64_nx_enabled(void) {
+    return nx_enabled;
+}
+
+static enum dodo_paging_status get_root_table(volatile uint64_t **root_table) {
+    if (!paging_initialized) {
+        return DODO_PAGING_INVALID_ARGUMENT;
+    }
+    if (!physical_to_hhdm(root_table_physical, root_table)) {
+        return DODO_PAGING_INVALID_HHDM;
+    }
+    return DODO_PAGING_OK;
+}
+
+static enum dodo_paging_status get_or_create_child(
+    volatile uint64_t *parent_entry,
+    uint64_t level,
+    uint64_t mapping_flags,
+    const uint64_t *frame_pool,
+    uint64_t frame_count,
+    uint64_t *frames_used,
+    volatile uint64_t **child_table) {
+    uint64_t entry = *parent_entry;
+
+    if ((entry & DODO_PTE_PRESENT) != 0u) {
+        if (level != 0u && (entry & DODO_PTE_PAGE_SIZE) != 0u) {
+            return DODO_PAGING_HUGE_PAGE_CONFLICT;
+        }
+        if ((mapping_flags & DODO_PAGE_WRITABLE) != 0u &&
+            (entry & DODO_PTE_WRITABLE) == 0u) {
+            return DODO_PAGING_PERMISSION_CONFLICT;
+        }
+        if ((mapping_flags & DODO_PAGE_NO_EXECUTE) == 0u &&
+            (entry & DODO_PTE_NO_EXECUTE) != 0u) {
+            return DODO_PAGING_PERMISSION_CONFLICT;
+        }
+
+        const uint64_t child_physical = entry & DODO_PTE_ADDRESS_MASK;
+        if (!physical_to_hhdm(child_physical, child_table)) {
+            return DODO_PAGING_INVALID_HHDM;
+        }
+        return DODO_PAGING_OK;
+    }
+
+    if (*frames_used >= frame_count) {
+        return DODO_PAGING_NO_TABLE_FRAMES;
+    }
+
+    const uint64_t frame = frame_pool[*frames_used];
+    if ((frame & (DODO_PAGE_SIZE - 1u)) != 0u ||
+        frame > DODO_PTE_ADDRESS_MASK) {
+        return DODO_PAGING_INVALID_ADDRESS;
+    }
+
+    volatile uint64_t *new_table;
+    if (!physical_to_hhdm(frame, &new_table)) {
+        return DODO_PAGING_INVALID_HHDM;
+    }
+    zero_physical_page(new_table);
+
+    /* New intermediate tables are writable; leaf permissions still decide access. */
+    *parent_entry = frame | DODO_PTE_PRESENT | DODO_PTE_WRITABLE;
+    *frames_used += 1u;
+    *child_table = new_table;
+    return DODO_PAGING_OK;
+}
+
+enum dodo_paging_status dodo_x86_64_map_page(
+    uint64_t virtual_address,
+    uint64_t physical_address,
+    uint64_t flags,
+    const uint64_t *page_table_frames,
+    uint64_t page_table_frame_count,
+    uint64_t *frames_used) {
+    if (!paging_initialized || frames_used == 0 ||
+        (page_table_frame_count != 0u && page_table_frames == 0)) {
+        return DODO_PAGING_INVALID_ARGUMENT;
+    }
+
+    *frames_used = 0;
+
+    if (!is_canonical(virtual_address) ||
+        (virtual_address & (DODO_PAGE_SIZE - 1u)) != 0u ||
+        (physical_address & (DODO_PAGE_SIZE - 1u)) != 0u ||
+        physical_address > DODO_PTE_ADDRESS_MASK ||
+        (flags & ~DODO_PTE_ALLOWED_FLAGS) != 0u) {
+        return DODO_PAGING_INVALID_ADDRESS;
+    }
+
+    if (page_table_frame_count > DODO_MAX_TABLE_FRAMES) {
+        return DODO_PAGING_INVALID_ARGUMENT;
+    }
+    if ((flags & DODO_PAGE_NO_EXECUTE) != 0u && !nx_enabled) {
+        return DODO_PAGING_NOT_SUPPORTED;
+    }
+
+    for (uint64_t i = 0; i < page_table_frame_count; ++i) {
+        const uint64_t frame = page_table_frames[i];
+        if ((frame & (DODO_PAGE_SIZE - 1u)) != 0u ||
+            frame > DODO_PTE_ADDRESS_MASK ||
+            frame == physical_address) {
+            return DODO_PAGING_INVALID_ADDRESS;
+        }
+        for (uint64_t j = 0; j < i; ++j) {
+            if (frame == page_table_frames[j]) {
+                return DODO_PAGING_INVALID_ADDRESS;
+            }
+        }
+    }
+
+    volatile uint64_t *table;
+    enum dodo_paging_status status = get_root_table(&table);
+    if (status != DODO_PAGING_OK) {
+        return status;
+    }
+
+    const uint64_t indexes[3] = {
+        (virtual_address >> 39) & UINT64_C(0x1ff),
+        (virtual_address >> 30) & UINT64_C(0x1ff),
+        (virtual_address >> 21) & UINT64_C(0x1ff)
+    };
+
+    for (uint64_t level = 0; level < 3u; ++level) {
+        volatile uint64_t *child = 0;
+        status = get_or_create_child(&table[indexes[level]], level,
+                                     flags, page_table_frames,
+                                     page_table_frame_count, frames_used,
+                                     &child);
+        if (status != DODO_PAGING_OK) {
+            return status;
+        }
+        table = child;
+    }
+
+    const uint64_t leaf_index = (virtual_address >> 12) & UINT64_C(0x1ff);
+    if ((table[leaf_index] & DODO_PTE_PRESENT) != 0u) {
+        return DODO_PAGING_ALREADY_MAPPED;
+    }
+
+    table[leaf_index] = physical_address | DODO_PTE_PRESENT | flags;
+    __asm__ volatile ("invlpg (%0)" : : "r"(virtual_address) : "memory");
+    return DODO_PAGING_OK;
+}
+
+static enum dodo_paging_status find_unused_kernel_slot(uint64_t *virtual_address) {
+    if (virtual_address == 0) {
+        return DODO_PAGING_INVALID_ARGUMENT;
+    }
+
+    volatile uint64_t *root_table;
+    enum dodo_paging_status status = get_root_table(&root_table);
+    if (status != DODO_PAGING_OK) {
+        return status;
+    }
+
+    for (uint64_t index = DODO_PML4_FIRST_KERNEL_SLOT;
+         index <= DODO_PML4_LAST_KERNEL_SLOT; ++index) {
+        if (root_table[index] == 0u) {
+            *virtual_address =
+                DODO_HHDM_MINIMUM +
+                ((index - DODO_PML4_FIRST_KERNEL_SLOT) * DODO_PML4_SLOT_SPAN);
+            return DODO_PAGING_OK;
+        }
+    }
+
+    return DODO_PAGING_NO_FREE_KERNEL_SLOT;
+}
+
+enum dodo_paging_status dodo_x86_64_paging_self_test(
+    const uint64_t frames[4],
+    uint64_t *mapped_virtual_address) {
+    if (frames == 0 || mapped_virtual_address == 0 ||
+        !paging_initialized) {
+        return DODO_PAGING_INVALID_ARGUMENT;
+    }
+
+    for (uint64_t i = 0; i < 4u; ++i) {
+        if ((frames[i] & (DODO_PAGE_SIZE - 1u)) != 0u ||
+            frames[i] > DODO_PTE_ADDRESS_MASK) {
+            return DODO_PAGING_INVALID_ADDRESS;
+        }
+        for (uint64_t j = 0; j < i; ++j) {
+            if (frames[i] == frames[j]) {
+                return DODO_PAGING_INVALID_ADDRESS;
+            }
+        }
+    }
+
+    uint64_t test_virtual_address = 0;
+    enum dodo_paging_status status =
+        find_unused_kernel_slot(&test_virtual_address);
+    if (status != DODO_PAGING_OK) {
+        return status;
+    }
+
+    uint64_t frames_used = 0;
+    const uint64_t flags = DODO_PAGE_WRITABLE |
+        (nx_enabled ? DODO_PAGE_NO_EXECUTE : 0u);
+    status = dodo_x86_64_map_page(test_virtual_address, frames[3],
+                                  flags, frames, 3u, &frames_used);
+    if (status != DODO_PAGING_OK) {
+        return status;
+    }
+    if (frames_used != 3u) {
+        return DODO_PAGING_NO_TABLE_FRAMES;
+    }
+
+    volatile uint64_t *direct_alias;
+    if (!physical_to_hhdm(frames[3], &direct_alias)) {
+        return DODO_PAGING_INVALID_HHDM;
+    }
+
+    volatile uint64_t *mapped_alias =
+        (volatile uint64_t *)(uintptr_t)test_virtual_address;
+    const uint64_t first_pattern = UINT64_C(0xd0d0c0ffee123456);
+    const uint64_t second_pattern = UINT64_C(0x5a5a96a5d00df00d);
+
+    *direct_alias = first_pattern;
+    if (*mapped_alias != first_pattern) {
+        return DODO_PAGING_READBACK_FAILED;
+    }
+
+    *mapped_alias = second_pattern;
+    if (*direct_alias != second_pattern) {
+        return DODO_PAGING_READBACK_FAILED;
+    }
+
+    *mapped_virtual_address = test_virtual_address;
+    return DODO_PAGING_OK;
+}
