@@ -218,8 +218,12 @@ static enum dodo_paging_status clone_page_table(
 
     volatile uint64_t *old_table;
     volatile uint64_t *new_table;
-    if (!physical_to_hhdm(old_physical, &old_table) ||
-        !physical_to_hhdm(allocated_physical, &new_table)) {
+    if (!physical_to_hhdm(old_physical, &old_table)) {
+        (void)release_frame(context, allocated_physical);
+        return DODO_PAGING_INVALID_HHDM;
+    }
+    if (!physical_to_hhdm(allocated_physical, &new_table)) {
+        (void)release_frame(context, allocated_physical);
         return DODO_PAGING_INVALID_HHDM;
     }
 
