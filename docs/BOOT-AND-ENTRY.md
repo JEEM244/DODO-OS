@@ -33,6 +33,7 @@ include/dodo/mm/phys.h exposes the bootstrap allocator interface; src/mm/phys.c 
 - Returns physical addresses only; it does not make them directly dereferenceable, create mappings, or zero data.
 - Has host-side tests covering alignment, malformed maps, overflow, overlap, exhaustion, freeing/reuse, frame zero, added regions, and allocation-ledger capacity.
 - Reclaiming bootloader regions is gated on the caller's lifetime decision; the boot path only does so after activating its own page-table clone and GDT/IDT.
+- The boot path explicitly allocates one frame through the newly added region index, checks that its address lies inside the reclaimed range, frees it again, and verifies the allocator counters remain unchanged.
 
 ## Virtual memory mapper and protection tests
 
