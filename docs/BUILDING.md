@@ -1,6 +1,6 @@
 # Building and testing DODO OS
 
-This guide builds the kernel and a bootable test ISO. The current kernel is a bring-up prototype: it prints diagnostics, validates the Limine handoff, parses the bootloader memory map, and exercises DODO's bootstrap physical page allocator. It does not yet provide a graphical desktop, networking, storage access, user processes, or a usable daily operating system.
+This guide builds the kernel and a bootable test ISO. The current kernel is a bring-up prototype: it validates the Limine handoff and memory map, exercises DODO's bootstrap physical page allocator, installs a minimal exception IDT, and tests breakpoint dispatch and recovery. It does not yet provide a graphical desktop, networking, storage access, user processes, or a usable daily operating system.
 
 ## Requirements
 
@@ -54,7 +54,7 @@ make run
 
 The prototype prints status messages over COM1 serial output, then halts the CPU. A blank graphical display is expected: DODO does not have a graphics driver or desktop yet. The messages appear in the terminal used to run QEMU.
 
-The boot path validates the memory-map response and initializes a simple physical page allocator. It allocates four 4 KiB frames for a bootstrap self-check and retains their addresses as reserved. The allocator returns physical addresses only; it does not yet create virtual mappings or allow those frames to be dereferenced.
+The boot path loads DODO's IDT for exception vectors 0–31, validates the memory map, and initializes a simple physical page allocator. Four 4 KiB frames are allocated for a bootstrap self-check and their addresses are retained as reserved. The kernel then executes an intentional `INT3`, verifies that the handler is reached, and resumes through `iretq`. The allocator returns physical addresses only; it does not yet create virtual mappings or allow those frames to be dereferenced.
 
 For an automated boot check on Linux:
 
@@ -62,7 +62,7 @@ For an automated boot check on Linux:
 make qemu-smoke
 ```
 
-The smoke test boots the ISO for up to 12 seconds, captures the serial log in `build/qemu-serial.log`, and checks that DODO reached its kernel entry point, accepted the requested Limine base revision, received the memory map, and passed the physical allocator self-check. It uses QEMU and does not write to the host's disks.
+The smoke test boots the ISO for up to 12 seconds, captures the serial log in `build/qemu-serial.log`, and checks the boot handoff, memory-map parsing, allocator self-check, IDT installation, and breakpoint recovery. It uses QEMU and does not write to the host's disks.
 
 ## Inspect the kernel
 
