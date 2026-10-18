@@ -149,6 +149,18 @@ int dodo_x86_64_nx_enabled(void) {
     return nx_enabled;
 }
 
+volatile void *dodo_x86_64_hhdm_pointer(uint64_t physical_address) {
+    if (!paging_initialized) {
+        return 0;
+    }
+
+    volatile uint64_t *pointer;
+    if (!physical_to_hhdm(physical_address, &pointer)) {
+        return 0;
+    }
+    return (volatile void *)pointer;
+}
+
 static enum dodo_paging_status get_root_table(volatile uint64_t **root_table) {
     if (!paging_initialized) {
         return DODO_PAGING_INVALID_ARGUMENT;
