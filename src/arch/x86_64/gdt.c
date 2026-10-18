@@ -17,10 +17,14 @@ _Static_assert(sizeof(struct dodo_x86_64_gdtr) == 10,
  */
 static const uint64_t gdt[] __attribute__((aligned(8))) = {
     UINT64_C(0x0000000000000000), /* 0x00: null */
-    UINT64_C(0x00AF9A000000FFFF), /* 0x08: ring-0 64-bit code */
-    UINT64_C(0x00CF92000000FFFF), /* 0x10: ring-0 data */
-    UINT64_C(0x00CFF2000000FFFF), /* 0x18: ring-3 data, selector 0x1b */
-    UINT64_C(0x00AFFA000000FFFF)  /* 0x20: ring-3 64-bit code, selector 0x23 */
+    UINT64_C(0x00009A000000FFFF), /* 0x08: 16-bit code (Limine layout) */
+    UINT64_C(0x000092000000FFFF), /* 0x10: 16-bit data (Limine layout) */
+    UINT64_C(0x00CF9A000000FFFF), /* 0x18: 32-bit code (Limine layout) */
+    UINT64_C(0x00CF92000000FFFF), /* 0x20: 32-bit data (Limine layout) */
+    UINT64_C(0x00AF9A000000FFFF), /* 0x28: ring-0 64-bit code */
+    UINT64_C(0x00CF92000000FFFF), /* 0x30: ring-0 data */
+    UINT64_C(0x00CFF2000000FFFF), /* 0x38: ring-3 data, selector 0x3b */
+    UINT64_C(0x00AFFA000000FFFF)  /* 0x40: ring-3 64-bit code, selector 0x43 */
 };
 
 void dodo_x86_64_gdt_init(void) {
@@ -36,7 +40,7 @@ void dodo_x86_64_gdt_init(void) {
      */
     __asm__ volatile (
         "lgdt %0\n\t"
-        "movw $0x10, %%ax\n\t"
+        "movw $0x30, %%ax\n\t"
         "movw %%ax, %%ds\n\t"
         "movw %%ax, %%es\n\t"
         "movw %%ax, %%ss\n\t"
@@ -68,6 +72,6 @@ int dodo_x86_64_gdt_verify(void) {
            ds == DODO_X86_64_KERNEL_DATA_SELECTOR &&
            es == DODO_X86_64_KERNEL_DATA_SELECTOR &&
            ss == DODO_X86_64_KERNEL_DATA_SELECTOR &&
-           gdt[3] == UINT64_C(0x00CFF2000000FFFF) &&
-           gdt[4] == UINT64_C(0x00AFFA000000FFFF);
+           gdt[7] == UINT64_C(0x00CFF2000000FFFF) &&
+           gdt[8] == UINT64_C(0x00AFFA000000FFFF);
 }
