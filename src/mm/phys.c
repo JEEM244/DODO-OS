@@ -168,6 +168,47 @@ enum dodo_phys_status dodo_phys_alloc_page(
     return DODO_PHYS_OK;
 }
 
+enum dodo_phys_status dodo_phys_alloc_page_from_region(
+    struct dodo_phys_allocator *allocator,
+    uint64_t region_index,
+    uint64_t *physical_address) {
+    if (allocator == 0 || physical_address == 0 ||
+        allocator->initialized == 0) {
+        return DODO_PHYS_INVALID_ARGUMENT;
+    }
+
+    if (region_index >= allocator->region_count) {
+        return DODO_PHYS_INVALID_ARGUMENT;
+    }
+
+    if (allocator->allocated_pages >= DODO_PHYS_MAX_TRACKED_PAGES) {
+        return DODO_PHYS_TRACKING_CAPACITY_EXCEEDED;
+    }
+
+    struct dodo_phys_region *region = &allocator->regions[region_index];
+    if (region->cursor >= region->end) {
+        return DODO_PHYS_NO_MEMORY;
+    }
+
+    if ((region->cursor & DODO_PAGE_MASK) != 0u ||
+        region->end - region->cursor < DODO_PHYS_PAGE_SIZE) {
+        allocator->initialized = 0;
+        return DODO_PHYS_INVALID_MAP;
+    }
+
+    if (allocator->free_pages == 0u) {
+        allocator->initialized = 0;
+        return DODO_PHYS_INVALID_MAP;
+    }
+
+    const uint64_t page = region->cursor;
+    region->cursor += DODO_PHYS_PAGE_SIZE;
+    allocator->allocated_frames[allocator->allocated_pages++] = page;
+    allocator->free_pages--;
+    *physical_address = page;
+    return DODO_PHYS_OK;
+}
+
 enum dodo_phys_status dodo_phys_free_page(
     struct dodo_phys_allocator *allocator,
     uint64_t physical_address) {
