@@ -30,8 +30,8 @@ This is a research hypothesis, not a claim of unprecedented invention. Existing 
 - **Boot path:** Limine protocol base revision 3, using a pinned upstream binary release verified by SHA-256.
 - **Implementation:** freestanding C and x86-64 assembly.
 - **Physical memory:** validates the bootloader map and allocates complete 4 KiB physical frames from usable ranges.
-- **Virtual memory:** reads CR3, uses Limine's higher-half direct map for page-table access, and maps a test page in an unused kernel PML4 slot without replacing existing mappings.
-- **Page protections:** explicitly enables CR0.WP; when supported, enables EFER.NXE. QEMU tests verify that writes to a read-only mapping and instruction fetches from an NX mapping fault as expected.
+- **Virtual memory:** allocates and activates a DODO-owned PML4 root while copying the current entries, then maps test pages in an unused kernel PML4 slot. The lower-level tables are still inherited from Limine.
+- **Page protections:** explicitly enables CR0.WP; when supported, enables EFER.NXE. QEMU tests verify read-only/NX faults, rejection of non-canonical addresses, and refusal to overwrite a present mapping.
 - **Exceptions:** IDT entries for vectors 0–31, fatal exception diagnostics, page-fault CR2 reporting, and tested recovery for intentionally triggered faults.
 - **Diagnostics:** COM1 serial output.
 - **Test environment:** QEMU before physical hardware.
@@ -57,7 +57,7 @@ The prototype prints diagnostic messages over COM1 serial output and eventually 
 See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/BUILDING.md](docs/BUILDING.md), and [docs/BOOT-AND-ENTRY.md](docs/BOOT-AND-ENTRY.md).
 
 1. **Kernel bring-up:** repeatable boot, serial diagnostics, and exception handling.
-2. **Memory:** physical frames, page-table mapping primitives, protection checks, then full virtual-memory ownership and guard pages.
+2. **Memory:** physical frames and an owned PML4 root are in place; next are independent lower-level tables, a full virtual-memory manager, and guard pages.
 3. **Isolation primitives:** user/kernel separation, IPC, scheduler, and capability enforcement.
 4. **SOMBRA prototype:** isolated workload, change journal, review, and discard tests.
 5. **Useful system services:** storage, networking, input, graphics, and update/recovery.
