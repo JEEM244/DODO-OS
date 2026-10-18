@@ -35,10 +35,12 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Verify read-only and NX page protection behavior in QEMU.
 - [x] Verify the mapper rejects remapping a present page and rejects non-canonical virtual addresses.
 - [ ] Add broader allocator stress tests and explicit allocation ownership tracking.
-- [ ] Create and own DODO's page-table root, virtual-memory manager, and guard pages.
+- [x] Allocate and activate DODO's own PML4 root by copying the current root entries.
+- [ ] Replace inherited lower-level tables with DODO-owned tables while preserving kernel, stack, IDT, HHDM, and boot-response mappings.
+- [ ] Build a full virtual-memory manager and guard-page support.
 - [ ] Define physical-frame release, ownership transfer, and lifetime rules.
 
-**Acceptance:** host allocator tests and QEMU mapping/protection checks pass in CI. The current mapper extends Limine's active page tables; DODO still does not own its root, support per-process address spaces, or free frames.
+**Acceptance:** host allocator tests and QEMU mapping/protection checks pass in CI. DODO owns the active PML4 root but inherits lower-level tables; per-process address spaces and frame reclamation are not implemented.
 
 ## M3 — Isolation primitives
 
