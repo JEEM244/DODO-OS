@@ -12,7 +12,7 @@ DODO is an original operating-system research project intended to become a daily
 - Build products: a kernel ELF with no host C runtime dependency and a bootable test ISO.
 - Initial diagnostics: COM1 serial console.
 - Boot protocol: Limine base revision 3, with a pinned binary release and SHA-256 verification. Limine is a bootstrap dependency; DODO's kernel is project-owned.
-- Current boot path: validate protocol and memory-map responses, initialize a bootstrap physical page allocator, install DODO's own GDT and exception IDT, clone and activate DODO-owned page tables, run controlled CPU/memory protection tests, and adopt bootloader-reclaimable memory only after boot-response use ends.
+- Current boot path: validate protocol and memory-map responses, initialize a bootstrap physical page allocator, install DODO's own GDT/TSS/IDT, clone and activate DODO-owned page tables, run controlled CPU/memory protection tests and a single-threaded CPL3 isolation probe, then adopt bootloader-reclaimable memory after boot-response use ends.
 
 ## Layers
 
@@ -60,9 +60,21 @@ Current limitations:
 
 ## Exception handling
 
-The initial IDT installs CPU exception vectors 0–31. Assembly stubs normalize exception error-code layouts and preserve general-purpose register state before invoking a C handler.
+The initial IDT installs CPU exception vectors 0–31. Assembly stubs normalize exception error-code layouts and preserve general-purpose register state before invoking a C handler. One DPL3 gate is installed for the intentional user-mode test interrupt; other software interrupt vectors remain inaccessible from CPL3.
 
-The verified tests cover INT3 dispatch/resumption and intentionally triggered page faults for read-only and NX protection. All other unexpected exceptions halt the kernel and log basic context. IRQs, timer delivery, nested interrupts, IST stacks, privilege transitions, and a full panic policy remain future work.
+The verified tests cover INT3 dispatch/resumption and intentionally triggered page faults for read-only and NX protection. All other unexpected exceptions halt the kernel and log basic context. IRQs, timer delivery, nested interrupts, IST stacks, and a full panic policy remain future work.
+
+## User-mode proof of concept
+
+DODO now has a deliberately narrow CPL3 probe, not a general process model:
+
+1. The kernel maps a page containing a few hand-written x86-64 instructions as user-accessible and a separate user stack page as user-readable/writable and NX where supported.
+2. The TSS supplies a dedicated ring-0 stack for the CPL3-to-CPL0 interrupt transition.
+3. User code invokes `int 0x80`. The DPL3 gate dispatches to the kernel handler only while the test is armed and the register marker is correct.
+4. The handler exits the transient user context through a dedicated assembly trampoline. It restores the saved kernel stack and SysV callee-saved registers instead of treating the mixed-privilege interrupt frame as a normal same-level `iretq`.
+5. User code is then changed to try to read `0xffffffff80000000`, a supervisor-only kernel virtual address. The page-fault handler resumes only when CR2, CPL3, and the page-fault error bits match that specific expected read; QEMU confirms the access is denied.
+
+This test is single-threaded and uses global one-shot state, a shared address-space hierarchy, and one fixed user region. It does not provide independent per-process address spaces, user memory reclamation, syscall validation, a scheduler, context switching, signals, or a hardened system-call ABI. It is evidence for two narrow behaviors in the QEMU configuration—not a claim that arbitrary user programs are safely isolated yet.
 
 ## Security model principles
 
