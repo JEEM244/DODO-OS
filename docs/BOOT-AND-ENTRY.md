@@ -6,14 +6,27 @@
 2. Limine reads /boot/limine/limine.conf and loads /boot/dodo-kernel.elf.
 3. Limine enters the ELF at _start in x86-64 long mode using its higher-half mapping.
 4. The assembly entry disables maskable interrupts, installs DODO's bootstrap stack, clears the frame pointer, and calls kernel_main.
-5. The kernel initializes COM1 and loads DODO's own GDT. It preserves Limine's entry selector layout (CS 0x28, data selectors 0x30) while reserving ring-3 descriptors for future privilege transitions.
-6. The kernel loads a project-owned IDT for CPU exception vectors 0–31, then validates the base protocol revision, memory-map response and HHDM response.
-7. DODO's physical allocator prepares complete usable 4 KiB frames. Five pages are reserved for table/mapping/protection self-tests, and another frame is allocated for DODO's PML4 root.
+5. The kernel initializes COM1 and loads DODO's own GDT and TSS. It preserves Limine's entry selector layout (CS 0x28, data selectors 0x30), reserves ring-3 selectors, and installs a dedicated RSP0 stack for privilege transitions.
+6. The kernel loads a project-owned IDT for CPU exception vectors 0–31 and one DPL3 gate for the controlled vector-128 test, then validates the base protocol revision, memory-map response and HHDM response.
+7. DODO's physical allocator prepares complete usable 4 KiB frames. Five pages are reserved for mapping/protection tests; the page-table tree clone and user-mode probe allocate additional tracked frames.
 8. The paging helpers read CR3, verify four-level paging (rejecting LA57), enable CR0.WP, and enable EFER.NXE when the CPU supports it.
-9. DODO copies the current PML4 entries to its own allocated root frame and activates it with CR3. This preserves current mappings but continues to use the inherited lower-level tables.
+9. DODO recursively clones the active four-level page-table tree into its own allocated frames, preserves the leaf mappings, and activates the new root with CR3 only after cloning succeeds. A fault-injection test also confirms temporary frames are returned if a clone fails.
 10. DODO creates mappings in an unused kernel PML4 slot. It verifies alias consistency, rejects an attempt to replace an existing mapping and a non-canonical address, then intentionally tests read-only and NX enforcement.
-11. An INT3 test verifies exception dispatch and return through iretq.
-12. After the last boot-response access, DODO adopts the protocol-marked bootloader-reclaimable regions into its physical allocator, checks the page-count accounting, and nulls its memory-map/HHDM response pointers. The kernel halts after successful bootstrap checks.
+11. The CPL3 probe maps a small user-code page and user stack, executes iretq into ring 3, calls the DPL3 int 0x80 gate, and returns by abandoning the transient interrupt frame and restoring the saved kernel stack/registers. It then tries to read a supervisor-only kernel virtual address; QEMU confirms the CPU raises the expected user protection fault and that the test handler recovers.
+12. An INT3 test verifies exception dispatch and return through iretq.
+13. After the last boot-response access, DODO adopts the protocol-marked bootloader-reclaimable regions into its physical allocator, allocates and frees a page from an adopted region to check accounting, and nulls its memory-map/HHDM response pointers. The kernel halts after successful bootstrap checks.
+
+## Controlled ring-3 proof of concept
+
+The test is deliberately small and single-threaded:
+
+- GDT selectors for user code/data and a 64-bit TSS descriptor are installed by DODO. TSS.RSP0 points to a dedicated ring-0 interrupt stack.
+- A DPL3 interrupt gate at vector 128 permits only the intentional software interrupt test; the handler checks a one-shot armed flag, CPL3, and the expected marker in RAX.
+- A small, page-aligned user code page and user stack are mapped in a low-half PML4 slot with U/S permissions. The code executes the software interrupt and is returned to the kernel through a trampoline that restores the original kernel stack plus SysV callee-saved registers.
+- The same user page is then filled with a short read instruction targeting 0xffffffff80000000. The page-fault handler only returns to the kernel when CR2, saved CPL, and error-code access bits match the expected supervisor-page read fault.
+- The QEMU smoke test requires serial markers for successful ring-3 entry/return and supervisor-memory access denial.
+
+This is not a general syscall ABI. User test state and saved kernel RSP are global one-shot values; no scheduler, SMP safety, independent process address spaces, per-process kernel stacks, user-page cleanup, syscall argument validation, or capability enforcement is implemented. Unexpected faults remain fatal.
 
 ## Protocol contract
 
