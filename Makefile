@@ -15,13 +15,14 @@ LIMINE_ARCHIVE := $(BUILD_DIR)/limine-binary.tar.gz
 LIMINE_DIR := $(BUILD_DIR)/limine-binary
 LIMINE_URL := https://github.com/Limine-Bootloader/Limine/releases/download/v$(LIMINE_VERSION)/limine-binary.tar.gz
 
-CFLAGS := -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding \
+CFLAGS := -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -Iinclude \
           -fno-stack-protector -fno-pic -fno-pie -fno-asynchronous-unwind-tables \
           -m64 -mcmodel=kernel -mno-red-zone -mgeneral-regs-only
 ASFLAGS := -m64 -ffreestanding -fno-pic -fno-pie
 LDFLAGS := -nostdlib -z max-page-size=0x1000 -T linker/x86_64.ld
 
 C_SOURCES := src/kernel/main.c
+HEADERS := include/dodo/boot/limine_protocol.h
 ASM_SOURCES := src/arch/x86_64/entry.S
 OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/entry.o
 
@@ -39,7 +40,7 @@ check-tools:
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-$(BUILD_DIR)/main.o: $(C_SOURCES) | $(BUILD_DIR)
+$(BUILD_DIR)/main.o: $(C_SOURCES) $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/entry.o: $(ASM_SOURCES) | $(BUILD_DIR)
@@ -103,7 +104,8 @@ qemu-smoke: $(ISO_IMAGE)
 		echo "QEMU exited unexpectedly with status $$status" >&2; exit $$status; \
 	fi; \
 	grep -Fq "DODO: kernel reached entry point" $(BUILD_DIR)/qemu-serial.log; \
-	grep -Fq "DODO: Limine base revision accepted" $(BUILD_DIR)/qemu-serial.log
+	grep -Fq "DODO: Limine base revision accepted" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: memory map accepted" $(BUILD_DIR)/qemu-serial.log
 
 clean:
 	rm -rf $(BUILD_DIR)
