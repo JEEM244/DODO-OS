@@ -7,8 +7,8 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Build a freestanding x86-64 kernel ELF without linking a host C runtime.
 - [x] Add an architecture-specific entry point and dedicated stack.
 - [x] Initialize COM1 and print a versioned boot message.
-- [x] Halt safely if the kernel returns.
-- [x] Reproduce the build in GitHub Actions and inspect the ELF metadata.
+- [x] Halt safely after the kernel bootstrap checks.
+- [x] Reproduce the build in GitHub Actions and inspect ELF metadata.
 - [x] Integrate a pinned Limine boot path and create a BIOS/UEFI test ISO.
 
 **Acceptance:** the kernel ELF builds, QEMU reaches the kernel, the protocol base revision is accepted, and serial output is checked by CI. The kernel is still only a bootstrap prototype.
@@ -17,23 +17,28 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 
 - [x] Install an initial IDT for CPU exception vectors 0–31.
 - [x] Normalize exception stack frames and report breakpoint/page-fault details.
-- [x] Add a QEMU breakpoint self-test which resumes through `iretq`.
+- [x] Add a QEMU breakpoint self-test which resumes through iretq.
+- [x] Test controlled read-only and NX page faults, resuming only explicitly armed test cases.
 - [ ] Add a reusable panic/assertion policy and structured fatal diagnostics.
 - [ ] Add a timer interrupt and deterministic timer test hooks.
-- [x] Test controlled read-only and NX page faults, resuming only the armed test cases.\n- [ ] Add a reusable panic/assertion policy and structured fatal diagnostics.\n- [ ] Add a timer interrupt and deterministic timer test hooks.\n- [ ] Add tests for other fatal exceptions.
+- [ ] Add tests for more fatal exception paths, including an intentional page fault outside the armed self-test.
 
-**Acceptance:** the tested INT3, read-only write, and NX instruction-fetch faults produce expected diagnostics and resume only when explicitly armed. Other exceptions remain fatal; the entire exception model is not yet complete.
+**Acceptance:** tested INT3, read-only write, and NX instruction-fetch faults produce expected diagnostics; only the explicitly armed protection tests resume. Other exceptions remain fatal. This does not mean the entire exception model is complete.
 
 ## M2 — Memory
 
 - [x] Parse and validate the bootloader memory map.
 - [x] Implement a bootstrap physical page-frame allocator for complete 4 KiB usable frames.
 - [x] Test alignment, exhaustion, null/malformed entries, overflow, and overlapping usable ranges.
-- [ ] Add broader allocator stress tests and allocation ownership tracking.
-- [x] Extend Limine's active 4-level page tables with a checked single-page mapper in an unused kernel PML4 slot.\n- [x] Verify same-frame aliases, read-only write protection, and NX instruction-fetch protection in QEMU.\n- [ ] Create and own DODO's page-table root, virtual-memory manager, and guard pages.
-- [ ] Define explicit physical-frame ownership and lifetime rules.
+- [x] Extend Limine's active 4-level page tables with a checked single-page mapper in an unused kernel PML4 slot.
+- [x] Verify physical/direct-map aliases and a new virtual mapping in QEMU.
+- [x] Verify read-only and NX page protection behavior in QEMU.
+- [x] Verify the mapper rejects remapping a present page and rejects non-canonical virtual addresses.
+- [ ] Add broader allocator stress tests and explicit allocation ownership tracking.
+- [ ] Create and own DODO's page-table root, virtual-memory manager, and guard pages.
+- [ ] Define physical-frame release, ownership transfer, and lifetime rules.
 
-**Acceptance:** current host allocator tests and QEMU mapping/protection checks pass in CI. The current mapper extends Limine's active page tables; DODO still does not own its root, support per-process address spaces, or free physical frames.
+**Acceptance:** host allocator tests and QEMU mapping/protection checks pass in CI. The current mapper extends Limine's active page tables; DODO still does not own its root, support per-process address spaces, or free frames.
 
 ## M3 — Isolation primitives
 
