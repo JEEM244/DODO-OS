@@ -22,6 +22,11 @@ dodo_x86_64_enter_user:
     pushq %r15
     movq %rsp, dodo_x86_64_saved_kernel_rsp(%rip)
 
+    /* Save the kernel root, then activate the private user page-table root (RDX). */
+    movq %cr3, %rax
+    movq %rax, dodo_x86_64_saved_kernel_cr3(%rip)
+    movq %rdx, %cr3
+
     /* User code must run with user-level data selectors, not kernel selectors. */
     movw $0x3b, %ax
     movw %ax, %ds
@@ -41,6 +46,10 @@ dodo_x86_64_enter_user:
 .type dodo_x86_64_user_return_trampoline, @function
 dodo_x86_64_user_return_trampoline:
     cli
+
+    /* Return to the kernel's root before using the saved kernel stack. */
+    movq dodo_x86_64_saved_kernel_cr3(%rip), %rax
+    movq %rax, %cr3
     movq dodo_x86_64_saved_kernel_rsp(%rip), %rsp
 
     /* Restore the kernel data/stack selectors before touching the old stack. */
@@ -68,5 +77,12 @@ dodo_x86_64_user_return_trampoline:
 dodo_x86_64_saved_kernel_rsp:
     .quad 0
 .size dodo_x86_64_saved_kernel_rsp, . - dodo_x86_64_saved_kernel_rsp
+
+.balign 8
+.global dodo_x86_64_saved_kernel_cr3
+.type dodo_x86_64_saved_kernel_cr3, @object
+dodo_x86_64_saved_kernel_cr3:
+    .quad 0
+.size dodo_x86_64_saved_kernel_cr3, . - dodo_x86_64_saved_kernel_cr3
 
 .section .note.GNU-stack,"",@progbits
