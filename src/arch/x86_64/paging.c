@@ -163,47 +163,146 @@ enum dodo_paging_status dodo_x86_64_paging_init(uint64_t offset) {
     return DODO_PAGING_OK;
 }
 
-enum dodo_paging_status dodo_x86_64_paging_take_root(
-    uint64_t new_root_physical,
-    uint64_t *previous_root_physical) {
-    if (!paging_initialized || previous_root_physical == 0) {
-        return DODO_PAGING_INVALID_ARGUMENT;
-    }
+#define DODO_MAX_CLONED_TABLES UINT64_C(8192)
 
-    if ((new_root_physical & (DODO_PAGE_SIZE - 1u)) != 0u ||
-        new_root_physical > DODO_PTE_ADDRESS_MASK ||
-        new_root_physical == root_table_physical) {
+struct dodo_page_table_clone_entry {
+    uint64_t old_physical;
+    uint64_t new_physical;
+};
+
+static struct dodo_page_table_clone_entry
+    page_table_clone_cache[DODO_MAX_CLONED_TABLES];
+static uint64_t page_table_clone_count;
+
+static enum dodo_paging_status clone_page_table(
+    uint64_t old_physical,
+    uint64_t level,
+    dodo_paging_allocate_frame_fn allocate_frame,
+    void *context,
+    uint64_t *new_physical) {
+    if (new_physical == 0 || level < 1u || level > 4u ||
+        (old_physical & (DODO_PAGE_SIZE - 1u)) != 0u ||
+        old_physical > DODO_PTE_ADDRESS_MASK) {
         return DODO_PAGING_INVALID_ADDRESS;
     }
 
-    volatile uint64_t *old_root;
-    volatile uint64_t *new_root;
-    if (!physical_to_hhdm(root_table_physical, &old_root) ||
-        !physical_to_hhdm(new_root_physical, &new_root)) {
+    /* Preserve shared table structure and terminate recursive self-mappings. */
+    for (uint64_t i = 0; i < page_table_clone_count; ++i) {
+        if (page_table_clone_cache[i].old_physical == old_physical) {
+            *new_physical = page_table_clone_cache[i].new_physical;
+            return DODO_PAGING_OK;
+        }
+    }
+
+    if (page_table_clone_count >= DODO_MAX_CLONED_TABLES) {
+        return DODO_PAGING_CLONE_CAPACITY_EXCEEDED;
+    }
+
+    uint64_t allocated_physical = 0;
+    if (allocate_frame == 0 || !allocate_frame(context, &allocated_physical)) {
+        return DODO_PAGING_NO_TABLE_FRAMES;
+    }
+
+    if ((allocated_physical & (DODO_PAGE_SIZE - 1u)) != 0u ||
+        allocated_physical > DODO_PTE_ADDRESS_MASK ||
+        allocated_physical == old_physical) {
+        return DODO_PAGING_INVALID_ADDRESS;
+    }
+
+    for (uint64_t i = 0; i < page_table_clone_count; ++i) {
+        if (page_table_clone_cache[i].new_physical == allocated_physical) {
+            return DODO_PAGING_INVALID_ADDRESS;
+        }
+    }
+
+    volatile uint64_t *old_table;
+    volatile uint64_t *new_table;
+    if (!physical_to_hhdm(old_physical, &old_table) ||
+        !physical_to_hhdm(allocated_physical, &new_table)) {
         return DODO_PAGING_INVALID_HHDM;
     }
 
     /*
-     * Copy all entries so the active kernel, IDT, stack, HHDM, and firmware
-     * response pointers stay mapped across the CR3 switch. Do not reclaim the
-     * previous root: lower-level tables and inherited entries may still refer
-     * to bootstrap-owned structures.
+     * Register before descending so shared references or recursive PML4
+     * mappings resolve to this same new table instead of allocating forever.
      */
+    page_table_clone_cache[page_table_clone_count].old_physical = old_physical;
+    page_table_clone_cache[page_table_clone_count].new_physical =
+        allocated_physical;
+    page_table_clone_count++;
+
     for (uint64_t i = 0; i < DODO_PAGE_SIZE / sizeof(uint64_t); ++i) {
-        new_root[i] = old_root[i];
+        const uint64_t entry = old_table[i];
+        new_table[i] = entry;
+
+        if ((entry & DODO_PTE_PRESENT) == 0u || level == 1u) {
+            continue;
+        }
+
+        /*
+         * Bit 7 means a huge-page leaf at PDPT/PD levels, not a child table.
+         * A PML4 huge-page entry is not a supported x86-64 mapping.
+         */
+        if (level == 4u && (entry & DODO_PTE_PAGE_SIZE) != 0u) {
+            return DODO_PAGING_NOT_SUPPORTED;
+        }
+        if ((level == 3u || level == 2u) &&
+            (entry & DODO_PTE_PAGE_SIZE) != 0u) {
+            continue;
+        }
+
+        const uint64_t old_child = entry & DODO_PTE_ADDRESS_MASK;
+        uint64_t new_child = 0;
+        const enum dodo_paging_status status = clone_page_table(
+            old_child, level - 1u, allocate_frame, context, &new_child);
+        if (status != DODO_PAGING_OK) {
+            return status;
+        }
+
+        new_table[i] = (entry & ~DODO_PTE_ADDRESS_MASK) |
+                       (new_child & DODO_PTE_ADDRESS_MASK);
     }
 
-    *previous_root_physical = root_table_physical;
+    *new_physical = allocated_physical;
+    return DODO_PAGING_OK;
+}
+
+enum dodo_paging_status dodo_x86_64_paging_clone_tree(
+    dodo_paging_allocate_frame_fn allocate_frame,
+    void *context,
+    uint64_t *new_root_physical,
+    uint64_t *tables_cloned) {
+    if (!paging_initialized || allocate_frame == 0 ||
+        new_root_physical == 0 || tables_cloned == 0) {
+        return DODO_PAGING_INVALID_ARGUMENT;
+    }
+
+    page_table_clone_count = 0;
+    const uint64_t old_root_physical = root_table_physical;
+    uint64_t cloned_root_physical = 0;
+
+    enum dodo_paging_status status = clone_page_table(
+        old_root_physical, 4u, allocate_frame, context,
+        &cloned_root_physical);
+    if (status != DODO_PAGING_OK) {
+        return status;
+    }
+
     __asm__ volatile ("mov %0, %%cr3"
                       :
-                      : "r"(new_root_physical)
+                      : "r"(cloned_root_physical)
                       : "memory");
 
-    if ((read_cr3() & DODO_PTE_ADDRESS_MASK) != new_root_physical) {
+    if ((read_cr3() & DODO_PTE_ADDRESS_MASK) != cloned_root_physical) {
         return DODO_PAGING_READBACK_FAILED;
     }
 
-    root_table_physical = new_root_physical;
+    root_table_physical = cloned_root_physical;
+    *new_root_physical = cloned_root_physical;
+    *tables_cloned = page_table_clone_count;
+
+    /* A separate read keeps this observable after the root variable updates. */
+    (void)old_root_physical;
     return DODO_PAGING_OK;
 }
 
