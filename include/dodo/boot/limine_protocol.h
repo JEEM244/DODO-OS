@@ -10,6 +10,7 @@
  */
 
 #define DODO_LIMINE_MEMMAP_USABLE UINT64_C(0)
+#define DODO_LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE UINT64_C(5)
 
 struct dodo_limine_memmap_entry {
     uint64_t base;
