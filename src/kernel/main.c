@@ -110,6 +110,16 @@ static const char *const exception_names[32] = {
     "Reserved Exception"
 };
 
+static int allocate_paging_frame(void *context, uint64_t *physical_address) {
+    if (context == NULL || physical_address == NULL) {
+        return 0;
+    }
+
+    struct dodo_phys_allocator *allocator =
+        (struct dodo_phys_allocator *)context;
+    return dodo_phys_alloc_page(allocator, physical_address) == DODO_PHYS_OK;
+}
+
 static inline void outb(uint16_t port, uint8_t value) {
     __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
 }
@@ -338,30 +348,26 @@ static void test_virtual_mapping(void) {
     serial_write(dodo_x86_64_nx_enabled() ? "enabled\n" : "not available\n");
 
     /*
-     * Take ownership of a new PML4 root while copying every current entry.
-     * Lower-level tables remain inherited; this is a staged handoff, not yet
-     * a completely independent address-space hierarchy.
+     * Clone the complete page-table hierarchy into DODO-owned frames. The leaf
+     * mappings keep their physical targets, so kernel text, stack, HHDM,
+     * response structures and IDT remain reachable across the CR3 switch.
      */
     uint64_t new_root_physical = 0;
-    if (dodo_phys_alloc_page(&physical_allocator, &new_root_physical) !=
-        DODO_PHYS_OK) {
-        report_boot_error("could not allocate DODO's PML4 root");
-    }
-
-    uint64_t previous_root_physical = 0;
-    status = dodo_x86_64_paging_take_root(
-        new_root_physical, &previous_root_physical);
+    uint64_t tables_cloned = 0;
+    status = dodo_x86_64_paging_clone_tree(
+        allocate_paging_frame, &physical_allocator,
+        &new_root_physical, &tables_cloned);
     if (status != DODO_PAGING_OK) {
-        serial_write("DODO: PML4 root handoff error code = ");
+        serial_write("DODO: page-table tree clone error code = ");
         serial_write_u64((uint64_t)status);
         serial_write("\n");
-        report_boot_error("could not activate DODO's PML4 root");
+        report_boot_error("could not clone and activate DODO's page-table tree");
     }
 
-    serial_write("DODO: previous PML4 root = ");
-    serial_write_hex64(previous_root_physical);
-    serial_write("\nDODO: DODO-owned PML4 root installed = ");
+    serial_write("DODO: DODO-owned page-table tree installed; root = ");
     serial_write_hex64(new_root_physical);
+    serial_write("\nDODO: page-table frames cloned = ");
+    serial_write_u64(tables_cloned);
     serial_write("\n");
 
     uint64_t mapped_virtual_address = 0;
