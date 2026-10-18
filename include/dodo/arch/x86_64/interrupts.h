@@ -4,9 +4,10 @@
 #include <stdint.h>
 
 /*
- * Stack layout created by src/arch/x86_64/interrupts.S.
- * This frame describes exceptions handled while executing in ring 0.
- * User-mode stack fields will be added with privilege separation.
+ * Fixed prefix of the frame built by src/arch/x86_64/interrupts.S.
+ * On CPL3-to-CPL0 transitions the CPU also pushes the prior user RSP and SS
+ * after RFLAGS; those tail fields are deliberately not exposed as ordinary
+ * members because the controlled return path abandons that frame.
  */
 struct dodo_x86_64_exception_frame {
     uint64_t r15;
