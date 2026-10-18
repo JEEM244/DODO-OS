@@ -26,7 +26,8 @@ HEADERS := include/dodo/boot/limine_protocol.h \
            include/dodo/arch/x86_64/interrupts.h \
            include/dodo/arch/x86_64/paging.h
 OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/idt.o \
-           $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o $(BUILD_DIR)/interrupts.o
+           $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o $(BUILD_DIR)/interrupts.o \
+           $(BUILD_DIR)/paging_test.o
 PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
 
 .PHONY: all kernel iso run qemu-smoke test-phys test clean check-tools
@@ -61,6 +62,9 @@ $(BUILD_DIR)/entry.o: src/arch/x86_64/entry.S | $(BUILD_DIR)
 	$(CC) $(ASFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/interrupts.o: src/arch/x86_64/interrupts.S | $(BUILD_DIR)
+	$(CC) $(ASFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/paging_test.o: src/arch/x86_64/paging_test.S | $(BUILD_DIR)
 	$(CC) $(ASFLAGS) -c $< -o $@
 
 $(KERNEL_ELF): $(OBJECTS) linker/x86_64.ld
@@ -130,6 +134,10 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "DODO: memory map received" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: physical allocator self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: virtual page mapping self-check passed" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: read-only page write was blocked" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: read-only page protection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: NX instruction fetch was blocked" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: NX execution protection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: exception IDT loaded" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: IDT breakpoint self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: exception handler resumed after INT3" $(BUILD_DIR)/qemu-serial.log; \
