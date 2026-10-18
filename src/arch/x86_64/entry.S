@@ -1,4 +1,4 @@
-.section .text
+.section .text.boot
 .global _start
 .type _start, @function
 .extern kernel_main
@@ -18,9 +18,9 @@ _start:
 .size _start, . - _start
 
 .section .bss
-.align 16
+.balign 16
 stack_bottom:
-    .skip 16384
+    .skip 65536
 stack_top:
 
 .section .note.GNU-stack,"",@progbits
