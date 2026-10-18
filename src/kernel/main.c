@@ -692,6 +692,10 @@ static void test_virtual_mapping(void) {
 }
 
 static void test_user_mode_transitions(void) {
+    const uint64_t free_pages_before_user_tests = physical_allocator.free_pages;
+    const uint64_t allocated_pages_before_user_tests =
+        physical_allocator.allocated_pages;
+
     uint64_t user_root_frame = 0;
     uint64_t user_code_frame = 0;
     uint64_t user_stack_frame = 0;
@@ -963,6 +967,40 @@ static void test_user_mode_transitions(void) {
         report_boot_error("second user root could access first root's mapping");
     }
     serial_write("DODO: independent user-root isolation self-check passed\\n");
+
+    /*
+     * No user root is active after the trampoline returns. Reinstall the kernel
+     * CR3 explicitly, then release only frames allocated for these two test
+     * roots; the shared supervisor-only upper-half tables are not ours to free.
+     */
+    if (dodo_x86_64_paging_switch_root(kernel_root_frame) != DODO_PAGING_OK) {
+        report_boot_error("could not confirm kernel root before user-root teardown");
+    }
+
+    for (uint64_t i = 0; i < 3u; ++i) {
+        if (dodo_phys_free_page(&physical_allocator, user_table_frames[i]) !=
+                DODO_PHYS_OK ||
+            dodo_phys_free_page(&physical_allocator, second_user_table_frames[i]) !=
+                DODO_PHYS_OK) {
+            report_boot_error("could not release user-root page-table frames");
+        }
+    }
+
+    if (dodo_phys_free_page(&physical_allocator, user_code_frame) != DODO_PHYS_OK ||
+        dodo_phys_free_page(&physical_allocator, user_stack_frame) != DODO_PHYS_OK ||
+        dodo_phys_free_page(&physical_allocator, user_root_frame) != DODO_PHYS_OK ||
+        dodo_phys_free_page(&physical_allocator, second_user_code_frame) != DODO_PHYS_OK ||
+        dodo_phys_free_page(&physical_allocator, second_user_stack_frame) != DODO_PHYS_OK ||
+        dodo_phys_free_page(&physical_allocator, second_user_root_frame) != DODO_PHYS_OK) {
+        report_boot_error("could not release user-root test frames");
+    }
+
+    if (physical_allocator.free_pages != free_pages_before_user_tests ||
+        physical_allocator.allocated_pages != allocated_pages_before_user_tests) {
+        report_boot_error("user-root teardown changed physical allocator accounting");
+    }
+
+    serial_write("DODO: user-root teardown/reclaim self-check passed\\n");
 }
 
 static void test_exception_handler(void) {
