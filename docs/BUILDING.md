@@ -22,13 +22,13 @@ make test
 ```
 
 These host-side tests exercise the physical page allocator with synthetic memory maps, including:
-- whole-page alignment and allocation exhaustion;
-- ignoring non-usable memory ranges;
-- invalid pointers and malformed memory maps;
-- integer-overflow rejection;
-- rejecting overlapping usable ranges, which could otherwise produce duplicate frames.
+- whole-page alignment, ignored reserved ranges, and allocation exhaustion;
+- invalid pointers, malformed memory maps, integer overflow, and overlapping usable ranges;
+- returning a page, reusing the same frame, and rejecting double frees or pages that were never allocated;
+- the valid physical frame at address zero;
+- the fixed limit of 16,384 live allocations and confirming a capacity error does not corrupt allocator counters.
 
-These tests check allocator logic separately from hardware boot. They do not prove that every physical memory map emitted by every firmware is valid.
+These tests check allocator logic separately from hardware boot. They do not prove that every physical memory map emitted by every firmware is valid, and the allocator is not yet safe for concurrent SMP use.
 
 ## Build
 
@@ -54,7 +54,7 @@ make run
 
 The prototype prints status messages over COM1 serial output, then halts the CPU. A blank graphical display is expected: DODO does not have a graphics driver or desktop yet. The messages appear in the terminal used to run QEMU.
 
-The boot path loads DODO's IDT for exception vectors 0–31, validates the memory map, and initializes a simple physical page allocator. Five 4 KiB frames are reserved for mapping and protection checks. DODO recursively clones the active four-level page-table tree into its own frames, preserving leaf mappings and permissions, and activates the new root through CR3. The current QEMU memory map requires ten table frames for the clone; this count can vary by firmware and configuration. DODO then extends an unused PML4 slot, enables CR0.WP and EFER.NXE where supported, and tests read-only and NX enforcement. The mapper also refuses to replace an existing leaf and rejects a non-canonical virtual address. The page-fault handler only resumes the exact faults armed by these tests; unexpected faults remain fatal. An intentional `INT3` also verifies exception dispatch and return through `iretq`.
+The boot path loads DODO's IDT for exception vectors 0–31, validates the memory map, and initializes the physical page allocator with a bounded live-allocation ledger and recycled-frame stack. Five 4 KiB frames are reserved for mapping and protection checks. Before the real page-table clone, a fault-injection test fails after two successful allocations and verifies that rollback restores the allocator's free/live counts. DODO then recursively clones the active four-level page-table tree into its own frames, preserves leaf mappings and permissions, and activates the new root through CR3. The current QEMU memory map requires ten table frames for the clone; this count can vary by firmware and configuration. DODO then extends an unused PML4 slot, enables CR0.WP and EFER.NXE where supported, and tests read-only and NX enforcement. The mapper also refuses to replace an existing leaf and rejects a non-canonical virtual address. The page-fault handler only resumes the exact faults armed by these tests; unexpected faults remain fatal. An intentional `INT3` also verifies exception dispatch and return through `iretq`.
 
 For an automated boot check on Linux:
 
@@ -62,7 +62,7 @@ For an automated boot check on Linux:
 make qemu-smoke
 ```
 
-The smoke test boots the ISO for up to 12 seconds, captures the serial log in `build/qemu-serial.log`, and checks the boot handoff, memory-map parsing, allocator self-check, page mapping, read-only/NX protection, IDT installation, and controlled exception recovery. It uses QEMU and does not write to the host's disks.
+The smoke test boots the ISO for up to 12 seconds, captures the serial log in `build/qemu-serial.log`, and checks the boot handoff, memory-map parsing, physical allocator, page-table clone rollback, page mapping, read-only/NX protection, IDT installation, and controlled exception recovery. It uses QEMU and does not write to the host's disks.
 
 ## Inspect the kernel
 
