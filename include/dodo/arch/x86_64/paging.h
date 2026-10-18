@@ -34,6 +34,15 @@ enum dodo_paging_status dodo_x86_64_paging_init(uint64_t hhdm_offset);
 
 int dodo_x86_64_nx_enabled(void);
 
+/* Return the HHDM alias for a physical address, or NULL before init/on error. */
+volatile void *dodo_x86_64_hhdm_pointer(uint64_t physical_address);
+
+/* Assembly helpers used only by the controlled read-only/NX fault self-tests. */
+int dodo_x86_64_test_write_readonly(volatile uint64_t *target);
+int dodo_x86_64_test_execute_nx(void *target);
+void dodo_x86_64_readonly_write_fault_resume(void);
+void dodo_x86_64_nx_execute_fault_resume(void);
+
 /*
  * Map one 4 KiB physical page at one canonical virtual address in the current
  * page-table root. page_table_frames is a pool of usable physical frames for
