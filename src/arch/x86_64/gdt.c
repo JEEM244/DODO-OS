@@ -30,16 +30,12 @@ void dodo_x86_64_gdt_init(void) {
     };
 
     /*
-     * Install the GDT, far-return through the new ring-0 code descriptor, and
-     * reload the data selectors. RSP is balanced across the far return.
+     * The ring-0 code descriptor is intentionally identical to the selector
+     * Limine provided at entry. Load the new table and replace data selectors
+     * first; an audited far-transfer path will be added before CPL transitions.
      */
     __asm__ volatile (
         "lgdt %0\n\t"
-        "pushq $0x08\n\t"
-        "leaq 1f(%%rip), %%rax\n\t"
-        "pushq %%rax\n\t"
-        "lretq\n\t"
-        "1:\n\t"
         "movw $0x10, %%ax\n\t"
         "movw %%ax, %%ds\n\t"
         "movw %%ax, %%es\n\t"
