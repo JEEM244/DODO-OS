@@ -20,9 +20,9 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Add a QEMU breakpoint self-test which resumes through `iretq`.
 - [ ] Add a reusable panic/assertion policy and structured fatal diagnostics.
 - [ ] Add a timer interrupt and deterministic timer test hooks.
-- [ ] Add tests for a controlled page fault and other fatal exceptions.
+- [x] Test controlled read-only and NX page faults, resuming only the armed test cases.\n- [ ] Add a reusable panic/assertion policy and structured fatal diagnostics.\n- [ ] Add a timer interrupt and deterministic timer test hooks.\n- [ ] Add tests for other fatal exceptions.
 
-**Acceptance:** expected test exceptions produce useful diagnostics; fatal exceptions stop safely rather than continuing with corrupted state. The current INT3 self-test verifies dispatch and resumption, not all exception paths.
+**Acceptance:** the tested INT3, read-only write, and NX instruction-fetch faults produce expected diagnostics and resume only when explicitly armed. Other exceptions remain fatal; the entire exception model is not yet complete.
 
 ## M2 — Memory
 
@@ -30,10 +30,10 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Implement a bootstrap physical page-frame allocator for complete 4 KiB usable frames.
 - [x] Test alignment, exhaustion, null/malformed entries, overflow, and overlapping usable ranges.
 - [ ] Add broader allocator stress tests and allocation ownership tracking.
-- [ ] Build kernel page tables / virtual-memory mappings and guard pages.
+- [x] Extend Limine's active 4-level page tables with a checked single-page mapper in an unused kernel PML4 slot.\n- [x] Verify same-frame aliases, read-only write protection, and NX instruction-fetch protection in QEMU.\n- [ ] Create and own DODO's page-table root, virtual-memory manager, and guard pages.
 - [ ] Define explicit physical-frame ownership and lifetime rules.
 
-**Acceptance:** stress tests, malformed-map rejection, and mapping permission tests pass. The current allocator returns physical addresses only; it is not a virtual-memory manager and does not support freeing frames.
+**Acceptance:** current host allocator tests and QEMU mapping/protection checks pass in CI. The current mapper extends Limine's active page tables; DODO still does not own its root, support per-process address spaces, or free physical frames.
 
 ## M3 — Isolation primitives
 
