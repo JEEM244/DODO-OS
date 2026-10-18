@@ -839,17 +839,49 @@ static void test_user_mode_transitions(void) {
     serial_write("DODO: separate user root mapping self-check passed\\n");
 
     /*
-     * mov eax, DODO_X86_64_USER_TEST_MAGIC; int 0x80; ud2
-     * The DPL3 gate returns to a kernel trampoline only when the handler sees
-     * CPL3 and the exact expected register marker.
+     * Minimal userspace syscall program:
+     *   write(user_code_va + 96, message_len)
+     *   write(0xffffffff80000000, 1)  -> must be rejected without dereference
+     *   exit-to-test-kernel via the one-shot marker
+     *
+     * This uses hand-written machine bytes so the first ABI can be tested
+     * without a userspace compiler or C runtime.
      */
-    const uint8_t interrupt_test_code[] = {
+    static const char user_message[] = "DODO says hello from CPL3";
+    const uint64_t user_message_length = sizeof(user_message) - 1u;
+    uint8_t syscall_test_code[] = {
+        UINT8_C(0xb8), UINT8_C(0x01), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
+        UINT8_C(0x48), UINT8_C(0xbf),
+        UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
+        UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
+        UINT8_C(0xbe), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
+        UINT8_C(0xcd), UINT8_C(0x80),
+        UINT8_C(0x48), UINT8_C(0xbf),
+        UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x80),
+        UINT8_C(0xff), UINT8_C(0xff), UINT8_C(0xff), UINT8_C(0xff),
+        UINT8_C(0xbe), UINT8_C(0x01), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
+        UINT8_C(0xb8), UINT8_C(0x01), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
+        UINT8_C(0xcd), UINT8_C(0x80),
         UINT8_C(0xb8), UINT8_C(0xde), UINT8_C(0xc0),
-        UINT8_C(0xd0), UINT8_C(0xd0), UINT8_C(0xcd),
-        UINT8_C(0x80), UINT8_C(0x0f), UINT8_C(0x0b)
+        UINT8_C(0xd0), UINT8_C(0xd0), UINT8_C(0xcd), UINT8_C(0x80),
+        UINT8_C(0x0f), UINT8_C(0x0b)
     };
-    for (size_t i = 0; i < sizeof(interrupt_test_code); ++i) {
-        user_code[i] = interrupt_test_code[i];
+
+    const uint64_t user_message_address = user_code_virtual + UINT64_C(96);
+    for (uint64_t i = 0; i < sizeof(uint64_t); ++i) {
+        syscall_test_code[7u + i] =
+            (uint8_t)(user_message_address >> (i * 8u));
+    }
+    syscall_test_code[16] = (uint8_t)user_message_length;
+    syscall_test_code[17] = 0;
+    syscall_test_code[18] = 0;
+    syscall_test_code[19] = 0;
+
+    for (size_t i = 0; i < sizeof(syscall_test_code); ++i) {
+        user_code[i] = syscall_test_code[i];
+    }
+    for (size_t i = 0; i < sizeof(user_message); ++i) {
+        user_code[96u + i] = (uint8_t)user_message[i];
     }
 
     /* Restore the kernel root before calling the assembly transition stub. */
@@ -861,12 +893,22 @@ static void test_user_mode_transitions(void) {
         user_stack_virtual + DODO_PAGE_SIZE - UINT64_C(16);
     user_mode_return_marker = 0;
     user_mode_test_armed = 1;
+    user_write_syscall_passed = 0;
+    user_invalid_pointer_denied = 0;
     dodo_x86_64_enter_user(user_code_virtual, user_stack_pointer, user_root_frame);
 
     if (user_mode_test_armed != 0u ||
         user_mode_return_marker != DODO_X86_64_USER_TEST_MAGIC) {
         report_boot_error("ring-3 entry or controlled interrupt return failed");
     }
+    if (user_write_syscall_passed == 0u) {
+        report_boot_error("valid user write syscall was not serviced");
+    }
+    serial_write("DODO: validated user write syscall self-check passed\\n");
+    if (user_invalid_pointer_denied == 0u) {
+        report_boot_error("kernel pointer passed to user syscall was not rejected");
+    }
+    serial_write("DODO: invalid user syscall pointer rejection self-check passed\\n");
     serial_write("DODO: ring-3 entry and controlled return self-check passed\\n");
 
     /*
