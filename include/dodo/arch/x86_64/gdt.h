@@ -7,11 +7,12 @@
 #define DODO_X86_64_KERNEL_DATA_SELECTOR UINT16_C(0x30)
 #define DODO_X86_64_USER_DATA_SELECTOR UINT16_C(0x3b)
 #define DODO_X86_64_USER_CODE_SELECTOR UINT16_C(0x43)
+#define DODO_X86_64_TSS_SELECTOR UINT16_C(0x48)
 
-/* Install DODO's own GDT and reload CS/data selectors. */
+/* Install DODO's GDT, initialize its TSS, and load TR. */
 void dodo_x86_64_gdt_init(void);
 
-/* Check GDTR base/limit and the active kernel selectors. */
+/* Check GDTR, active selectors, TR, TSS limit, and ring-0 interrupt stack. */
 int dodo_x86_64_gdt_verify(void);
 
 #endif
