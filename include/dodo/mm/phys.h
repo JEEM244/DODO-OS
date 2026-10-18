@@ -66,6 +66,12 @@ enum dodo_phys_status dodo_phys_free_page(
     struct dodo_phys_allocator *allocator,
     uint64_t physical_address);
 
+/* Allocate directly from a specific region, bypassing the recycled-page stack. */
+enum dodo_phys_status dodo_phys_alloc_page_from_region(
+    struct dodo_phys_allocator *allocator,
+    uint64_t region_index,
+    uint64_t *physical_address);
+
 /*
  * Add a page-aligned region that the kernel has independently proven safe
  * to reclaim (for example, Limine bootloader-reclaimable memory after all
