@@ -4,7 +4,7 @@
 
 The goal is not to create another Linux distribution or a collection of security utilities. DODO aims to become a practical daily-use desktop operating system whose architecture limits what programs can access, makes their actions explainable, and allows risky work to happen in isolated environments.
 
-> **Current status:** DODO has a freestanding x86-64 kernel, a pinned Limine boot path, a BIOS/UEFI test ISO, a bootstrap physical page allocator, an initial exception IDT, and a cloned, DODO-owned four-level page-table tree. GitHub Actions runs host allocator tests and boots the ISO in QEMU, including read-only and NX protection tests. This remains an early kernel prototype, not a desktop OS. Check the latest CI run before treating any milestone as verified.
+> **Current status:** DODO has a freestanding x86-64 kernel, a pinned Limine boot path, a BIOS/UEFI test ISO, a tracked physical page allocator with free/reuse and double-free checks, an initial exception IDT, and a cloned DODO-owned four-level page-table tree. The page-table clone now has rollback callbacks and a boot-time fault-injection test to check that partial clones return temporary frames. This remains an early kernel prototype, not a desktop OS. Check the latest CI run before treating the newest work as verified.
 
 ## Project principles
 
@@ -29,8 +29,8 @@ This is a research hypothesis, not a claim of unprecedented invention. Existing 
 - **Architecture:** x86-64 long mode, 4-level page tables.
 - **Boot path:** Limine protocol base revision 3, using a pinned upstream binary release verified by SHA-256.
 - **Implementation:** freestanding C and x86-64 assembly.
-- **Physical memory:** validates the bootloader map and allocates complete 4 KiB physical frames from usable ranges.
-- **Virtual memory:** clones the active four-level page-table tree into DODO-owned frames, switches CR3 to the new root, and preserves the existing leaf mappings. QEMU currently reports ten cloned table frames for its test memory map.
+- **Physical memory:** validates the bootloader map and allocates complete 4 KiB physical frames from usable ranges. A bounded ownership ledger tracks live frames; the allocator can release/reuse them and rejects double frees and unknown pages.
+- **Virtual memory:** clones the active four-level page-table tree into DODO-owned frames, switches CR3 to the new root, preserves leaf mappings, and attempts rollback if cloning fails before activation. QEMU currently reports ten cloned table frames for its test memory map.
 - **Page protections:** explicitly enables CR0.WP; when supported, enables EFER.NXE. QEMU tests verify read-only/NX faults, rejection of non-canonical addresses, and refusal to overwrite a present mapping.
 - **Exceptions:** IDT entries for vectors 0–31, fatal exception diagnostics, page-fault CR2 reporting, and tested recovery for intentionally triggered faults.
 - **Diagnostics:** COM1 serial output.
@@ -44,7 +44,7 @@ Limine is deliberately used only to bootstrap the kernel. DODO's kernel and futu
 Read [docs/BUILDING.md](docs/BUILDING.md) before building.
 
 ~~~sh
-make test            # host-side physical allocator tests
+make test            # host-side physical allocator, free/reuse and capacity tests
 make clean all       # build kernel and bootable test ISO
 make run             # launch the ISO in QEMU
 make qemu-smoke      # verify boot, page protections, and exception recovery
