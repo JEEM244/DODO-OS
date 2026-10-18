@@ -686,6 +686,132 @@ static void test_virtual_mapping(void) {
     }
 }
 
+static void test_user_mode_transitions(void) {
+    uint64_t user_region_base = 0;
+    enum dodo_paging_status paging_status =
+        dodo_x86_64_find_unused_user_region(&user_region_base);
+    if (paging_status != DODO_PAGING_OK) {
+        serial_write("DODO: user region selection error = ");
+        serial_write_u64((uint64_t)paging_status);
+        serial_write("\\n");
+        report_boot_error("could not find an empty user PML4 slot");
+    }
+
+    uint64_t user_code_frame = 0;
+    uint64_t user_stack_frame = 0;
+    uint64_t user_table_frames[3] = { 0, 0, 0 };
+
+    if (dodo_phys_alloc_page(&physical_allocator, &user_code_frame) != DODO_PHYS_OK ||
+        dodo_phys_alloc_page(&physical_allocator, &user_stack_frame) != DODO_PHYS_OK) {
+        report_boot_error("could not allocate user-mode test code/stack frames");
+    }
+    for (uint64_t i = 0; i < 3u; ++i) {
+        if (dodo_phys_alloc_page(&physical_allocator, &user_table_frames[i]) !=
+            DODO_PHYS_OK) {
+            report_boot_error("could not allocate user page-table frames");
+        }
+    }
+
+    volatile uint8_t *user_code =
+        (volatile uint8_t *)dodo_x86_64_hhdm_pointer(user_code_frame);
+    volatile uint8_t *user_stack =
+        (volatile uint8_t *)dodo_x86_64_hhdm_pointer(user_stack_frame);
+    if (user_code == NULL || user_stack == NULL) {
+        report_boot_error("cannot initialize user pages through the HHDM");
+    }
+
+    for (uint64_t i = 0; i < DODO_PAGE_SIZE; ++i) {
+        user_code[i] = 0;
+        user_stack[i] = 0;
+    }
+
+    const uint64_t user_code_virtual = user_region_base;
+    const uint64_t user_stack_virtual = user_region_base + DODO_PAGE_SIZE;
+    uint64_t frames_used = 0;
+    paging_status = dodo_x86_64_map_page(
+        user_code_virtual, user_code_frame, DODO_PAGE_USER_ACCESSIBLE,
+        user_table_frames, 3u, &frames_used);
+    if (paging_status != DODO_PAGING_OK || frames_used != 3u) {
+        serial_write("DODO: user code mapping error = ");
+        serial_write_u64((uint64_t)paging_status);
+        serial_write("\\n");
+        report_boot_error("could not create a user executable page mapping");
+    }
+
+    const uint64_t user_stack_flags = DODO_PAGE_USER_ACCESSIBLE |
+        DODO_PAGE_WRITABLE |
+        (dodo_x86_64_nx_enabled() ? DODO_PAGE_NO_EXECUTE : 0u);
+    paging_status = dodo_x86_64_map_page(
+        user_stack_virtual, user_stack_frame, user_stack_flags,
+        NULL, 0, &frames_used);
+    if (paging_status != DODO_PAGING_OK || frames_used != 0u) {
+        serial_write("DODO: user stack mapping error = ");
+        serial_write_u64((uint64_t)paging_status);
+        serial_write("\\n");
+        report_boot_error("could not create a user stack mapping");
+    }
+
+    /*
+     * mov eax, DODO_X86_64_USER_TEST_MAGIC; int 0x80; ud2
+     * The DPL3 gate returns to a kernel trampoline only when the handler sees
+     * CPL3 and the exact expected register marker.
+     */
+    const uint8_t interrupt_test_code[] = {
+        UINT8_C(0xb8), UINT8_C(0xde), UINT8_C(0xc0),
+        UINT8_C(0xd0), UINT8_C(0xd0), UINT8_C(0xcd),
+        UINT8_C(0x80), UINT8_C(0x0f), UINT8_C(0x0b)
+    };
+    for (size_t i = 0; i < sizeof(interrupt_test_code); ++i) {
+        user_code[i] = interrupt_test_code[i];
+    }
+
+    const uint64_t user_stack_pointer =
+        user_stack_virtual + DODO_PAGE_SIZE - UINT64_C(16);
+    user_mode_return_marker = 0;
+    user_mode_test_armed = 1;
+    dodo_x86_64_enter_user(user_code_virtual, user_stack_pointer);
+
+    if (user_mode_test_armed != 0u ||
+        user_mode_return_marker != DODO_X86_64_USER_TEST_MAGIC) {
+        report_boot_error("ring-3 entry or controlled interrupt return failed");
+    }
+    serial_write("DODO: ring-3 entry and controlled return self-check passed\\n");
+
+    /*
+     * Try to read supervisor-only kernel memory from CPL3. If the U/S bits are
+     * correct, this read raises a protection page fault (P=1, W=0, U=1).
+     * The handler returns to the kernel only for the exact expected CR2/error
+     * code; executing the following UD2 indicates that isolation failed.
+     *
+     * movabs rax, 0xffffffff80000000; mov rax, [rax]; ud2
+     */
+    const uint8_t supervisor_read_test_code[] = {
+        UINT8_C(0x48), UINT8_C(0xb8),
+        UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x80),
+        UINT8_C(0xff), UINT8_C(0xff), UINT8_C(0xff), UINT8_C(0xff),
+        UINT8_C(0x48), UINT8_C(0x8b), UINT8_C(0x00),
+        UINT8_C(0x0f), UINT8_C(0x0b)
+    };
+    for (uint64_t i = 0; i < DODO_PAGE_SIZE; ++i) {
+        user_code[i] = 0;
+    }
+    for (size_t i = 0; i < sizeof(supervisor_read_test_code); ++i) {
+        user_code[i] = supervisor_read_test_code[i];
+    }
+
+    expected_page_fault_address = UINT64_C(0xffffffff80000000);
+    expected_page_fault_kind = DODO_EXPECT_USER_SUPERVISOR_FAULT;
+    page_fault_selftest_armed = 1;
+    user_supervisor_read_test_passed = 0;
+    dodo_x86_64_enter_user(user_code_virtual, user_stack_pointer);
+
+    if (page_fault_selftest_armed != 0u ||
+        user_supervisor_read_test_passed == 0u) {
+        report_boot_error("user mode read a supervisor-only page or faulted unexpectedly");
+    }
+    serial_write("DODO: ring-3 supervisor-isolation self-check passed\\n");
+}
+
 static void test_exception_handler(void) {
     breakpoint_selftest_armed = 1;
     __asm__ volatile ("int3" : : : "memory");
@@ -726,6 +852,7 @@ void kernel_main(void) {
     serial_write("DODO: exception IDT loaded\n");
     inspect_memory_map();
     test_virtual_mapping();
+    test_user_mode_transitions();
     test_exception_handler();
     reclaim_bootloader_memory();
     serial_write("DODO: all kernel bootstrap self-checks passed\n");
