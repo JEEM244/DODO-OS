@@ -163,6 +163,50 @@ enum dodo_paging_status dodo_x86_64_paging_init(uint64_t offset) {
     return DODO_PAGING_OK;
 }
 
+enum dodo_paging_status dodo_x86_64_paging_take_root(
+    uint64_t new_root_physical,
+    uint64_t *previous_root_physical) {
+    if (!paging_initialized || previous_root_physical == 0) {
+        return DODO_PAGING_INVALID_ARGUMENT;
+    }
+
+    if ((new_root_physical & (DODO_PAGE_SIZE - 1u)) != 0u ||
+        new_root_physical > DODO_PTE_ADDRESS_MASK ||
+        new_root_physical == root_table_physical) {
+        return DODO_PAGING_INVALID_ADDRESS;
+    }
+
+    volatile uint64_t *old_root;
+    volatile uint64_t *new_root;
+    if (!physical_to_hhdm(root_table_physical, &old_root) ||
+        !physical_to_hhdm(new_root_physical, &new_root)) {
+        return DODO_PAGING_INVALID_HHDM;
+    }
+
+    /*
+     * Copy all entries so the active kernel, IDT, stack, HHDM, and firmware
+     * response pointers stay mapped across the CR3 switch. Do not reclaim the
+     * previous root: lower-level tables and inherited entries may still refer
+     * to bootstrap-owned structures.
+     */
+    for (uint64_t i = 0; i < DODO_PAGE_SIZE / sizeof(uint64_t); ++i) {
+        new_root[i] = old_root[i];
+    }
+
+    *previous_root_physical = root_table_physical;
+    __asm__ volatile ("mov %0, %%cr3"
+                      :
+                      : "r"(new_root_physical)
+                      : "memory");
+
+    if ((read_cr3() & DODO_PTE_ADDRESS_MASK) != new_root_physical) {
+        return DODO_PAGING_READBACK_FAILED;
+    }
+
+    root_table_physical = new_root_physical;
+    return DODO_PAGING_OK;
+}
+
 int dodo_x86_64_nx_enabled(void) {
     return nx_enabled;
 }
