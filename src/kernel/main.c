@@ -856,6 +856,113 @@ static void test_user_mode_transitions(void) {
         report_boot_error("user mode read a supervisor-only page or faulted unexpectedly");
     }
     serial_write("DODO: ring-3 supervisor-isolation self-check passed\\n");
+
+    /*
+     * Build a second independent user root. It maps its own code at +2 pages
+     * and stack at +3 pages, leaving the first root's code VA unmapped. The
+     * test code in root B then tries to read root A's code VA; the expected
+     * not-present user page fault proves that a low-half mapping did not leak
+     * across CR3 roots.
+     */
+    uint64_t second_user_root_frame = 0;
+    uint64_t second_user_code_frame = 0;
+    uint64_t second_user_stack_frame = 0;
+    uint64_t second_user_table_frames[3] = { 0, 0, 0 };
+
+    if (dodo_phys_alloc_page(&physical_allocator, &second_user_root_frame) != DODO_PHYS_OK ||
+        dodo_phys_alloc_page(&physical_allocator, &second_user_code_frame) != DODO_PHYS_OK ||
+        dodo_phys_alloc_page(&physical_allocator, &second_user_stack_frame) != DODO_PHYS_OK) {
+        report_boot_error("could not allocate frames for second user root");
+    }
+    for (uint64_t i = 0; i < 3u; ++i) {
+        if (dodo_phys_alloc_page(&physical_allocator, &second_user_table_frames[i]) !=
+            DODO_PHYS_OK) {
+            report_boot_error("could not allocate second-root page tables");
+        }
+    }
+
+    paging_status = dodo_x86_64_paging_create_user_root(second_user_root_frame);
+    if (paging_status != DODO_PAGING_OK ||
+        dodo_x86_64_paging_switch_root(second_user_root_frame) != DODO_PAGING_OK) {
+        report_boot_error("could not create/activate second user root");
+    }
+
+    uint64_t second_user_region_base = 0;
+    paging_status = dodo_x86_64_find_unused_user_region(&second_user_region_base);
+    if (paging_status != DODO_PAGING_OK) {
+        report_boot_error("could not select low-half region in second user root");
+    }
+
+    const uint64_t second_user_code_virtual =
+        second_user_region_base + 2u * DODO_PAGE_SIZE;
+    const uint64_t second_user_stack_virtual =
+        second_user_region_base + 3u * DODO_PAGE_SIZE;
+    volatile uint8_t *second_user_code = (volatile uint8_t *)
+        dodo_x86_64_hhdm_pointer(second_user_code_frame);
+    volatile uint8_t *second_user_stack = (volatile uint8_t *)
+        dodo_x86_64_hhdm_pointer(second_user_stack_frame);
+    if (second_user_code == NULL || second_user_stack == NULL) {
+        report_boot_error("cannot initialize second user pages through HHDM");
+    }
+
+    for (uint64_t i = 0; i < DODO_PAGE_SIZE; ++i) {
+        second_user_code[i] = 0;
+        second_user_stack[i] = 0;
+    }
+
+    paging_status = dodo_x86_64_map_page(
+        second_user_code_virtual, second_user_code_frame,
+        DODO_PAGE_USER_ACCESSIBLE, second_user_table_frames, 3u, &frames_used);
+    if (paging_status != DODO_PAGING_OK || frames_used != 3u) {
+        report_boot_error("could not map second user code page");
+    }
+
+    const uint64_t second_stack_flags = DODO_PAGE_USER_ACCESSIBLE |
+        DODO_PAGE_WRITABLE |
+        (dodo_x86_64_nx_enabled() ? DODO_PAGE_NO_EXECUTE : 0u);
+    paging_status = dodo_x86_64_map_page(
+        second_user_stack_virtual, second_user_stack_frame,
+        second_stack_flags, NULL, 0, &frames_used);
+    if (paging_status != DODO_PAGING_OK || frames_used != 0u) {
+        report_boot_error("could not map second user stack page");
+    }
+
+    /*
+     * movabs rax, first_root_code_va; mov rax, [rax]; ud2
+     * The immediate is encoded little-endian, so derive it from the first
+     * root's actual user code address instead of assuming a fixed PML4 slot.
+     */
+    second_user_code[0] = UINT8_C(0x48);
+    second_user_code[1] = UINT8_C(0xb8);
+    for (uint64_t i = 0; i < sizeof(uint64_t); ++i) {
+        second_user_code[2u + i] =
+            (uint8_t)(user_code_virtual >> (i * 8u));
+    }
+    second_user_code[10] = UINT8_C(0x48);
+    second_user_code[11] = UINT8_C(0x8b);
+    second_user_code[12] = UINT8_C(0x00);
+    second_user_code[13] = UINT8_C(0x0f);
+    second_user_code[14] = UINT8_C(0x0b);
+
+    if (dodo_x86_64_paging_switch_root(kernel_root_frame) != DODO_PAGING_OK) {
+        report_boot_error("could not restore kernel root before second CPL3 probe");
+    }
+
+    expected_page_fault_address = user_code_virtual;
+    expected_page_fault_kind = DODO_EXPECT_USER_UNMAPPED_FAULT;
+    page_fault_selftest_armed = 1;
+    user_cross_root_isolation_passed = 0;
+    const uint64_t second_user_stack_pointer =
+        second_user_stack_virtual + DODO_PAGE_SIZE - UINT64_C(16);
+    dodo_x86_64_enter_user(
+        second_user_code_virtual, second_user_stack_pointer,
+        second_user_root_frame);
+
+    if (page_fault_selftest_armed != 0u ||
+        user_cross_root_isolation_passed == 0u) {
+        report_boot_error("second user root could access first root's mapping");
+    }
+    serial_write("DODO: independent user-root isolation self-check passed\\n");
 }
 
 static void test_exception_handler(void) {
