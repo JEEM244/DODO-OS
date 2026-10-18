@@ -30,18 +30,20 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Parse and validate the bootloader memory map.
 - [x] Implement a bootstrap physical page-frame allocator for complete 4 KiB usable frames.
 - [x] Test alignment, exhaustion, null/malformed entries, overflow, and overlapping usable ranges.
+- [x] Track active physical-frame allocations; support free/reuse, reject double frees and unknown frames, and enforce a fixed tracking cap.
 - [x] Extend Limine's active 4-level page tables with a checked single-page mapper in an unused kernel PML4 slot.
 - [x] Verify physical/direct-map aliases and a new virtual mapping in QEMU.
 - [x] Verify read-only and NX page protection behavior in QEMU.
 - [x] Verify the mapper rejects remapping a present page and rejects non-canonical virtual addresses.
-- [ ] Add broader allocator stress tests and explicit allocation ownership tracking.
+- [ ] Add broader allocator stress tests, locking/SMP safety, and complete frame ownership transfer rules.
 - [x] Recursively clone the active four-level page-table tree into DODO-owned frames while retaining leaf mappings and permissions.
 - [x] Preserve shared table references and recursive root mappings during cloning.
-- [ ] Track table/frame ownership, reclaim the obsolete bootloader tree safely, and handle allocation failure cleanup.
+- [x] Add allocation-failure injection during page-table cloning and verify rollback restores allocator counts.
+- [ ] Track table/frame ownership, reclaim the obsolete bootloader tree safely, and stress rollback failure paths.
 - [ ] Build a full virtual-memory manager and guard-page support.
 - [ ] Define physical-frame release, ownership transfer, and lifetime rules.
 
-**Acceptance:** host allocator tests and QEMU mapping/protection checks pass in CI. DODO now activates a cloned four-level table tree, but retains the same leaf physical mappings and does not yet reclaim the old tree or support per-process address spaces.
+**Acceptance:** host allocator tests cover free/reuse and invalid frees; QEMU checks mapping/protection and a failed-clone rollback. DODO activates a cloned four-level table tree, but retains the same leaf physical mappings and does not yet reclaim the old tree or support per-process address spaces. The allocator is not yet SMP-safe.
 
 ## M3 — Isolation primitives
 
