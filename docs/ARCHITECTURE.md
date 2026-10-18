@@ -1,4 +1,4 @@
-# DODO OS architecture (draft 0.2)
+# DODO OS architecture (draft 0.3)
 
 ## Goals
 
@@ -6,13 +6,13 @@ DODO is an original operating-system research project intended to become a daily
 
 ## Initial platform
 
-- CPU mode: x86-64 long mode.
+- CPU mode: x86-64 long mode, four-level paging for the first target.
 - First execution target: QEMU; physical PCs come later.
 - Initial kernel language: freestanding C; assembly only for architecture-specific entry and low-level operations.
 - Build products: a kernel ELF with no host C runtime dependency and a bootable test ISO.
 - Initial diagnostics: COM1 serial console.
 - Boot protocol: Limine base revision 3, with a pinned binary release and SHA-256 verification. Limine is a bootstrap dependency; DODO's kernel is project-owned.
-- Current boot milestone: validate the protocol handoff and memory-map response, initialize a bootstrap physical page allocator, retain four allocated frames for the next memory-management steps, and halt.
+- Current boot path: validate protocol and memory-map responses, initialize a bootstrap physical page allocator, install an initial exception IDT, and run controlled CPU/memory protection tests.
 
 ## Layers
 
@@ -23,11 +23,42 @@ DODO is an original operating-system research project intended to become a daily
 5. **Desktop and applications:** daily-use workflows, settings, file manager, browser strategy, development tools, and accessibility.
 6. **DODO Web (future):** a browser-facing workspace or remote instance using shared APIs. It is not the native kernel running unrestricted inside a browser tab.
 
-## Memory ownership
+## Physical memory
 
-DODO does not yet own its page tables or virtual-memory mappings. Its bootstrap page allocator returns only physical addresses from complete 4 KiB pages inside ranges marked usable by the Limine memory map. It rejects malformed, overlapping, unaligned, and overflowing ranges instead of trying to guess.
+DODO's bootstrap frame allocator lives in include/dodo/mm/phys.h and src/mm/phys.c.
 
-The allocator currently is intentionally simple: no page reclamation, allocation zones, NUMA policies, virtual mappings, zeroing, or ownership transfer. It is a bootstrap component and not an application-facing API.
+- It only accepts ranges explicitly marked usable by the Limine memory map.
+- It selects complete 4 KiB frames by aligning range start upward and end downward.
+- It rejects malformed maps, overflow, duplicate/overlapping usable ranges, and capacity violations.
+- Host-side tests cover alignment, exclusion of reserved ranges, invalid responses, overflow, overlaps, and exhaustion.
+- The allocator returns physical addresses. It does not make them directly dereferenceable or map/free/reclaim them.
+
+The current bootstrap reserves five page frames: three for intermediate page tables, one for a writable test page, and one for a read-only/NX protection page. These frames remain allocated during the test.
+
+## Virtual memory and permissions
+
+The x86-64 paging helper reads the active CR3 root and uses the Limine higher-half direct map to inspect and initialize page-table pages. It refuses unsupported five-level paging, invalid addresses, unknown flags, huge-page collisions, conflicting parent permissions, existing leaf mappings, and reused or unaligned table frames.
+
+It maps a test page into an unused kernel PML4 slot. The QEMU self-test verifies that the direct-map alias and the new virtual alias see the same contents.
+
+Before enforcing supervisor read-only checks, DODO enables CR0.WP. If the CPU supports NX, it enables EFER.NXE. The boot test then demonstrates hardware enforcement:
+- reading the test page through a read-only mapping succeeds;
+- writing through the read-only mapping raises a page fault with the expected access bits and is recovered only because the test was explicitly armed;
+- instruction fetch from an NX mapping raises the expected instruction-fetch page fault and is recovered only in the armed test path.
+
+Unhandled page faults remain fatal. These tests cover particular paths in QEMU; they are not a complete virtual-memory manager or a comprehensive security proof.
+
+Current limitations:
+- DODO does not yet create and own its own top-level page-table root.
+- The bootstrap still relies on Limine's active mappings and the higher-half direct map.
+- There is no virtual-memory area manager, allocation reclamation, demand paging, copy-on-write, per-process address space, or guard-page stack allocator.
+- Existing page tables are extended only in an empty kernel PML4 slot; the mapper intentionally never overwrites a present leaf.
+
+## Exception handling
+
+The initial IDT installs CPU exception vectors 0–31. Assembly stubs normalize exception error-code layouts and preserve general-purpose register state before invoking a C handler.
+
+The verified tests cover INT3 dispatch/resumption and intentionally triggered page faults for read-only and NX protection. All other unexpected exceptions halt the kernel and log basic context. IRQs, timer delivery, nested interrupts, IST stacks, privilege transitions, and a full panic policy remain future work.
 
 ## Security model principles
 
