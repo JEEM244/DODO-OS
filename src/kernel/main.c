@@ -352,6 +352,29 @@ static void test_virtual_mapping(void) {
     serial_write("\n");
 
     /*
+     * Security regressions: a present leaf must never be silently replaced,
+     * and non-canonical addresses must be rejected before any table mutation.
+     */
+    uint64_t frames_used = 0;
+    const uint64_t existing_flags = DODO_PAGE_WRITABLE |
+        (dodo_x86_64_nx_enabled() ? DODO_PAGE_NO_EXECUTE : 0u);
+    status = dodo_x86_64_map_page(
+        mapped_virtual_address, bootstrap_reserved_frames[3],
+        existing_flags, NULL, 0, &frames_used);
+    if (status != DODO_PAGING_ALREADY_MAPPED || frames_used != 0u) {
+        report_boot_error("mapper did not protect an existing leaf mapping");
+    }
+    serial_write("DODO: existing mapping protection self-check passed\n");
+
+    status = dodo_x86_64_map_page(
+        UINT64_C(0x0000800000000000), bootstrap_reserved_frames[4],
+        0, NULL, 0, &frames_used);
+    if (status != DODO_PAGING_INVALID_ADDRESS || frames_used != 0u) {
+        report_boot_error("mapper accepted a non-canonical virtual address");
+    }
+    serial_write("DODO: noncanonical address rejection self-check passed\n");
+
+    /*
      * Map an additional page read-only. The direct-map alias remains writable,
      * so the contents can be initialized without violating the test mapping.
      */
@@ -359,7 +382,6 @@ static void test_virtual_mapping(void) {
         mapped_virtual_address + DODO_PAGE_SIZE;
     const uint64_t read_only_flags =
         dodo_x86_64_nx_enabled() ? DODO_PAGE_NO_EXECUTE : 0u;
-    uint64_t frames_used = 0;
     status = dodo_x86_64_map_page(
         read_only_virtual_address, bootstrap_reserved_frames[4],
         read_only_flags, NULL, 0, &frames_used);
