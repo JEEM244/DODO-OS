@@ -1,4 +1,4 @@
-name: Kernel build
+name: DODO kernel and boot test
 
 on:
   push:
@@ -9,21 +9,36 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  kernel-build-and-boot:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install --yes build-essential binutils
+      - name: Install build and test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes build-essential binutils curl xorriso qemu-system-x86
 
-      - name: Build freestanding kernel ELF
+      - name: Build kernel and bootable ISO
         run: make clean all
 
-      - name: Verify ELF architecture and entry point
+      - name: Verify ELF architecture, entry point, and load segments
         run: |
           file build/dodo-kernel.elf
           readelf -h build/dodo-kernel.elf
+          readelf -l build/dodo-kernel.elf
           readelf -h build/dodo-kernel.elf | grep -q 'Advanced Micro Devices X86-64'
           nm build/dodo-kernel.elf | grep -q ' T _start$'
+
+      - name: Boot ISO and verify kernel serial output
+        run: make qemu-smoke
+
+      - name: Upload bootable ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: dodo-os-bootable-iso
+          path: build/dodo-os.iso
+          if-no-files-found: error
+          retention-days: 14
