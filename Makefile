@@ -25,10 +25,12 @@ HEADERS := include/dodo/boot/limine_protocol.h \
            include/dodo/mm/phys.h \
            include/dodo/arch/x86_64/gdt.h \
            include/dodo/arch/x86_64/interrupts.h \
-           include/dodo/arch/x86_64/paging.h
+           include/dodo/arch/x86_64/paging.h \
+           include/dodo/arch/x86_64/user_mode.h
 OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/gdt.o \
            $(BUILD_DIR)/idt.o $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o \
-           $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/paging_test.o
+           $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/paging_test.o \
+           $(BUILD_DIR)/user_mode.o
 PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
 
 .PHONY: all kernel iso run qemu-smoke test-phys test clean check-tools
@@ -69,6 +71,9 @@ $(BUILD_DIR)/interrupts.o: src/arch/x86_64/interrupts.S | $(BUILD_DIR)
 	$(CC) $(ASFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/paging_test.o: src/arch/x86_64/paging_test.S | $(BUILD_DIR)
+	$(CC) $(ASFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/user_mode.o: src/arch/x86_64/user_mode.S | $(BUILD_DIR)
 	$(CC) $(ASFLAGS) -c $< -o $@
 
 $(KERNEL_ELF): $(OBJECTS) linker/x86_64.ld
@@ -154,6 +159,10 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "DODO: read-only page protection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: NX instruction fetch was blocked" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: NX execution protection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: ring-3 software interrupt reached kernel handler" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: ring-3 entry and controlled return self-check passed" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: ring-3 read of supervisor memory was blocked" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: ring-3 supervisor-isolation self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: exception IDT loaded" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: IDT breakpoint self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: exception handler resumed after INT3" $(BUILD_DIR)/qemu-serial.log; \
