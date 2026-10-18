@@ -4,7 +4,7 @@
 
 The goal is not to create another Linux distribution or a collection of security utilities. DODO aims to become a practical daily-use desktop operating system whose architecture limits what programs can access, makes their actions explainable, and allows risky work to happen in isolated environments.
 
-> **Current status:** DODO has a freestanding x86-64 kernel, a pinned Limine boot path, a BIOS/UEFI test ISO, a bootstrap physical page allocator, and an initial exception IDT. GitHub Actions runs host allocator tests and boots the ISO in QEMU. This remains an early kernel prototype, not a desktop OS. Check the latest CI run before treating any milestone as verified.
+> **Current status:** DODO has a freestanding x86-64 kernel, a pinned Limine boot path, a BIOS/UEFI test ISO, a bootstrap physical page allocator, an initial exception IDT, and a checked extension of the active page tables. GitHub Actions runs host allocator tests and boots the ISO in QEMU, including read-only and NX protection tests. This remains an early kernel prototype, not a desktop OS. Check the latest CI run before treating any milestone as verified.
 
 ## Project principles
 
@@ -26,15 +26,16 @@ This is a research hypothesis, not a claim of unprecedented invention. Existing 
 
 ## Current kernel milestone
 
-- Architecture: x86-64.
-- Boot path: Limine protocol base revision 3, using a pinned upstream binary release verified by SHA-256.
-- Implementation: freestanding C and x86-64 assembly.
-- Memory: validates the bootloader map and allocates complete 4 KiB physical frames from usable ranges.
-- Exceptions: IDT entries for vectors 0–31, fatal exception diagnostics, page-fault CR2 reporting, and a tested INT3 return path.
-- Link layout: higher-half kernel with separate request, executable, read-only, and writable ELF segments.
-- Diagnostics: COM1 serial output.
-- Test environment: QEMU before physical hardware.
-- Safety boundary: no disk installation, no privileged host access, and no real network tools.
+- **Architecture:** x86-64 long mode, 4-level page tables.
+- **Boot path:** Limine protocol base revision 3, using a pinned upstream binary release verified by SHA-256.
+- **Implementation:** freestanding C and x86-64 assembly.
+- **Physical memory:** validates the bootloader map and allocates complete 4 KiB physical frames from usable ranges.
+- **Virtual memory:** reads CR3, uses Limine's higher-half direct map for page-table access, and maps a test page in an unused kernel PML4 slot without replacing existing mappings.
+- **Page protections:** explicitly enables CR0.WP; when supported, enables EFER.NXE. QEMU tests verify that writes to a read-only mapping and instruction fetches from an NX mapping fault as expected.
+- **Exceptions:** IDT entries for vectors 0–31, fatal exception diagnostics, page-fault CR2 reporting, and tested recovery for intentionally triggered faults.
+- **Diagnostics:** COM1 serial output.
+- **Test environment:** QEMU before physical hardware.
+- **Safety boundary:** no disk installation, no privileged host access, and no real network tools.
 
 Limine is deliberately used only to bootstrap the kernel. DODO's kernel and future operating-system services remain our own work; developing a custom bootloader, every driver, and all desktop applications at the same time would delay the first useful milestones.
 
@@ -42,12 +43,12 @@ Limine is deliberately used only to bootstrap the kernel. DODO's kernel and futu
 
 Read [docs/BUILDING.md](docs/BUILDING.md) before building.
 
-```sh
+~~~sh
 make test            # host-side physical allocator tests
 make clean all       # build kernel and bootable test ISO
 make run             # launch the ISO in QEMU
-make qemu-smoke      # verify boot, allocator, and IDT self-checks
-```
+make qemu-smoke      # verify boot, page protections, and exception recovery
+~~~
 
 The prototype prints diagnostic messages over COM1 serial output and eventually halts after its self-tests. A blank graphical display is expected: DODO does not yet have graphics support or a desktop.
 
@@ -56,7 +57,7 @@ The prototype prints diagnostic messages over COM1 serial output and eventually 
 See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/BUILDING.md](docs/BUILDING.md), and [docs/BOOT-AND-ENTRY.md](docs/BOOT-AND-ENTRY.md).
 
 1. **Kernel bring-up:** repeatable boot, serial diagnostics, and exception handling.
-2. **Memory:** physical frames, virtual memory, page tables, and guard pages.
+2. **Memory:** physical frames, page-table mapping primitives, protection checks, then full virtual-memory ownership and guard pages.
 3. **Isolation primitives:** user/kernel separation, IPC, scheduler, and capability enforcement.
 4. **SOMBRA prototype:** isolated workload, change journal, review, and discard tests.
 5. **Useful system services:** storage, networking, input, graphics, and update/recovery.
@@ -65,23 +66,23 @@ See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE
 
 ## Repository layout
 
-```text
+~~~text
 .
 ├── config/                  # Limine boot menu
 ├── docs/                    # Architecture, build, threat model, and roadmap
 ├── include/dodo/            # Kernel-owned public headers
-├── src/arch/x86_64/          # Entry, IDT, and exception stubs
+├── src/arch/x86_64/          # Entry, IDT, paging, and exception stubs
 ├── src/kernel/              # Main kernel bootstrap
 ├── src/mm/                  # Physical frame allocator
 ├── tests/                   # Host-side unit tests
 ├── linker/                  # ELF load layout
 ├── Makefile                 # Kernel, ISO, and test targets
 └── .github/workflows/       # Build and QEMU boot tests
-```
+~~~
 
 ## Security status
 
-DODO is experimental and must not be used to protect sensitive data or as a production security boundary. A successful boot test only proves that the tested artifact reaches the checked points; it does not prove the absence of vulnerabilities. Do not install early builds on a daily-use computer.
+DODO is experimental and must not be used to protect sensitive data or as a production security boundary. The checked mapping tests show specific hardware-enforced behaviors in QEMU; they do not prove the absence of vulnerabilities or establish a complete memory-protection design. Do not install early builds on a daily-use computer.
 
 ## Contributing
 
