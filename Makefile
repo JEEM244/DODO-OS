@@ -133,6 +133,7 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "DODO: Limine base revision accepted" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: memory map received" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: physical allocator self-check passed" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: page-table clone rollback self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: DODO-owned page-table tree installed; root =" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: page-table frames cloned =" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: virtual page mapping self-check passed" $(BUILD_DIR)/qemu-serial.log; \
