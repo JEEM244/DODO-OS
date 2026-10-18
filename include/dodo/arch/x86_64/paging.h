@@ -25,7 +25,8 @@ enum dodo_paging_status {
     DODO_PAGING_NOT_SUPPORTED = 10,
     DODO_PAGING_READBACK_FAILED = 11,
     DODO_PAGING_CLONE_CAPACITY_EXCEEDED = 12,
-    DODO_PAGING_ROLLBACK_FAILED = 13
+    DODO_PAGING_ROLLBACK_FAILED = 13,
+    DODO_PAGING_NO_FREE_USER_SLOT = 14
 };
 
 /*
@@ -57,6 +58,10 @@ int dodo_x86_64_nx_enabled(void);
 
 /* Return the HHDM alias for a physical address, or NULL before init/on error. */
 volatile void *dodo_x86_64_hhdm_pointer(uint64_t physical_address);
+
+/* Find an empty canonical low-half PML4 slot for a user address space. */
+enum dodo_paging_status dodo_x86_64_find_unused_user_region(
+    uint64_t *virtual_address);
 
 /* Assembly helpers used only by the controlled read-only/NX fault self-tests. */
 int dodo_x86_64_test_write_readonly(volatile uint64_t *target);
