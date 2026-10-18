@@ -160,6 +160,10 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "DODO: NX instruction fetch was blocked" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: NX execution protection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: separate user root mapping self-check passed" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO USER: DODO says hello from CPL3" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: invalid user syscall pointer rejected" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: validated user write syscall self-check passed" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: invalid user syscall pointer rejection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: ring-3 software interrupt reached kernel handler" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: ring-3 entry and controlled return self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: ring-3 read of supervisor memory was blocked" $(BUILD_DIR)/qemu-serial.log; \
