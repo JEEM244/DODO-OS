@@ -64,7 +64,7 @@ For an automated boot check on Linux:
 make qemu-smoke
 ```
 
-The smoke test boots the ISO for up to 12 seconds, captures the serial log in `build/qemu-serial.log`, and checks the boot handoff, memory-map parsing, physical allocator, page-table clone rollback, virtual mapping, read-only/NX protection, separate user-root mapping, CPL3 interrupt/return, supervisor-memory denial, IDT installation, and controlled exception recovery. It uses QEMU and does not write to the host's disks.
+The smoke test boots the ISO for up to 12 seconds, captures the serial log in `build/qemu-serial.log`, and checks the boot handoff, memory-map parsing, physical allocator, page-table clone rollback, virtual mapping, read-only/NX protection, separate user-root mapping, CPL3 interrupt/return, supervisor-memory denial, cross-root non-present fault, IDT installation, and controlled exception recovery. It uses QEMU and does not write to the host's disks.
 
 ## Inspect the kernel
 
