@@ -17,6 +17,7 @@
 #define DODO_PML4_SLOT_SHIFT 39u
 #define DODO_PML4_SLOT_SPAN (UINT64_C(1) << DODO_PML4_SLOT_SHIFT)
 #define DODO_HHDM_MINIMUM UINT64_C(0xffff800000000000)
+#define DODO_USER_ADDRESS_LIMIT UINT64_C(0x0000800000000000)
 #define DODO_EFER_MSR UINT32_C(0xc0000080)
 #define DODO_EFER_NXE (UINT64_C(1) << 11)
 #define DODO_CR4_LA57 (UINT64_C(1) << 12)
@@ -462,7 +463,9 @@ enum dodo_paging_status dodo_x86_64_map_page(
         (virtual_address & (DODO_PAGE_SIZE - 1u)) != 0u ||
         (physical_address & (DODO_PAGE_SIZE - 1u)) != 0u ||
         physical_address > DODO_PTE_ADDRESS_MASK ||
-        (flags & ~DODO_PTE_ALLOWED_FLAGS) != 0u) {
+        (flags & ~DODO_PTE_ALLOWED_FLAGS) != 0u ||
+        ((flags & DODO_PAGE_USER_ACCESSIBLE) != 0u &&
+         virtual_address >= DODO_USER_ADDRESS_LIMIT)) {
         return DODO_PAGING_INVALID_ADDRESS;
     }
 
