@@ -9,6 +9,17 @@ dodo_x86_64_enter_user:
      * fault returns through dodo_x86_64_user_return_trampoline, which restores
      * this RSP and returns to the caller as an ordinary function return.
      */
+    /*
+     * Preserve SysV callee-saved registers across this special transition.
+     * The interrupt handler intentionally abandons the user register frame, so
+     * the kernel caller's RBX/RBP/R12-R15 must be restored from its own stack.
+     */
+    pushq %rbx
+    pushq %rbp
+    pushq %r12
+    pushq %r13
+    pushq %r14
+    pushq %r15
     movq %rsp, dodo_x86_64_saved_kernel_rsp(%rip)
 
     /* User code must run with user-level data selectors, not kernel selectors. */
@@ -32,7 +43,7 @@ dodo_x86_64_user_return_trampoline:
     cli
     movq dodo_x86_64_saved_kernel_rsp(%rip), %rsp
 
-    /* Restore the kernel data/stack selectors before returning to C. */
+    /* Restore the kernel data/stack selectors before touching the old stack. */
     movw $0x30, %ax
     movw %ax, %ds
     movw %ax, %es
@@ -40,6 +51,14 @@ dodo_x86_64_user_return_trampoline:
     xorw %ax, %ax
     movw %ax, %fs
     movw %ax, %gs
+
+    /* Reverse the six pushes at entry and return to the original caller. */
+    popq %r15
+    popq %r14
+    popq %r13
+    popq %r12
+    popq %rbp
+    popq %rbx
     ret
 
 .section .bss
