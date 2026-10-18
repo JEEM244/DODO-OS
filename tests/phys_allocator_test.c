@@ -156,6 +156,58 @@ static void test_zero_physical_page_can_be_allocated_and_freed(void) {
     assert(page == 0);
 }
 
+static void test_tracking_capacity_is_bounded(void) {
+    const struct dodo_limine_memmap_entry usable = {
+        .base = UINT64_C(0x1000),
+        .length = (DODO_PHYS_MAX_TRACKED_PAGES + UINT64_C(1)) *
+                  DODO_PHYS_PAGE_SIZE,
+        .type = DODO_LIMINE_MEMMAP_USABLE
+    };
+    struct dodo_limine_memmap_entry *entries[] = {
+        (struct dodo_limine_memmap_entry *)&usable
+    };
+    const struct dodo_limine_memmap_response map = {
+        .revision = 0,
+        .entry_count = 1,
+        .entries = entries
+    };
+
+    struct dodo_phys_allocator allocator;
+    assert(dodo_phys_init(&allocator, &map) == DODO_PHYS_OK);
+
+    uint64_t first_page = UINT64_MAX;
+    for (uint64_t i = 0; i < DODO_PHYS_MAX_TRACKED_PAGES; ++i) {
+        uint64_t page = UINT64_MAX;
+        assert(dodo_phys_alloc_page(&allocator, &page) == DODO_PHYS_OK);
+        assert(page % DODO_PHYS_PAGE_SIZE == 0);
+        if (i == 0) {
+            first_page = page;
+        } else {
+            assert(page != first_page);
+        }
+    }
+
+    assert(allocator.allocated_pages == DODO_PHYS_MAX_TRACKED_PAGES);
+    assert(allocator.free_pages == 1);
+
+    uint64_t untouched_output = UINT64_C(0x1234);
+    assert(dodo_phys_alloc_page(&allocator, &untouched_output) ==
+           DODO_PHYS_TRACKING_CAPACITY_EXCEEDED);
+    assert(untouched_output == UINT64_C(0x1234));
+    assert(allocator.allocated_pages == DODO_PHYS_MAX_TRACKED_PAGES);
+    assert(allocator.free_pages == 1);
+
+    assert(dodo_phys_free_page(&allocator, first_page) == DODO_PHYS_OK);
+    assert(allocator.allocated_pages == DODO_PHYS_MAX_TRACKED_PAGES - 1u);
+    assert(allocator.free_pages == 2);
+
+    uint64_t recycled_page = 0;
+    assert(dodo_phys_alloc_page(&allocator, &recycled_page) == DODO_PHYS_OK);
+    assert(recycled_page == first_page);
+    assert(allocator.allocated_pages == DODO_PHYS_MAX_TRACKED_PAGES);
+    assert(allocator.free_pages == 1);
+}
+
 static void test_invalid_arguments_and_map(void) {
     struct dodo_phys_allocator allocator;
     assert(dodo_phys_init(0, 0) == DODO_PHYS_INVALID_ARGUMENT);
@@ -226,6 +278,7 @@ int main(void) {
     test_basic_allocation();
     test_free_reallocate_and_duplicate_free();
     test_zero_physical_page_can_be_allocated_and_freed();
+    test_tracking_capacity_is_bounded();
     test_invalid_arguments_and_map();
     test_overlap_rejected();
     puts("DODO physical allocator tests: PASS");
