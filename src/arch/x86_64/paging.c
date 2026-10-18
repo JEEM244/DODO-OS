@@ -5,12 +5,13 @@
 
 #define DODO_PTE_PRESENT (UINT64_C(1) << 0)
 #define DODO_PTE_WRITABLE (UINT64_C(1) << 1)
+#define DODO_PTE_USER (UINT64_C(1) << 2)
 #define DODO_PTE_PAGE_SIZE (UINT64_C(1) << 7)
 #define DODO_PTE_NO_EXECUTE (UINT64_C(1) << 63)
 #define DODO_PTE_ADDRESS_MASK UINT64_C(0x000ffffffffff000)
-#define DODO_PTE_ALLOWED_FLAGS (DODO_PAGE_WRITABLE | DODO_PAGE_WRITE_THROUGH | \
-                                DODO_PAGE_CACHE_DISABLE | DODO_PAGE_GLOBAL | \
-                                DODO_PAGE_NO_EXECUTE)
+#define DODO_PTE_ALLOWED_FLAGS (DODO_PAGE_WRITABLE | DODO_PAGE_USER_ACCESSIBLE | \
+                                DODO_PAGE_WRITE_THROUGH | DODO_PAGE_CACHE_DISABLE | \
+                                DODO_PAGE_GLOBAL | DODO_PAGE_NO_EXECUTE)
 #define DODO_PML4_FIRST_KERNEL_SLOT UINT64_C(256)
 #define DODO_PML4_LAST_KERNEL_SLOT UINT64_C(510)
 #define DODO_PML4_SLOT_SHIFT 39u
@@ -372,6 +373,11 @@ static enum dodo_paging_status get_or_create_child(
             (entry & DODO_PTE_WRITABLE) == 0u) {
             return DODO_PAGING_PERMISSION_CONFLICT;
         }
+        if ((mapping_flags & DODO_PAGE_USER_ACCESSIBLE) != 0u &&
+            (entry & DODO_PTE_USER) == 0u) {
+            /* Never widen an existing supervisor-only ancestor implicitly. */
+            return DODO_PAGING_PERMISSION_CONFLICT;
+        }
         if ((mapping_flags & DODO_PAGE_NO_EXECUTE) == 0u &&
             (entry & DODO_PTE_NO_EXECUTE) != 0u) {
             return DODO_PAGING_PERMISSION_CONFLICT;
@@ -400,8 +406,13 @@ static enum dodo_paging_status get_or_create_child(
     }
     zero_physical_page(new_table);
 
-    /* New intermediate tables are writable; leaf permissions still decide access. */
-    *parent_entry = frame | DODO_PTE_PRESENT | DODO_PTE_WRITABLE;
+    /*
+     * Intermediate permissions must allow every requested leaf permission;
+     * supervisor mappings never acquire U/S bits, even when a parent exists.
+     */
+    *parent_entry = frame | DODO_PTE_PRESENT | DODO_PTE_WRITABLE |
+        ((mapping_flags & DODO_PAGE_USER_ACCESSIBLE) != 0u
+            ? DODO_PTE_USER : 0u);
     *frames_used += 1u;
     *child_table = new_table;
     return DODO_PAGING_OK;
