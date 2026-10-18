@@ -27,15 +27,17 @@ include/dodo/mm/phys.h exposes the bootstrap allocator interface; src/mm/phys.c 
 - Uses only entries explicitly marked usable by the boot protocol.
 - Aligns usable ranges inward so each returned address identifies a complete 4 KiB page.
 - Rejects null entries, excessive entry counts, arithmetic overflow, and overlapping usable ranges.
-- Tracks remaining and allocated frame counts.
-- Returns physical addresses only; it does not make them directly dereferenceable, create mappings, zero data, or support freeing.
-- Has host-side tests covering alignment, exclusion of reserved ranges, malformed maps, overflow, overlap and exhaustion.
+- Tracks remaining pages, outstanding allocations, and a bounded recycled-frame stack.
+- Supports returning a tracked frame and reusing it; rejects unaligned, unknown, and duplicate frees.
+- Returns physical addresses only; it does not make them directly dereferenceable, create mappings, or zero data.
+- Has host-side tests covering alignment, malformed maps, overflow, overlap, exhaustion, freeing/reuse, frame zero, and allocation-ledger capacity.
 
 ## Virtual memory mapper and protection tests
 
 include/dodo/arch/x86_64/paging.h and src/arch/x86_64/paging.c provide a deliberately small x86-64 mapping primitive.
 
 - Recursively clones the four-level table hierarchy into DODO-owned frames, preserves leaf mappings, handles shared references and recursive root mappings, and activates the new root only after the copy succeeds. Uses the Limine HHDM to access source and destination tables during bootstrap.
+- If cloning fails before CR3 activation, calls the frame-release callback for cached clone frames in reverse order. QEMU injects an allocation failure after two successful frame allocations and checks that free/live allocator counts are restored.
 - Supports four-level paging only; rejects LA57 (five-level paging).
 - Maps one aligned 4 KiB page in an unused kernel PML4 slot and never overwrites an existing leaf mapping.
 - Rejects unsupported flags, invalid/unaligned addresses, huge-page conflicts, conflicting parent permissions and repeated table frames.
@@ -49,7 +51,7 @@ The QEMU smoke test proves the specific assertions in this path:
 - instruction fetch through an NX mapping is blocked when NX is supported;
 - the handler resumes only the intentionally triggered faults.
 
-DODO owns a clone of the four-level page-table hierarchy, but retains the same leaf physical mappings and does not reclaim the previous tree. This is not a complete virtual-memory system: no frame reclamation, per-process spaces, demand paging, copy-on-write, or guard-page stack allocator exists yet.
+DODO owns a clone of the four-level page-table hierarchy, but retains the same leaf physical mappings and does not reclaim the previous Limine tree. The physical allocator supports freeing tracked frames, but the kernel does not yet reclaim old table frames or provide a general virtual-memory area manager. Per-process spaces, demand paging, copy-on-write, and guard-page stack allocation are still absent.
 
 ## Early exception IDT
 
