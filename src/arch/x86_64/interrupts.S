@@ -56,8 +56,18 @@ DODO_ISR_ERR   29
 DODO_ISR_ERR   30
 DODO_ISR_NOERR 31
 
+/* DPL3 software interrupt used only by the controlled ring-3 self-test. */
+.global dodo_isr_128
+.type dodo_isr_128, @function
+dodo_isr_128:
+    pushq $0
+    pushq $128
+    jmp dodo_isr_common
+.size dodo_isr_128, . - dodo_isr_128
+
 /*
- * On entry: [vector, error, RIP, CS, RFLAGS].
+ * On entry: [vector, error, RIP, CS, RFLAGS], followed by user RSP/SS
+ * when the exception crossed from CPL3 to CPL0.
  * Save all general-purpose registers. r12 temporarily holds the stack frame
  * address; its pre-interrupt value is already saved on the stack.
  */
