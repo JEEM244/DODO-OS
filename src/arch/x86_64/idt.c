@@ -6,6 +6,8 @@
 #define DODO_IDT_ENTRIES 256u
 #define DODO_IDT_EXCEPTION_COUNT 32u
 #define DODO_IDT_INTERRUPT_GATE UINT8_C(0x8e)
+#define DODO_IDT_USER_TEST_GATE UINT8_C(0xee)
+#define DODO_IDT_USER_TEST_VECTOR 128u
 
 struct dodo_idt_gate {
     uint16_t offset_low;
@@ -27,13 +29,15 @@ _Static_assert(sizeof(struct dodo_idtr) == 10, "IDTR must be 10 bytes");
 
 static struct dodo_idt_gate idt[DODO_IDT_ENTRIES] __attribute__((aligned(16)));
 extern void (*dodo_isr_table[DODO_IDT_EXCEPTION_COUNT])(void);
+extern void dodo_isr_128(void);
 
-static void set_gate(uint8_t vector, uintptr_t handler, uint16_t code_selector) {
+static void set_gate(uint8_t vector, uintptr_t handler,
+                     uint16_t code_selector, uint8_t attributes) {
     struct dodo_idt_gate *gate = &idt[vector];
     gate->offset_low = (uint16_t)(handler & UINT64_C(0xffff));
     gate->selector = code_selector;
     gate->ist = 0;
-    gate->attributes = DODO_IDT_INTERRUPT_GATE;
+    gate->attributes = attributes;
     gate->offset_middle = (uint16_t)((handler >> 16) & UINT64_C(0xffff));
     gate->offset_high = (uint32_t)((handler >> 32) & UINT64_C(0xffffffff));
     gate->reserved = 0;
@@ -54,8 +58,13 @@ void dodo_x86_64_idt_init(void) {
     }
 
     for (uint8_t vector = 0; vector < DODO_IDT_EXCEPTION_COUNT; ++vector) {
-        set_gate(vector, (uintptr_t)dodo_isr_table[vector], code_selector);
+        set_gate(vector, (uintptr_t)dodo_isr_table[vector], code_selector,
+                 DODO_IDT_INTERRUPT_GATE);
     }
+
+    /* Only this intentional test interrupt is callable from CPL3. */
+    set_gate(DODO_IDT_USER_TEST_VECTOR, (uintptr_t)dodo_isr_128,
+             code_selector, DODO_IDT_USER_TEST_GATE);
 
     const struct dodo_idtr idtr = {
         .limit = (uint16_t)(sizeof(idt) - 1u),
