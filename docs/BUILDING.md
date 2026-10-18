@@ -1,6 +1,6 @@
 # Building and testing DODO OS
 
-This guide builds the kernel and a bootable test ISO. The first build is only a kernel diagnostics milestone: it does not provide a graphical desktop, networking, storage access, or a usable daily operating system.
+This guide builds the kernel and a bootable test ISO. The current kernel is a bring-up prototype: it prints diagnostics, validates the Limine handoff, parses the bootloader memory map, and exercises DODO's bootstrap physical page allocator. It does not yet provide a graphical desktop, networking, storage access, user processes, or a usable daily operating system.
 
 ## Requirements
 
@@ -14,6 +14,21 @@ sudo apt install --yes build-essential binutils make curl xorriso qemu-system-x8
 ```
 
 The build downloads the pinned Limine binary release. A SHA-256 checksum is checked before extraction. Limine is used as a bootloader; the kernel source in `src/` is DODO's own code.
+
+## Run the allocator unit tests
+
+```sh
+make test
+```
+
+These host-side tests exercise the physical page allocator with synthetic memory maps, including:
+- whole-page alignment and allocation exhaustion;
+- ignoring non-usable memory ranges;
+- invalid pointers and malformed memory maps;
+- integer-overflow rejection;
+- rejecting overlapping usable ranges, which could otherwise produce duplicate frames.
+
+These tests check allocator logic separately from hardware boot. They do not prove that every physical memory map emitted by every firmware is valid.
 
 ## Build
 
@@ -37,7 +52,9 @@ The ISO is constructed with Limine's BIOS and UEFI boot files. Build tools and b
 make run
 ```
 
-The first milestone prints status messages over COM1 serial output, then halts the CPU. A blank graphical display is expected: DODO does not have a graphics driver or desktop yet. The messages appear in the terminal used to run QEMU.
+The prototype prints status messages over COM1 serial output, then halts the CPU. A blank graphical display is expected: DODO does not have a graphics driver or desktop yet. The messages appear in the terminal used to run QEMU.
+
+The boot path validates the memory-map response and initializes a simple physical page allocator. It allocates four 4 KiB frames for a bootstrap self-check and retains their addresses as reserved. The allocator returns physical addresses only; it does not yet create virtual mappings or allow those frames to be dereferenced.
 
 For an automated boot check on Linux:
 
@@ -45,7 +62,7 @@ For an automated boot check on Linux:
 make qemu-smoke
 ```
 
-The smoke test boots the ISO for up to 12 seconds, captures the serial log in `build/qemu-serial.log`, and checks that DODO reached its kernel entry point and that Limine accepted the requested base protocol revision. It uses QEMU and does not write to the host's disks.
+The smoke test boots the ISO for up to 12 seconds, captures the serial log in `build/qemu-serial.log`, and checks that DODO reached its kernel entry point, accepted the requested Limine base revision, received the memory map, and passed the physical allocator self-check. It uses QEMU and does not write to the host's disks.
 
 ## Inspect the kernel
 
@@ -62,9 +79,9 @@ The kernel uses a higher-half x86-64 layout and separate load segments for reque
 
 - Do not install this prototype on your main computer.
 - Do not write the image to a USB stick or disk containing important data.
-- Do not treat the prototype as a security boundary or use it to protect sensitive information.
+- Do not treat this prototype as a security boundary or use it to protect sensitive information.
 - Boot testing in CI is not the same as testing on every physical PC.
 
 ## Continuous integration
 
-The GitHub Actions workflow compiles the kernel, verifies ELF metadata, boots the generated ISO under QEMU, checks serial output, and uploads `dodo-os.iso` as an artifact for 14 days. The repository's Actions tab is the source of truth for the latest run result.
+The GitHub Actions workflow runs the allocator unit tests, compiles the kernel, verifies ELF metadata, boots the generated ISO under QEMU, checks serial output, and uploads `dodo-os.iso` as an artifact for 14 days. The repository's Actions tab is the source of truth for the latest run result.
