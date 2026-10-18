@@ -68,13 +68,14 @@ The verified tests cover INT3 dispatch/resumption and intentionally triggered pa
 
 DODO now has a deliberately narrow CPL3 probe, not a general process model:
 
-1. The kernel maps a page containing a few hand-written x86-64 instructions as user-accessible and a separate user stack page as user-readable/writable and NX where supported.
-2. The TSS supplies a dedicated ring-0 stack for the CPL3-to-CPL0 interrupt transition.
-3. User code invokes `int 0x80`. The DPL3 gate dispatches to the kernel handler only while the test is armed and the register marker is correct.
-4. The handler exits the transient user context through a dedicated assembly trampoline. It restores the saved kernel stack and SysV callee-saved registers instead of treating the mixed-privilege interrupt frame as a normal same-level `iretq`.
-5. User code is then changed to try to read `0xffffffff80000000`, a supervisor-only kernel virtual address. The page-fault handler resumes only when CR2, CPL3, and the page-fault error bits match that specific expected read; QEMU confirms the access is denied.
+1. The kernel allocates a separate user PML4 root. It starts with the lower-half entries empty and copies the kernel half with the U/S bit forcibly cleared at the PML4 level.
+2. The user code page and user stack are mapped only in that user root. A check verifies that the same lower-half PML4 slot remains empty in the kernel root and is present with U/S set in the user root.
+3. The TSS supplies a dedicated ring-0 stack for the CPL3-to-CPL0 interrupt transition.
+4. User code invokes `int 0x80`. The DPL3 gate dispatches to the kernel handler only while the test is armed and the register marker is correct.
+5. The handler exits the transient user context through a dedicated assembly trampoline. It switches CR3 back to the kernel root and restores the saved kernel stack plus SysV callee-saved registers instead of treating the mixed-privilege interrupt frame as a normal same-level `iretq`.
+6. User code is then changed to try to read `0xffffffff80000000`, a supervisor-only kernel virtual address. The page-fault handler resumes only when CR2, CPL3, and the page-fault error bits match that specific expected read; QEMU confirms the access is denied under the separate user root.
 
-This test is single-threaded and uses global one-shot state, a shared address-space hierarchy, and one fixed user region. It does not provide independent per-process address spaces, user memory reclamation, syscall validation, a scheduler, context switching, signals, or a hardened system-call ABI. It is evidence for two narrow behaviors in the QEMU configuration—not a claim that arbitrary user programs are safely isolated yet.
+This test is single-threaded and uses global one-shot state, one fixed user root, and shared supervisor-only higher-half mappings. User mappings in the lower half are now held in a root separate from the kernel's root, but DODO does not yet create multiple simultaneous address spaces, track/reclaim their page tables, validate syscall arguments, schedule processes, deliver signals, or provide a hardened syscall ABI. This proves the initial address-space boundary in the QEMU configuration; it does not establish that arbitrary user programs are safely isolated yet.
 
 ## Security model principles
 
