@@ -6,9 +6,9 @@
 2. Limine reads `/boot/limine/limine.conf` and loads `/boot/dodo-kernel.elf`.
 3. Limine enters the ELF at `_start` in x86-64 long mode using the protocol's higher-half mapping.
 4. `_start` disables maskable interrupts, installs DODO's temporary bootstrap stack, clears the frame pointer, and calls `kernel_main`.
-5. `kernel_main` initializes the COM1 serial port and validates that Limine accepted the requested base revision.
-6. The kernel checks the memory-map response, and DODO's own physical page allocator validates each usable range.
-7. Four physical pages are allocated as a bootstrap self-check. Their addresses are retained in kernel-owned memory and are not dereferenced yet.
+5. The kernel initializes COM1 and loads a project-owned IDT for CPU exceptions 0–31.
+6. The kernel validates the boot protocol and memory map, initializes the physical page allocator, and retains four allocated frames for later memory-management work.
+7. The kernel executes an intentional `INT3` to test exception dispatch and recovery. The handler logs the breakpoint, returns through `iretq`, and execution continues to the final self-check message.
 
 ## Protocol contract
 
@@ -29,6 +29,17 @@ DODO's private `include/dodo/boot/limine_protocol.h` contains only the memory-ma
 
 This is a simple bootstrap allocator, not a complete memory manager. It has no page reclamation, zones, NUMA policy, virtual-memory mapping, demand paging, or allocation ownership beyond the sequential frame list.
 
+## Early exception IDT
+
+`src/arch/x86_64/idt.c` installs 16-byte IDT gates for exception vectors 0–31. `src/arch/x86_64/interrupts.S` provides stubs that normalize exceptions with and without CPU error codes and save general-purpose registers before calling the C handler.
+
+- IDT gates use the code selector active at kernel entry instead of assuming a specific selector value.
+- A breakpoint self-test verifies dispatch and the return path through `iretq`.
+- Unhandled exceptions print the vector name, error code, and instruction pointer, then halt. Page faults additionally report CR2.
+- The handler is a ring-0 bootstrap mechanism; it does not yet support user-mode transitions or interrupt-driven scheduling.
+
+Maskable interrupts stay disabled. Hardware interrupt controllers, timer delivery, interrupt nesting, IST stacks, user-mode exception frames, and full panic/recovery policy remain future work.
+
 ## ELF memory layout
 
 - Request metadata: writable load segment, because the bootloader updates the base-revision tag and request response pointers.
@@ -42,7 +53,7 @@ These segment flags are an early defense-in-depth choice. Later memory-managemen
 ## Current limitations
 
 - COM1 I/O is used for diagnostics; there is no terminal service.
-- Interrupts are disabled in the bootstrap entry path and no IDT is installed yet.
+- No timer interrupt or hardware interrupt delivery is enabled.
 - The kernel can consume physical frame addresses but does not yet own its page tables or a virtual-memory manager.
 - There is no user mode, scheduler, IPC, capability enforcement, filesystem, network stack, or GUI.
-- The QEMU smoke test checks the tested boot path and allocator self-check only; it does not establish that DODO is secure or suitable for daily use.
+- The QEMU smoke test checks the tested boot path, frame allocator, and intentional breakpoint only; it does not establish that DODO is secure or suitable for daily use.
