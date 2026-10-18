@@ -120,6 +120,16 @@ static int allocate_paging_frame(void *context, uint64_t *physical_address) {
     return dodo_phys_alloc_page(allocator, physical_address) == DODO_PHYS_OK;
 }
 
+static int release_paging_frame(void *context, uint64_t physical_address) {
+    if (context == NULL) {
+        return 0;
+    }
+
+    struct dodo_phys_allocator *allocator =
+        (struct dodo_phys_allocator *)context;
+    return dodo_phys_free_page(allocator, physical_address) == DODO_PHYS_OK;
+}
+
 static inline void outb(uint16_t port, uint8_t value) {
     __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
 }
@@ -355,7 +365,7 @@ static void test_virtual_mapping(void) {
     uint64_t new_root_physical = 0;
     uint64_t tables_cloned = 0;
     status = dodo_x86_64_paging_clone_tree(
-        allocate_paging_frame, &physical_allocator,
+        allocate_paging_frame, release_paging_frame, &physical_allocator,
         &new_root_physical, &tables_cloned);
     if (status != DODO_PAGING_OK) {
         serial_write("DODO: page-table tree clone error code = ");
