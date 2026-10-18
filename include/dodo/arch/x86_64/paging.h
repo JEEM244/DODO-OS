@@ -78,6 +78,17 @@ volatile void *dodo_x86_64_hhdm_pointer(uint64_t physical_address);
 enum dodo_paging_status dodo_x86_64_find_unused_user_region(
     uint64_t *virtual_address);
 
+/*
+ * Safely copy bytes from the address space currently loaded in hardware CR3.
+ * Every paging level must be present and user-accessible; huge-page mappings
+ * are deliberately rejected by this bootstrap API. Length is bounded by the
+ * caller and the user-half canonical address limit.
+ */
+enum dodo_paging_status dodo_x86_64_copy_from_active_user(
+    void *kernel_destination,
+    uint64_t user_source,
+    uint64_t length);
+
 /* Assembly helpers used only by the controlled read-only/NX fault self-tests. */
 int dodo_x86_64_test_write_readonly(volatile uint64_t *target);
 int dodo_x86_64_test_execute_nx(void *target);
