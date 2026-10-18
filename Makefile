@@ -58,13 +58,20 @@ $(LIMINE_DIR)/limine.c: $(LIMINE_ARCHIVE)
 	tar -xzf $< -C $(BUILD_DIR)
 	test -f $@
 
+# Extraction above provides all assets from the pinned archive.
+$(LIMINE_DIR)/limine-bios.sys $(LIMINE_DIR)/limine-bios-cd.bin \
+$(LIMINE_DIR)/limine-uefi-cd.bin $(LIMINE_DIR)/BOOTX64.EFI \
+$(LIMINE_DIR)/BOOTIA32.EFI: $(LIMINE_DIR)/limine.c
+	@test -f $@
+
 $(LIMINE_DIR)/limine: $(LIMINE_DIR)/limine.c
 	$(MAKE) -C $(LIMINE_DIR) CC="$(HOST_CC)"
 	test -x $@
 
 $(ISO_IMAGE): $(KERNEL_ELF) config/limine.conf \
               $(LIMINE_DIR)/limine $(LIMINE_DIR)/limine-bios.sys \
-              $(LIMINE_DIR)/limine-bios-cd.bin $(LIMINE_DIR)/limine-uefi-cd.bin
+              $(LIMINE_DIR)/limine-bios-cd.bin $(LIMINE_DIR)/limine-uefi-cd.bin \
+              $(LIMINE_DIR)/BOOTX64.EFI $(LIMINE_DIR)/BOOTIA32.EFI
 	rm -rf $(ISO_ROOT)
 	mkdir -p $(ISO_ROOT)/boot/limine $(ISO_ROOT)/EFI/BOOT
 	cp $(KERNEL_ELF) $(ISO_ROOT)/boot/dodo-kernel.elf
