@@ -22,7 +22,8 @@ enum dodo_paging_status {
     DODO_PAGING_HUGE_PAGE_CONFLICT = 8,
     DODO_PAGING_PERMISSION_CONFLICT = 9,
     DODO_PAGING_NOT_SUPPORTED = 10,
-    DODO_PAGING_READBACK_FAILED = 11
+    DODO_PAGING_READBACK_FAILED = 11,
+    DODO_PAGING_CLONE_CAPACITY_EXCEEDED = 12
 };
 
 /*
@@ -33,12 +34,19 @@ enum dodo_paging_status {
 enum dodo_paging_status dodo_x86_64_paging_init(uint64_t hhdm_offset);
 
 /*
- * Allocate and install DODO's own top-level PML4 frame while retaining the
- * current PML4 entries. Lower-level tables are still inherited at this stage.
+ * Clone the active four-level page-table tree into newly allocated DODO-owned
+ * table frames. Leaf mappings keep their physical targets and permissions;
+ * intermediate tables are private to DODO. The allocator callback returns
+ * nonzero on success. The old hierarchy is not reclaimed during bootstrap.
  */
-enum dodo_paging_status dodo_x86_64_paging_take_root(
-    uint64_t new_root_physical,
-    uint64_t *previous_root_physical);
+typedef int (*dodo_paging_allocate_frame_fn)(
+    void *context, uint64_t *physical_address);
+
+enum dodo_paging_status dodo_x86_64_paging_clone_tree(
+    dodo_paging_allocate_frame_fn allocate_frame,
+    void *context,
+    uint64_t *new_root_physical,
+    uint64_t *tables_cloned);
 
 int dodo_x86_64_nx_enabled(void);
 
