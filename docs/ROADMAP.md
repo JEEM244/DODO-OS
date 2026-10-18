@@ -35,12 +35,13 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Verify read-only and NX page protection behavior in QEMU.
 - [x] Verify the mapper rejects remapping a present page and rejects non-canonical virtual addresses.
 - [ ] Add broader allocator stress tests and explicit allocation ownership tracking.
-- [x] Allocate and activate DODO's own PML4 root by copying the current root entries.
-- [ ] Replace inherited lower-level tables with DODO-owned tables while preserving kernel, stack, IDT, HHDM, and boot-response mappings.
+- [x] Recursively clone the active four-level page-table tree into DODO-owned frames while retaining leaf mappings and permissions.
+- [x] Preserve shared table references and recursive root mappings during cloning.
+- [ ] Track table/frame ownership, reclaim the obsolete bootloader tree safely, and handle allocation failure cleanup.
 - [ ] Build a full virtual-memory manager and guard-page support.
 - [ ] Define physical-frame release, ownership transfer, and lifetime rules.
 
-**Acceptance:** host allocator tests and QEMU mapping/protection checks pass in CI. DODO owns the active PML4 root but inherits lower-level tables; per-process address spaces and frame reclamation are not implemented.
+**Acceptance:** host allocator tests and QEMU mapping/protection checks pass in CI. DODO now activates a cloned four-level table tree, but retains the same leaf physical mappings and does not yet reclaim the old tree or support per-process address spaces.
 
 ## M3 — Isolation primitives
 
