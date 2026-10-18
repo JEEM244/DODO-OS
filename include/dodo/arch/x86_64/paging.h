@@ -32,6 +32,14 @@ enum dodo_paging_status {
  */
 enum dodo_paging_status dodo_x86_64_paging_init(uint64_t hhdm_offset);
 
+/*
+ * Allocate and install DODO's own top-level PML4 frame while retaining the
+ * current PML4 entries. Lower-level tables are still inherited at this stage.
+ */
+enum dodo_paging_status dodo_x86_64_paging_take_root(
+    uint64_t new_root_physical,
+    uint64_t *previous_root_physical);
+
 int dodo_x86_64_nx_enabled(void);
 
 /* Return the HHDM alias for a physical address, or NULL before init/on error. */
