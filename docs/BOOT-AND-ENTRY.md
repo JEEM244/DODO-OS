@@ -23,12 +23,13 @@ The test is deliberately small and single-threaded:
 - GDT selectors for user code/data and a 64-bit TSS descriptor are installed by DODO. TSS.RSP0 points to a dedicated ring-0 interrupt stack.
 - A DPL3 interrupt gate at vector 128 permits only the intentional software interrupt test; the handler checks a one-shot armed flag, CPL3, and the expected marker in RAX.
 - DODO allocates a separate user PML4 root. Its low-half entries start empty; the kernel-half entries are copied with U/S cleared at the PML4 level so CPL3 cannot access any high-half address through those entries. The user code page and user stack are mapped only into this root.
-- A boot self-check confirms that the chosen user PML4 slot is still empty in the kernel root but present and U/S-enabled in the user root.
+- A boot self-check confirms that the chosen user PML4 slot is still empty in the kernel root but present and U/S-enabled in the first user root.
 - The code executes the software interrupt and is returned to the kernel through a trampoline that restores the kernel CR3, original kernel stack, and SysV callee-saved registers.
 - The same user page is then filled with a short read instruction targeting 0xffffffff80000000. The page-fault handler only returns to the kernel when CR2, saved CPL, and error-code access bits match the expected supervisor-page read fault.
-- The QEMU smoke test requires serial markers for successful ring-3 entry/return and supervisor-memory access denial.
+- A second root is built with its own code and stack mappings, leaving the first root's code virtual address absent. User code in the second root reads that address and must fault with a non-present user-page error; the kernel root must still lack the corresponding low-half PML4 entry.
+- The QEMU smoke test requires serial markers for the separate user root, successful ring-3 entry/return, supervisor-memory denial, and cross-root mapping denial.
 
-This is not a general syscall ABI. User test state and saved kernel RSP/CR3 are global one-shot values; no scheduler, SMP safety, multiple simultaneous user address spaces, per-process kernel stacks, user-page cleanup, syscall argument validation, or capability enforcement is implemented. The test root shares supervisor-only higher-half table entries with the kernel; only its lower half is private for this prototype. Unexpected faults remain fatal.
+This is not a general syscall ABI. The boot probe creates two user roots but uses global one-shot state and a single fixed TSS.RSP0 stack; it has no scheduler, SMP safety, per-thread trap context, per-process kernel stacks, user-page/table cleanup, syscall argument validation, or capability enforcement. Each root shares supervisor-only higher-half mappings with the kernel while keeping its lower-half mappings separate. Unexpected faults remain fatal.
 
 ## Protocol contract
 
