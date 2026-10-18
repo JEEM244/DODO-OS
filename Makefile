@@ -114,7 +114,7 @@ qemu-smoke: $(ISO_IMAGE)
 	fi; \
 	grep -Fq "DODO OS: kernel reached entry point" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: Limine base revision accepted" $(BUILD_DIR)/qemu-serial.log; \
-	grep -Fq "DODO: memory map accepted" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: memory map received" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: physical allocator self-check passed" $(BUILD_DIR)/qemu-serial.log
 
 clean:
