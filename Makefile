@@ -134,6 +134,8 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "DODO: memory map received" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: physical allocator self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: virtual page mapping self-check passed" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: existing mapping protection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: noncanonical address rejection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: read-only page write was blocked" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: read-only page protection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: NX instruction fetch was blocked" $(BUILD_DIR)/qemu-serial.log; \
