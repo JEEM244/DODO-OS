@@ -54,15 +54,16 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 
 - [x] Add a controlled, single-threaded CPL3 entry/return probe using the TSS RSP0 stack and reserved selectors.
 - [x] Create a separate user PML4 root with an empty lower half and supervisor-only higher-half mappings.
-- [x] Verify the user mapping stays absent from the kernel root and cannot read the tested supervisor-only kernel address.
-- [ ] Create multiple simultaneous user roots and verify cross-address-space isolation.
+- [x] Verify user mappings stay absent from the kernel root and cannot read the tested supervisor-only kernel address.
+- [x] Create two user roots concurrently and verify the second root faults when it reads a lower-half page mapped only in the first.
+- [ ] Replace the single test root pair with a reusable address-space creation/switch/teardown API and safe table reclamation.
 - [ ] Replace global one-shot test state with per-thread/per-process trap context and independent kernel stacks.
 - [ ] Add safe user-page allocation/reclamation, validated syscall arguments, and a stable kernel-entry ABI.
 - [ ] Context switching and scheduler.
 - [ ] IPC with validated message boundaries.
 - [ ] Capability table and deny-by-default resource access.
 
-**Acceptance:** independent test processes cannot read each other's mappings or use a resource without an explicit capability. The current code proves one separate user root versus the kernel root; it does not yet prove isolation between multiple user processes or implement a production process model.
+**Acceptance:** independent test processes cannot read each other's mappings or use a resource without an explicit capability. QEMU now verifies a controlled cross-root read denial between two test roots, but there is no general per-process lifecycle, kernel stack ownership, scheduler, or capability model yet.
 
 ## M4 — DODO SOMBRA prototype
 
