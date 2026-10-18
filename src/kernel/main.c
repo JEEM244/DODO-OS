@@ -403,7 +403,7 @@ static void test_virtual_mapping(void) {
         physical_allocator.allocated_pages != allocated_pages_before_failure) {
         report_boot_error("failed page-table clone did not roll back all frames");
     }
-    serial_write("DODO: page-table clone rollback self-check passed\\n");
+    serial_write("DODO: page-table clone rollback self-check passed\n");
 
     /*
      * Clone the complete page-table hierarchy into DODO-owned frames. The leaf
