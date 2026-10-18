@@ -615,7 +615,9 @@ void kernel_main(void) {
     serial_init();
     serial_write("\nDODO OS: kernel reached entry point\n");
 
+    serial_write("DODO: begin own GDT installation\n");
     dodo_x86_64_gdt_init();
+    serial_write("DODO: own GDT load instruction returned\n");
     if (!dodo_x86_64_gdt_verify()) {
         report_boot_error("DODO's GDT installation self-check failed");
     }
