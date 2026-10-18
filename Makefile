@@ -21,17 +21,18 @@ CFLAGS := -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -Iinclude \
 ASFLAGS := -m64 -ffreestanding -fno-pic -fno-pie
 LDFLAGS := -nostdlib -z max-page-size=0x1000 -T linker/x86_64.ld
 
-C_SOURCES := src/kernel/main.c
-HEADERS := include/dodo/boot/limine_protocol.h
-ASM_SOURCES := src/arch/x86_64/entry.S
-OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/entry.o
+HEADERS := include/dodo/boot/limine_protocol.h include/dodo/mm/phys.h
+OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/entry.o
+PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
 
-.PHONY: all kernel iso run qemu-smoke clean check-tools
+.PHONY: all kernel iso run qemu-smoke test-phys test clean check-tools
 all: iso
 
 kernel: check-tools $(KERNEL_ELF)
 
 iso: check-tools $(ISO_IMAGE)
+
+test: test-phys
 
 check-tools:
 	@command -v $(CC) >/dev/null || (echo "Missing C compiler: $(CC)" >&2; exit 1)
@@ -40,22 +41,31 @@ check-tools:
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-$(BUILD_DIR)/main.o: $(C_SOURCES) $(HEADERS) | $(BUILD_DIR)
+$(BUILD_DIR)/main.o: src/kernel/main.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/entry.o: $(ASM_SOURCES) | $(BUILD_DIR)
+$(BUILD_DIR)/phys.o: src/mm/phys.c $(HEADERS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/entry.o: src/arch/x86_64/entry.S | $(BUILD_DIR)
 	$(CC) $(ASFLAGS) -c $< -o $@
 
 $(KERNEL_ELF): $(OBJECTS) linker/x86_64.ld
 	$(LD) $(LDFLAGS) -o $@ $(OBJECTS)
 	@echo "Built $@"
 
+$(PHYS_TEST): src/mm/phys.c tests/phys_allocator_test.c $(HEADERS) | $(BUILD_DIR)
+	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -Iinclude \
+		src/mm/phys.c tests/phys_allocator_test.c -o $@
+
+test-phys: $(PHYS_TEST)
+	$(PHYS_TEST)
+
 $(LIMINE_ARCHIVE): | $(BUILD_DIR)
 	curl --fail --location --retry 3 --output $@ "$(LIMINE_URL)"
 	echo "$(LIMINE_SHA256)  $@" | sha256sum --check -
 
-# The archive preserves upstream timestamps. Use a stamp so make does not
-# delete/re-extract the bootloader on every subsequent invocation.
+# Use a stamp because the release archive preserves upstream timestamps.
 $(LIMINE_STAMP): $(LIMINE_ARCHIVE)
 	rm -rf $(LIMINE_DIR)
 	tar -xzf $< -C $(BUILD_DIR)
@@ -104,7 +114,8 @@ qemu-smoke: $(ISO_IMAGE)
 	fi; \
 	grep -Fq "DODO OS: kernel reached entry point" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: Limine base revision accepted" $(BUILD_DIR)/qemu-serial.log; \
-	grep -Fq "DODO: memory map accepted" $(BUILD_DIR)/qemu-serial.log
+	grep -Fq "DODO: memory map accepted" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: physical allocator self-check passed" $(BUILD_DIR)/qemu-serial.log
 
 clean:
 	rm -rf $(BUILD_DIR)
