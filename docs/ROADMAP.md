@@ -34,6 +34,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Track active physical-frame allocations; support free/reuse, reject double frees and unknown frames, and enforce a fixed tracking cap.
 - [x] Add validated, non-overlapping regions that the kernel has independently determined safe to reclaim.
 - [x] Adopt the protocol-marked bootloader-reclaimable memory after replacing the active page-table tree and GDT/IDT; invalidate Limine response pointers afterward.
+- [x] Allocate and free a test frame directly from an adopted region, confirming allocator accounting returns to its prior state.
 - [x] Extend Limine's active 4-level page tables with a checked single-page mapper in an unused kernel PML4 slot.
 - [x] Verify physical/direct-map aliases and a new virtual mapping in QEMU.
 - [x] Verify read-only and NX page protection behavior in QEMU.
