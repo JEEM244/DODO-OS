@@ -1,6 +1,6 @@
 # Building and testing DODO OS
 
-This guide builds the kernel and a bootable test ISO. The current kernel is a bring-up prototype: it validates the Limine handoff and memory map, exercises DODO's bootstrap physical page allocator, installs a minimal exception IDT, and tests breakpoint dispatch and recovery. It does not yet provide a graphical desktop, networking, storage access, user processes, or a usable daily operating system.
+This guide builds the kernel and a bootable test ISO. The current kernel is a bring-up prototype: it validates the Limine handoff and memory map, exercises DODO's bootstrap physical page allocator, installs an initial exception IDT, tests breakpoint dispatch, and checks virtual page mapping plus hardware-enforced read-only/NX protections. It does not yet provide a graphical desktop, networking, storage access, user processes, or a usable daily operating system.
 
 ## Requirements
 
@@ -54,7 +54,7 @@ make run
 
 The prototype prints status messages over COM1 serial output, then halts the CPU. A blank graphical display is expected: DODO does not have a graphics driver or desktop yet. The messages appear in the terminal used to run QEMU.
 
-The boot path loads DODO's IDT for exception vectors 0–31, validates the memory map, and initializes a simple physical page allocator. Four 4 KiB frames are allocated for a bootstrap self-check and their addresses are retained as reserved. The kernel then executes an intentional `INT3`, verifies that the handler is reached, and resumes through `iretq`. The allocator returns physical addresses only; it does not yet create virtual mappings or allow those frames to be dereferenced.
+The boot path loads DODO's IDT for exception vectors 0–31, validates the memory map, and initializes a simple physical page allocator. Five 4 KiB frames are reserved for mapping and protection checks. The kernel extends an unused slot in Limine's active four-level page tables, enables CR0.WP and EFER.NXE where supported, and tests a read-only write fault and an NX instruction-fetch fault. The page-fault handler only resumes the exact faults armed by these tests; unexpected faults remain fatal. An intentional `INT3` also verifies exception dispatch and return through `iretq`. The allocator itself returns physical addresses only; the mapping test is a separate, deliberately limited bootstrap feature.
 
 For an automated boot check on Linux:
 
@@ -62,7 +62,7 @@ For an automated boot check on Linux:
 make qemu-smoke
 ```
 
-The smoke test boots the ISO for up to 12 seconds, captures the serial log in `build/qemu-serial.log`, and checks the boot handoff, memory-map parsing, allocator self-check, IDT installation, and breakpoint recovery. It uses QEMU and does not write to the host's disks.
+The smoke test boots the ISO for up to 12 seconds, captures the serial log in `build/qemu-serial.log`, and checks the boot handoff, memory-map parsing, allocator self-check, page mapping, read-only/NX protection, IDT installation, and controlled exception recovery. It uses QEMU and does not write to the host's disks.
 
 ## Inspect the kernel
 
@@ -73,7 +73,7 @@ readelf -l build/dodo-kernel.elf
 nm build/dodo-kernel.elf
 ```
 
-The kernel uses a higher-half x86-64 layout and separate load segments for request data, executable code, read-only data, and writable data. These permissions are an ELF loading contract; they are not a complete security model by themselves.
+The kernel uses a higher-half x86-64 layout and separate load segments for request data, executable code, read-only data, and writable data. The bootstrap paging helper deliberately extends the page tables supplied by Limine and is not yet a complete virtual-memory manager or an independent security boundary.
 
 ## Safety
 
