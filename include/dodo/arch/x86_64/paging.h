@@ -23,7 +23,8 @@ enum dodo_paging_status {
     DODO_PAGING_PERMISSION_CONFLICT = 9,
     DODO_PAGING_NOT_SUPPORTED = 10,
     DODO_PAGING_READBACK_FAILED = 11,
-    DODO_PAGING_CLONE_CAPACITY_EXCEEDED = 12
+    DODO_PAGING_CLONE_CAPACITY_EXCEEDED = 12,
+    DODO_PAGING_ROLLBACK_FAILED = 13
 };
 
 /*
@@ -41,9 +42,12 @@ enum dodo_paging_status dodo_x86_64_paging_init(uint64_t hhdm_offset);
  */
 typedef int (*dodo_paging_allocate_frame_fn)(
     void *context, uint64_t *physical_address);
+typedef int (*dodo_paging_release_frame_fn)(
+    void *context, uint64_t physical_address);
 
 enum dodo_paging_status dodo_x86_64_paging_clone_tree(
     dodo_paging_allocate_frame_fn allocate_frame,
+    dodo_paging_release_frame_fn release_frame,
     void *context,
     uint64_t *new_root_physical,
     uint64_t *tables_cloned);
