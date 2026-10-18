@@ -23,9 +23,10 @@ LDFLAGS := -nostdlib -z max-page-size=0x1000 -T linker/x86_64.ld
 
 HEADERS := include/dodo/boot/limine_protocol.h \
            include/dodo/mm/phys.h \
-           include/dodo/arch/x86_64/interrupts.h
+           include/dodo/arch/x86_64/interrupts.h \
+           include/dodo/arch/x86_64/paging.h
 OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/idt.o \
-           $(BUILD_DIR)/entry.o $(BUILD_DIR)/interrupts.o
+           $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o $(BUILD_DIR)/interrupts.o
 PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
 
 .PHONY: all kernel iso run qemu-smoke test-phys test clean check-tools
@@ -51,6 +52,9 @@ $(BUILD_DIR)/phys.o: src/mm/phys.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/idt.o: src/arch/x86_64/idt.c $(HEADERS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/paging.o: src/arch/x86_64/paging.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/entry.o: src/arch/x86_64/entry.S | $(BUILD_DIR)
@@ -125,6 +129,7 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "DODO: Limine base revision accepted" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: memory map received" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: physical allocator self-check passed" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: virtual page mapping self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: exception IDT loaded" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: IDT breakpoint self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: exception handler resumed after INT3" $(BUILD_DIR)/qemu-serial.log; \
