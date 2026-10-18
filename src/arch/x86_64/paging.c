@@ -446,6 +446,97 @@ enum dodo_paging_status dodo_x86_64_find_unused_user_region(
     return DODO_PAGING_NO_FREE_USER_SLOT;
 }
 
+enum dodo_paging_status dodo_x86_64_copy_from_active_user(
+    void *kernel_destination,
+    uint64_t user_source,
+    uint64_t length) {
+    if (!paging_initialized) {
+        return DODO_PAGING_INVALID_ARGUMENT;
+    }
+    if (length == 0u) {
+        return DODO_PAGING_OK;
+    }
+    if (kernel_destination == 0 ||
+        user_source >= DODO_USER_ADDRESS_LIMIT ||
+        length > DODO_USER_ADDRESS_LIMIT - user_source ||
+        !is_canonical(user_source)) {
+        return DODO_PAGING_INVALID_ADDRESS;
+    }
+
+    uint8_t *destination = (uint8_t *)kernel_destination;
+    uint64_t copied = 0;
+
+    while (copied < length) {
+        const uint64_t virtual_address = user_source + copied;
+        const uint64_t root_physical = read_cr3() & DODO_PTE_ADDRESS_MASK;
+        volatile uint64_t *table = 0;
+        if (!physical_to_hhdm(root_physical, &table)) {
+            return DODO_PAGING_INVALID_HHDM;
+        }
+
+        const uint64_t shifts[3] = { 39u, 30u, 21u };
+        enum dodo_paging_status status = DODO_PAGING_OK;
+
+        for (uint64_t level = 4u; level > 1u; --level) {
+            const uint64_t index =
+                (virtual_address >> shifts[4u - level]) & UINT64_C(0x1ff);
+            const uint64_t entry = table[index];
+
+            if ((entry & DODO_PTE_PRESENT) == 0u) {
+                return DODO_PAGING_INVALID_ADDRESS;
+            }
+            if ((entry & DODO_PTE_USER) == 0u) {
+                return DODO_PAGING_PERMISSION_CONFLICT;
+            }
+
+            /* This bounded bootstrap copy routine supports 4 KiB user leaves only. */
+            if ((level == 3u || level == 2u) &&
+                (entry & DODO_PTE_PAGE_SIZE) != 0u) {
+                return DODO_PAGING_NOT_SUPPORTED;
+            }
+            if (level == 4u && (entry & DODO_PTE_PAGE_SIZE) != 0u) {
+                return DODO_PAGING_NOT_SUPPORTED;
+            }
+
+            const uint64_t child_physical = entry & DODO_PTE_ADDRESS_MASK;
+            if (!physical_to_hhdm(child_physical, &table)) {
+                return DODO_PAGING_INVALID_HHDM;
+            }
+        }
+
+        const uint64_t leaf_index =
+            (virtual_address >> 12) & UINT64_C(0x1ff);
+        const uint64_t leaf = table[leaf_index];
+        if ((leaf & DODO_PTE_PRESENT) == 0u) {
+            return DODO_PAGING_INVALID_ADDRESS;
+        }
+        if ((leaf & DODO_PTE_USER) == 0u) {
+            return DODO_PAGING_PERMISSION_CONFLICT;
+        }
+
+        const uint64_t physical_page = leaf & DODO_PTE_ADDRESS_MASK;
+        volatile uint64_t *physical_words = 0;
+        if (!physical_to_hhdm(physical_page, &physical_words)) {
+            return DODO_PAGING_INVALID_HHDM;
+        }
+
+        const uint64_t page_offset = virtual_address & (DODO_PAGE_SIZE - 1u);
+        const uint64_t available = DODO_PAGE_SIZE - page_offset;
+        const uint64_t remaining = length - copied;
+        const uint64_t chunk = available < remaining ? available : remaining;
+        const volatile uint8_t *source_bytes =
+            (const volatile uint8_t *)physical_words + page_offset;
+
+        for (uint64_t i = 0; i < chunk; ++i) {
+            destination[copied + i] = source_bytes[i];
+        }
+        copied += chunk;
+        (void)status;
+    }
+
+    return DODO_PAGING_OK;
+}
+
 static enum dodo_paging_status get_root_table(volatile uint64_t **root_table) {
     if (!paging_initialized) {
         return DODO_PAGING_INVALID_ARGUMENT;
