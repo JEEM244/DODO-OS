@@ -77,6 +77,8 @@ static volatile uint64_t user_mode_test_armed = 0;
 static volatile uint64_t user_mode_return_marker = 0;
 static volatile uint64_t user_supervisor_read_test_passed = 0;
 static volatile uint64_t user_cross_root_isolation_passed = 0;
+static volatile uint64_t user_write_syscall_passed = 0;
+static volatile uint64_t user_invalid_pointer_denied = 0;
 
 #define DODO_EXPECT_WRITE_FAULT UINT64_C(1)
 #define DODO_EXPECT_EXECUTE_FAULT UINT64_C(2)
@@ -255,17 +257,57 @@ int dodo_x86_64_exception_handler(
      * stack, because IRETQ to the same privilege level doesn't pop user RSP/SS.
      */
     if (frame->vector == DODO_X86_64_USER_TEST_VECTOR) {
-        if (user_mode_test_armed != 0u &&
-            (frame->cs & UINT64_C(3)) == UINT64_C(3) &&
-            frame->rax == DODO_X86_64_USER_TEST_MAGIC) {
+        if ((frame->cs & UINT64_C(3)) != UINT64_C(3) ||
+            user_mode_test_armed == 0u) {
+            serial_write("DODO: FATAL: unexpected vector-128 software interrupt\n");
+            return DODO_EXCEPTION_FATAL;
+        }
+
+        /*
+         * Minimal syscall ABI for this prototype:
+         *   RAX = WRITE, RDI = user pointer, RSI = byte length (1..96)
+         * The pointer is copied only after every active-CR3 paging level is
+         * present and user-accessible. No user pointer is directly dereferenced.
+         */
+        if (frame->rax == DODO_X86_64_SYSCALL_WRITE) {
+            if (frame->rsi == 0u ||
+                frame->rsi > DODO_X86_64_SYSCALL_MAX_WRITE) {
+                frame->rax = DODO_X86_64_SYSCALL_ERROR;
+                return DODO_EXCEPTION_RESUME;
+            }
+
+            char kernel_buffer[DODO_X86_64_SYSCALL_MAX_WRITE + 1u];
+            const enum dodo_paging_status copy_status =
+                dodo_x86_64_copy_from_active_user(
+                    kernel_buffer, frame->rdi, frame->rsi);
+            if (copy_status != DODO_PAGING_OK) {
+                if (frame->rdi == UINT64_C(0xffffffff80000000) &&
+                    frame->rsi == 1u) {
+                    user_invalid_pointer_denied = 1;
+                    serial_write("DODO: invalid user syscall pointer rejected\n");
+                }
+                frame->rax = DODO_X86_64_SYSCALL_ERROR;
+                return DODO_EXCEPTION_RESUME;
+            }
+
+            kernel_buffer[frame->rsi] = '\0';
+            serial_write("DODO USER: ");
+            serial_write(kernel_buffer);
+            serial_write("\n");
+            user_write_syscall_passed = 1;
+            frame->rax = frame->rsi;
+            return DODO_EXCEPTION_RESUME;
+        }
+
+        if (frame->rax == DODO_X86_64_USER_TEST_MAGIC) {
             user_mode_test_armed = 0;
             user_mode_return_marker = frame->rax;
-            serial_write("DODO: ring-3 software interrupt reached kernel handler\\n");
+            serial_write("DODO: ring-3 software interrupt reached kernel handler\n");
             return DODO_EXCEPTION_RETURN_TO_KERNEL;
         }
 
-        serial_write("DODO: FATAL: unexpected vector-128 software interrupt\\n");
-        return 0;
+        serial_write("DODO: FATAL: unknown user syscall number\n");
+        return DODO_EXCEPTION_FATAL;
     }
 
     if (frame->vector >= 32u) {
