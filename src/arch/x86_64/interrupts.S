@@ -2,6 +2,7 @@
 .code64
 
 .extern dodo_x86_64_exception_handler
+.extern dodo_x86_64_user_return_trampoline
 
 .macro DODO_ISR_NOERR vector
     .global dodo_isr_\vector
@@ -97,10 +98,12 @@ dodo_isr_common:
     call dodo_x86_64_exception_handler
     movq %r12, %rsp
 
+    cmpl $2, %eax
+    je dodo_isr_return_to_kernel
     testl %eax, %eax
     jz dodo_isr_fatal
 
-    /* Handler explicitly allowed the armed breakpoint test to resume. */
+    /* Handler explicitly allowed the armed exception test to resume. */
     popq %r15
     popq %r14
     popq %r13
@@ -118,6 +121,15 @@ dodo_isr_common:
     popq %rax
     addq $16, %rsp
     iretq
+
+/*
+ * Controlled CPL3 test path: never try an IRETQ back to CPL0 using a frame
+ * originally created by a privilege transition. Abandon that transient frame
+ * and restore the kernel stack saved by dodo_x86_64_enter_user instead.
+ */
+dodo_isr_return_to_kernel:
+    cli
+    jmp dodo_x86_64_user_return_trampoline
 
 dodo_isr_fatal:
     cli
