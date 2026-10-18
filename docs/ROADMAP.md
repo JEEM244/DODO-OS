@@ -56,14 +56,15 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Create a separate user PML4 root with an empty lower half and supervisor-only higher-half mappings.
 - [x] Verify user mappings stay absent from the kernel root and cannot read the tested supervisor-only kernel address.
 - [x] Create two user roots concurrently and verify the second root faults when it reads a lower-half page mapped only in the first.
-- [ ] Replace the single test root pair with a reusable address-space creation/switch/teardown API and safe table reclamation.
+- [x] Tear down the two test roots after returning to kernel CR3, free their explicitly tracked code/stack/private-table/root frames, and verify allocator counters return to baseline.
+- [ ] Replace the test-specific cleanup list with a reusable address-space creation/switch/teardown API that tracks all owned frames and handles partial failures.
 - [ ] Replace global one-shot test state with per-thread/per-process trap context and independent kernel stacks.
 - [ ] Add safe user-page allocation/reclamation, validated syscall arguments, and a stable kernel-entry ABI.
 - [ ] Context switching and scheduler.
 - [ ] IPC with validated message boundaries.
 - [ ] Capability table and deny-by-default resource access.
 
-**Acceptance:** independent test processes cannot read each other's mappings or use a resource without an explicit capability. QEMU now verifies a controlled cross-root read denial between two test roots, but there is no general per-process lifecycle, kernel stack ownership, scheduler, or capability model yet.
+**Acceptance:** independent test processes cannot read each other's mappings or use a resource without an explicit capability. QEMU now verifies a controlled cross-root read denial and test-specific frame cleanup, but there is no reusable per-process lifecycle, per-process kernel stack ownership, scheduler, or capability model yet.
 
 ## M4 — DODO SOMBRA prototype
 
