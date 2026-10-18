@@ -333,6 +333,37 @@ static void test_add_region_after_reclamation(void) {
     }
     assert(allocator.allocated_pages == 5);
     assert(allocator.free_pages == 2);
+
+    /*
+     * Region-targeted allocation proves that the newly added range can supply
+     * a frame even while older usable regions still have space left.
+     */
+    uint64_t reclaimed_page = UINT64_MAX;
+    assert(dodo_phys_alloc_page_from_region(
+        &allocator, 1, &reclaimed_page) == DODO_PHYS_OK);
+    assert(reclaimed_page == UINT64_C(0x11000));
+    assert(allocator.allocated_pages == 6);
+    assert(allocator.free_pages == 1);
+
+    assert(dodo_phys_free_page(&allocator, reclaimed_page) == DODO_PHYS_OK);
+    assert(allocator.allocated_pages == 5);
+    assert(allocator.free_pages == 2);
+
+    /* The ordinary allocator should also reuse that returned reclaimed frame. */
+    uint64_t reused_reclaimed_page = 0;
+    assert(dodo_phys_alloc_page(&allocator, &reused_reclaimed_page) == DODO_PHYS_OK);
+    assert(reused_reclaimed_page == reclaimed_page);
+    assert(allocator.allocated_pages == 6);
+    assert(allocator.free_pages == 1);
+    assert(dodo_phys_free_page(&allocator, reused_reclaimed_page) == DODO_PHYS_OK);
+    assert(allocator.allocated_pages == 5);
+    assert(allocator.free_pages == 2);
+
+    uint64_t invalid_output = UINT64_C(0xCAFE);
+    assert(dodo_phys_alloc_page_from_region(
+        &allocator, allocator.region_count, &invalid_output) ==
+        DODO_PHYS_INVALID_ARGUMENT);
+    assert(invalid_output == UINT64_C(0xCAFE));
 }
 
 static void test_invalid_arguments_and_map(void) {
