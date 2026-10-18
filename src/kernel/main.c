@@ -258,16 +258,8 @@ int dodo_x86_64_exception_handler(
             frame->rax == DODO_X86_64_USER_TEST_MAGIC) {
             user_mode_test_armed = 0;
             user_mode_return_marker = frame->rax;
-            frame->rip = (uint64_t)(uintptr_t)dodo_x86_64_user_return_trampoline;
-            frame->cs = DODO_X86_64_KERNEL_CODE_SELECTOR;
-            frame->rflags = UINT64_C(2); /* Keep external interrupts disabled. */
-            serial_write("DODO: ring-3 return selector = ");
-            serial_write_hex64(frame->cs);
-            serial_write(" RIP = ");
-            serial_write_hex64(frame->rip);
-            serial_write("\\n");
             serial_write("DODO: ring-3 software interrupt reached kernel handler\\n");
-            return 1;
+            return DODO_EXCEPTION_RETURN_TO_KERNEL;
         }
 
         serial_write("DODO: FATAL: unexpected vector-128 software interrupt\\n");
@@ -322,11 +314,8 @@ int dodo_x86_64_exception_handler(
                 (error & UINT64_C(0x7)) == UINT64_C(0x5)) {
                 page_fault_selftest_armed = 0;
                 user_supervisor_read_test_passed = 1;
-                frame->rip = (uint64_t)(uintptr_t)dodo_x86_64_user_return_trampoline;
-                frame->cs = DODO_X86_64_KERNEL_CODE_SELECTOR;
-                frame->rflags = UINT64_C(2);
                 serial_write("DODO: ring-3 read of supervisor memory was blocked\\n");
-                return 1;
+                return DODO_EXCEPTION_RETURN_TO_KERNEL;
             }
         }
     }
