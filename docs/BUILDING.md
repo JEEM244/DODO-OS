@@ -54,7 +54,7 @@ make run
 
 The prototype prints status messages over COM1 serial output, then halts the CPU. A blank graphical display is expected: DODO does not have a graphics driver or desktop yet. The messages appear in the terminal used to run QEMU.
 
-The boot path loads DODO's IDT for exception vectors 0–31, validates the memory map, and initializes a simple physical page allocator. Five 4 KiB frames are reserved for mapping and protection checks, and a separate frame becomes DODO's new PML4 root. DODO copies the existing root entries and switches CR3, preserving the current kernel and HHDM mappings while inheriting the lower-level tables. It then extends an unused PML4 slot, enables CR0.WP and EFER.NXE where supported, and tests read-only and NX enforcement. The mapper also refuses to replace an existing leaf and rejects a non-canonical virtual address. The page-fault handler only resumes the exact faults armed by these tests; unexpected faults remain fatal. An intentional `INT3` also verifies exception dispatch and return through `iretq`.
+The boot path loads DODO's IDT for exception vectors 0–31, validates the memory map, and initializes a simple physical page allocator. Five 4 KiB frames are reserved for mapping and protection checks. DODO recursively clones the active four-level page-table tree into its own frames, preserving leaf mappings and permissions, and activates the new root through CR3. The current QEMU memory map requires ten table frames for the clone; this count can vary by firmware and configuration. DODO then extends an unused PML4 slot, enables CR0.WP and EFER.NXE where supported, and tests read-only and NX enforcement. The mapper also refuses to replace an existing leaf and rejects a non-canonical virtual address. The page-fault handler only resumes the exact faults armed by these tests; unexpected faults remain fatal. An intentional `INT3` also verifies exception dispatch and return through `iretq`.
 
 For an automated boot check on Linux:
 
@@ -73,7 +73,7 @@ readelf -l build/dodo-kernel.elf
 nm build/dodo-kernel.elf
 ```
 
-The kernel uses a higher-half x86-64 layout and separate load segments for request data, executable code, read-only data, and writable data. The bootstrap paging helper deliberately extends the page tables supplied by Limine and is not yet a complete virtual-memory manager or an independent security boundary.
+The kernel uses a higher-half x86-64 layout and separate load segments for request data, executable code, read-only data, and writable data. The bootstrap pager clones the active page-table structures into DODO-owned frames but keeps the same leaf physical mappings; it does not yet implement per-process address spaces, frame reclamation, or a complete virtual-memory manager.
 
 ## Safety
 
