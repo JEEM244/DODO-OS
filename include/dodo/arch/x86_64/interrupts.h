@@ -35,6 +35,6 @@ void dodo_x86_64_idt_init(void);
 
 /* Return 1 only when the explicitly armed INT3 self-test should resume. */
 int dodo_x86_64_exception_handler(
-    const struct dodo_x86_64_exception_frame *frame);
+    struct dodo_x86_64_exception_frame *frame);
 
 #endif
