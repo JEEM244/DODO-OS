@@ -123,10 +123,12 @@ enum dodo_phys_status dodo_phys_alloc_page(
     }
 
     uint64_t page = 0;
+    int page_found = 0;
 
     if (allocator->free_stack_count != 0) {
         page = allocator->free_stack[--allocator->free_stack_count];
         allocator->free_stack[allocator->free_stack_count] = 0;
+        page_found = 1;
     } else {
         while (allocator->current_region < allocator->region_count) {
             struct dodo_phys_region *region =
@@ -146,11 +148,11 @@ enum dodo_phys_status dodo_phys_alloc_page(
 
             page = region->cursor;
             region->cursor += DODO_PHYS_PAGE_SIZE;
+            page_found = 1;
             break;
         }
 
-        if (allocator->current_region >= allocator->region_count &&
-            page == 0) {
+        if (!page_found) {
             return DODO_PHYS_NO_MEMORY;
         }
     }
