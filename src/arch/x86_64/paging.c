@@ -345,6 +345,32 @@ volatile void *dodo_x86_64_hhdm_pointer(uint64_t physical_address) {
     return (volatile void *)pointer;
 }
 
+enum dodo_paging_status dodo_x86_64_find_unused_user_region(
+    uint64_t *virtual_address) {
+    if (!paging_initialized || virtual_address == 0) {
+        return DODO_PAGING_INVALID_ARGUMENT;
+    }
+
+    volatile uint64_t *root_table;
+    const enum dodo_paging_status status = get_root_table(&root_table);
+    if (status != DODO_PAGING_OK) {
+        return status;
+    }
+
+    /* Skip PML4[0], which commonly contains boot-time identity mappings. */
+    for (uint64_t index = 1; index < UINT64_C(256); ++index) {
+        if (root_table[index] == 0u) {
+            *virtual_address = index * DODO_PML4_SLOT_SPAN;
+            if (!is_canonical(*virtual_address)) {
+                return DODO_PAGING_INVALID_ADDRESS;
+            }
+            return DODO_PAGING_OK;
+        }
+    }
+
+    return DODO_PAGING_NO_FREE_USER_SLOT;
+}
+
 static enum dodo_paging_status get_root_table(volatile uint64_t **root_table) {
     if (!paging_initialized) {
         return DODO_PAGING_INVALID_ARGUMENT;
