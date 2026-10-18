@@ -681,23 +681,15 @@ static void test_virtual_mapping(void) {
 }
 
 static void test_user_mode_transitions(void) {
-    uint64_t user_region_base = 0;
-    enum dodo_paging_status paging_status =
-        dodo_x86_64_find_unused_user_region(&user_region_base);
-    if (paging_status != DODO_PAGING_OK) {
-        serial_write("DODO: user region selection error = ");
-        serial_write_u64((uint64_t)paging_status);
-        serial_write("\\n");
-        report_boot_error("could not find an empty user PML4 slot");
-    }
-
+    uint64_t user_root_frame = 0;
     uint64_t user_code_frame = 0;
     uint64_t user_stack_frame = 0;
     uint64_t user_table_frames[3] = { 0, 0, 0 };
 
-    if (dodo_phys_alloc_page(&physical_allocator, &user_code_frame) != DODO_PHYS_OK ||
+    if (dodo_phys_alloc_page(&physical_allocator, &user_root_frame) != DODO_PHYS_OK ||
+        dodo_phys_alloc_page(&physical_allocator, &user_code_frame) != DODO_PHYS_OK ||
         dodo_phys_alloc_page(&physical_allocator, &user_stack_frame) != DODO_PHYS_OK) {
-        report_boot_error("could not allocate user-mode test code/stack frames");
+        report_boot_error("could not allocate user root/code/stack frames");
     }
     for (uint64_t i = 0; i < 3u; ++i) {
         if (dodo_phys_alloc_page(&physical_allocator, &user_table_frames[i]) !=
@@ -706,12 +698,41 @@ static void test_user_mode_transitions(void) {
         }
     }
 
+    enum dodo_paging_status paging_status =
+        dodo_x86_64_paging_create_user_root(user_root_frame);
+    if (paging_status != DODO_PAGING_OK) {
+        serial_write("DODO: user root creation error = ");
+        serial_write_u64((uint64_t)paging_status);
+        serial_write("\\n");
+        report_boot_error("could not create isolated user page-table root");
+    }
+
+    const uint64_t kernel_root_frame = dodo_x86_64_kernel_root_physical();
+    if (kernel_root_frame == 0u ||
+        dodo_x86_64_paging_switch_root(user_root_frame) != DODO_PAGING_OK) {
+        report_boot_error("could not activate isolated user root for mapping setup");
+    }
+
+    uint64_t user_region_base = 0;
+    paging_status = dodo_x86_64_find_unused_user_region(&user_region_base);
+    if (paging_status != DODO_PAGING_OK) {
+        serial_write("DODO: user region selection error = ");
+        serial_write_u64((uint64_t)paging_status);
+        serial_write("\\n");
+        report_boot_error("could not find an empty user PML4 slot");
+    }
+
     volatile uint8_t *user_code =
         (volatile uint8_t *)dodo_x86_64_hhdm_pointer(user_code_frame);
     volatile uint8_t *user_stack =
         (volatile uint8_t *)dodo_x86_64_hhdm_pointer(user_stack_frame);
-    if (user_code == NULL || user_stack == NULL) {
-        report_boot_error("cannot initialize user pages through the HHDM");
+    volatile uint64_t *user_root_table =
+        (volatile uint64_t *)dodo_x86_64_hhdm_pointer(user_root_frame);
+    volatile uint64_t *kernel_root_table =
+        (volatile uint64_t *)dodo_x86_64_hhdm_pointer(kernel_root_frame);
+    if (user_code == NULL || user_stack == NULL ||
+        user_root_table == NULL || kernel_root_table == NULL) {
+        report_boot_error("cannot inspect or initialize address-space frames through HHDM");
     }
 
     for (uint64_t i = 0; i < DODO_PAGE_SIZE; ++i) {
@@ -746,6 +767,21 @@ static void test_user_mode_transitions(void) {
     }
 
     /*
+     * Prove the low-half mapping was added only to the user root. The kernel
+     * root must still have no entry for this PML4 slot, while the user root's
+     * entry must be present and marked U/S.
+     */
+    const uint64_t user_pml4_index =
+        (user_code_virtual >> 39) & UINT64_C(0x1ff);
+    if (user_pml4_index >= UINT64_C(256) ||
+        kernel_root_table[user_pml4_index] != 0u ||
+        (user_root_table[user_pml4_index] & UINT64_C(1)) == 0u ||
+        (user_root_table[user_pml4_index] & (UINT64_C(1) << 2)) == 0u) {
+        report_boot_error("user mapping leaked into kernel root or lacks U/S permission");
+    }
+    serial_write("DODO: separate user root mapping self-check passed\\n");
+
+    /*
      * mov eax, DODO_X86_64_USER_TEST_MAGIC; int 0x80; ud2
      * The DPL3 gate returns to a kernel trampoline only when the handler sees
      * CPL3 and the exact expected register marker.
@@ -759,11 +795,16 @@ static void test_user_mode_transitions(void) {
         user_code[i] = interrupt_test_code[i];
     }
 
+    /* Restore the kernel root before calling the assembly transition stub. */
+    if (dodo_x86_64_paging_switch_root(kernel_root_frame) != DODO_PAGING_OK) {
+        report_boot_error("could not restore kernel page-table root before CPL3 entry");
+    }
+
     const uint64_t user_stack_pointer =
         user_stack_virtual + DODO_PAGE_SIZE - UINT64_C(16);
     user_mode_return_marker = 0;
     user_mode_test_armed = 1;
-    dodo_x86_64_enter_user(user_code_virtual, user_stack_pointer);
+    dodo_x86_64_enter_user(user_code_virtual, user_stack_pointer, user_root_frame);
 
     if (user_mode_test_armed != 0u ||
         user_mode_return_marker != DODO_X86_64_USER_TEST_MAGIC) {
@@ -797,7 +838,7 @@ static void test_user_mode_transitions(void) {
     expected_page_fault_kind = DODO_EXPECT_USER_SUPERVISOR_FAULT;
     page_fault_selftest_armed = 1;
     user_supervisor_read_test_passed = 0;
-    dodo_x86_64_enter_user(user_code_virtual, user_stack_pointer);
+    dodo_x86_64_enter_user(user_code_virtual, user_stack_pointer, user_root_frame);
 
     if (page_fault_selftest_armed != 0u ||
         user_supervisor_read_test_passed == 0u) {
