@@ -6,13 +6,14 @@
 2. Limine reads /boot/limine/limine.conf and loads /boot/dodo-kernel.elf.
 3. Limine enters the ELF at _start in x86-64 long mode using its higher-half mapping.
 4. The assembly entry disables maskable interrupts, installs DODO's bootstrap stack, clears the frame pointer, and calls kernel_main.
-5. The kernel initializes COM1 and loads a project-owned IDT for CPU exception vectors 0–31.
-6. The kernel validates the base protocol revision, memory-map response and HHDM response.
+5. The kernel initializes COM1 and loads DODO's own GDT. It preserves Limine's entry selector layout (CS 0x28, data selectors 0x30) while reserving ring-3 descriptors for future privilege transitions.
+6. The kernel loads a project-owned IDT for CPU exception vectors 0–31, then validates the base protocol revision, memory-map response and HHDM response.
 7. DODO's physical allocator prepares complete usable 4 KiB frames. Five pages are reserved for table/mapping/protection self-tests, and another frame is allocated for DODO's PML4 root.
 8. The paging helpers read CR3, verify four-level paging (rejecting LA57), enable CR0.WP, and enable EFER.NXE when the CPU supports it.
 9. DODO copies the current PML4 entries to its own allocated root frame and activates it with CR3. This preserves current mappings but continues to use the inherited lower-level tables.
 10. DODO creates mappings in an unused kernel PML4 slot. It verifies alias consistency, rejects an attempt to replace an existing mapping and a non-canonical address, then intentionally tests read-only and NX enforcement.
-11. An INT3 test verifies exception dispatch and return through iretq. The kernel halts after successful bootstrap checks.
+11. An INT3 test verifies exception dispatch and return through iretq.
+12. After the last boot-response access, DODO adopts the protocol-marked bootloader-reclaimable regions into its physical allocator, checks the page-count accounting, and nulls its memory-map/HHDM response pointers. The kernel halts after successful bootstrap checks.
 
 ## Protocol contract
 
@@ -30,7 +31,8 @@ include/dodo/mm/phys.h exposes the bootstrap allocator interface; src/mm/phys.c 
 - Tracks remaining pages, outstanding allocations, and a bounded recycled-frame stack.
 - Supports returning a tracked frame and reusing it; rejects unaligned, unknown, and duplicate frees.
 - Returns physical addresses only; it does not make them directly dereferenceable, create mappings, or zero data.
-- Has host-side tests covering alignment, malformed maps, overflow, overlap, exhaustion, freeing/reuse, frame zero, and allocation-ledger capacity.
+- Has host-side tests covering alignment, malformed maps, overflow, overlap, exhaustion, freeing/reuse, frame zero, added regions, and allocation-ledger capacity.
+- Reclaiming bootloader regions is gated on the caller's lifetime decision; the boot path only does so after activating its own page-table clone and GDT/IDT.
 
 ## Virtual memory mapper and protection tests
 
@@ -43,7 +45,7 @@ include/dodo/arch/x86_64/paging.h and src/arch/x86_64/paging.c provide a deliber
 - Rejects unsupported flags, invalid/unaligned addresses, huge-page conflicts, conflicting parent permissions and repeated table frames.
 - Enables CR0.WP before tests so supervisor code cannot silently bypass read-only leaf protection.
 - Enables EFER.NXE if supported, and only then runs the NX execution test.
-- The controlled test traps only page faults whose address and error bits match the currently armed test. Any unrelated page fault remains fatal.
+- The controlled test traps only page faults whose address and error bits match the currently armed test. Any unrelated page fault remains fatal. After the bootloader-reclaimable regions have been added, the Limine response pointers are set to NULL to prevent accidental reads through stale response metadata.
 
 The QEMU smoke test proves the specific assertions in this path:
 - the direct-map and test virtual aliases see the same data;
@@ -75,6 +77,7 @@ These segment flags are defense in depth. Later memory-management work must pres
 
 - COM1 is used for diagnostics; there is no terminal service.
 - There is no timer or external interrupt delivery.
+- The GDT is owned by DODO, but ring-3 entry/return instructions and actual user-mode processes are not implemented yet.
 - DODO owns the cloned page-table structure but preserves Limine's leaf mappings and HHDM layout; it does not yet maintain its own physical-frame reclamation or per-process mapping policy.
 - There is no user mode, scheduler, IPC, capability enforcement, filesystem, network stack, or GUI.
 - The QEMU smoke test covers the tested paths only; it does not establish that DODO is secure or suitable for daily use.
