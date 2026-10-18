@@ -56,6 +56,21 @@ enum dodo_paging_status dodo_x86_64_paging_clone_tree(
 
 int dodo_x86_64_nx_enabled(void);
 
+/* Physical address of the kernel root established during bootstrap. */
+uint64_t dodo_x86_64_kernel_root_physical(void);
+
+/*
+ * Create a separate user root with all lower-half PML4 entries empty and only
+ * the kernel-half entries copied from DODO's active kernel root. This provides
+ * a fresh user mapping tree while sharing supervisor-only higher-half mappings.
+ */
+enum dodo_paging_status dodo_x86_64_paging_create_user_root(
+    uint64_t user_root_physical);
+
+/* Switch CR3 to a previously prepared root and update the mapper's active root. */
+enum dodo_paging_status dodo_x86_64_paging_switch_root(
+    uint64_t root_physical);
+
 /* Return the HHDM alias for a physical address, or NULL before init/on error. */
 volatile void *dodo_x86_64_hhdm_pointer(uint64_t physical_address);
 
