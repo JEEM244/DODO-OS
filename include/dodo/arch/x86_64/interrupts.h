@@ -31,9 +31,17 @@ struct dodo_x86_64_exception_frame {
     uint64_t rflags;
 };
 
+#define DODO_EXCEPTION_FATAL 0
+#define DODO_EXCEPTION_RESUME 1
+#define DODO_EXCEPTION_RETURN_TO_KERNEL 2
+
 void dodo_x86_64_idt_init(void);
 
-/* Return 1 only when the explicitly armed INT3 self-test should resume. */
+/*
+ * Return RESUME to restore the saved CPU frame with iretq, or
+ * RETURN_TO_KERNEL to abandon a controlled CPL3 frame and restore the saved
+ * kernel call stack via dodo_x86_64_user_return_trampoline.
+ */
 int dodo_x86_64_exception_handler(
     struct dodo_x86_64_exception_frame *frame);
 
