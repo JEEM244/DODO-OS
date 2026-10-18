@@ -1,35 +1,39 @@
 # DODO OS roadmap
 
-The dates are deliberately omitted: progress depends on learning, hardware support, testing, and the size of the contributor team. A milestone is complete only when its acceptance checks pass.
+This roadmap tracks implemented behavior, not just intended features. A checked box means code exists; milestone acceptance still depends on repeatable tests passing in the latest CI run.
 
 ## M0 — Reproducible kernel build
 
-- [ ] Build a freestanding x86-64 kernel ELF without linking a host C runtime.
-- [ ] Add an architecture-specific entry point and dedicated stack.
-- [ ] Initialize COM1 and print a versioned boot message.
-- [ ] Halt safely if the kernel returns.
-- [ ] Document toolchain versions and reproduce the build in CI.
-- [ ] Add a documented boot protocol and QEMU boot image in a later substep.
+- [x] Build a freestanding x86-64 kernel ELF without linking a host C runtime.
+- [x] Add an architecture-specific entry point and dedicated stack.
+- [x] Initialize COM1 and print a versioned boot message.
+- [x] Halt safely if the kernel returns.
+- [x] Reproduce the build in GitHub Actions and inspect the ELF metadata.
+- [x] Integrate a pinned Limine boot path and create a BIOS/UEFI test ISO.
 
-**Acceptance:** clean build from a fresh checkout; inspectable ELF; serial output reproducible in QEMU after boot integration. No disk writes to the host.
+**Acceptance:** the kernel ELF builds, QEMU reaches the kernel, the protocol base revision is accepted, and serial output is checked by CI. The kernel is still only a bootstrap prototype.
 
 ## M1 — CPU and diagnostics
 
-- [ ] Define panic and assertion paths.
-- [ ] Install exception/interrupt descriptor tables.
-- [ ] Handle at least breakpoint and page-fault diagnostics.
-- [ ] Add a timer interrupt and deterministic test hooks.
+- [x] Install an initial IDT for CPU exception vectors 0–31.
+- [x] Normalize exception stack frames and report breakpoint/page-fault details.
+- [x] Add a QEMU breakpoint self-test which resumes through `iretq`.
+- [ ] Add a reusable panic/assertion policy and structured fatal diagnostics.
+- [ ] Add a timer interrupt and deterministic timer test hooks.
+- [ ] Add tests for a controlled page fault and other fatal exceptions.
 
-**Acceptance:** intentionally triggered test exceptions produce useful diagnostics and do not silently continue.
+**Acceptance:** expected test exceptions produce useful diagnostics; fatal exceptions stop safely rather than continuing with corrupted state. The current INT3 self-test verifies dispatch and resumption, not all exception paths.
 
 ## M2 — Memory
 
-- [ ] Parse bootloader memory map.
-- [ ] Physical page allocator.
-- [ ] Kernel virtual-memory mappings and guard pages.
-- [ ] Explicit ownership and lifetime rules.
+- [x] Parse and validate the bootloader memory map.
+- [x] Implement a bootstrap physical page-frame allocator for complete 4 KiB usable frames.
+- [x] Test alignment, exhaustion, null/malformed entries, overflow, and overlapping usable ranges.
+- [ ] Add broader allocator stress tests and allocation ownership tracking.
+- [ ] Build kernel page tables / virtual-memory mappings and guard pages.
+- [ ] Define explicit physical-frame ownership and lifetime rules.
 
-**Acceptance:** allocator stress tests, invalid-free detection in debug builds, and memory-map validation.
+**Acceptance:** stress tests, malformed-map rejection, and mapping permission tests pass. The current allocator returns physical addresses only; it is not a virtual-memory manager and does not support freeing frames.
 
 ## M3 — Isolation primitives
 
