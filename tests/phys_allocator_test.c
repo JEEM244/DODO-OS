@@ -208,6 +208,76 @@ static void test_tracking_capacity_is_bounded(void) {
     assert(allocator.free_pages == 1);
 }
 
+static void test_deterministic_allocate_free_stress(void) {
+    enum { PAGE_COUNT = 512, ITERATION_COUNT = 20000 };
+    const struct dodo_limine_memmap_entry usable = {
+        .base = UINT64_C(0x1000),
+        .length = (uint64_t)PAGE_COUNT * DODO_PHYS_PAGE_SIZE,
+        .type = DODO_LIMINE_MEMMAP_USABLE
+    };
+    struct dodo_limine_memmap_entry *entries[] = {
+        (struct dodo_limine_memmap_entry *)&usable
+    };
+    const struct dodo_limine_memmap_response map = {
+        .revision = 0,
+        .entry_count = 1,
+        .entries = entries
+    };
+
+    struct dodo_phys_allocator allocator;
+    uint64_t live[PAGE_COUNT];
+    uint64_t live_count = 0;
+    uint32_t random_state = UINT32_C(0xD0D05EED);
+
+    assert(dodo_phys_init(&allocator, &map) == DODO_PHYS_OK);
+    for (uint64_t step = 0; step < ITERATION_COUNT; ++step) {
+        /* Fixed LCG seed makes a failure reproducible in every environment. */
+        random_state = random_state * UINT32_C(1664525) +
+                       UINT32_C(1013904223);
+
+        const int should_allocate =
+            live_count == 0 ||
+            (live_count < PAGE_COUNT && ((random_state >> 8) & 1u) != 0u);
+
+        if (should_allocate) {
+            uint64_t page = UINT64_MAX;
+            assert(dodo_phys_alloc_page(&allocator, &page) == DODO_PHYS_OK);
+            assert(page % DODO_PHYS_PAGE_SIZE == 0);
+            for (uint64_t i = 0; i < live_count; ++i) {
+                assert(live[i] != page);
+            }
+            live[live_count++] = page;
+        } else {
+            const uint64_t index = (uint64_t)random_state % live_count;
+            const uint64_t page = live[index];
+            assert(dodo_phys_free_page(&allocator, page) == DODO_PHYS_OK);
+            live[index] = live[live_count - 1u];
+            live_count--;
+        }
+
+        assert(allocator.allocated_pages == live_count);
+        assert(allocator.free_pages + live_count == PAGE_COUNT);
+    }
+
+    while (live_count != 0) {
+        assert(dodo_phys_free_page(&allocator, live[live_count - 1u]) ==
+               DODO_PHYS_OK);
+        live_count--;
+    }
+    assert(allocator.allocated_pages == 0);
+    assert(allocator.free_pages == PAGE_COUNT);
+
+    uint64_t all_pages[PAGE_COUNT];
+    for (uint64_t i = 0; i < PAGE_COUNT; ++i) {
+        assert(dodo_phys_alloc_page(&allocator, &all_pages[i]) == DODO_PHYS_OK);
+        for (uint64_t j = 0; j < i; ++j) {
+            assert(all_pages[j] != all_pages[i]);
+        }
+    }
+    assert(allocator.free_pages == 0);
+    assert(allocator.allocated_pages == PAGE_COUNT);
+}
+
 static void test_invalid_arguments_and_map(void) {
     struct dodo_phys_allocator allocator;
     assert(dodo_phys_init(0, 0) == DODO_PHYS_INVALID_ARGUMENT);
@@ -279,6 +349,7 @@ int main(void) {
     test_free_reallocate_and_duplicate_free();
     test_zero_physical_page_can_be_allocated_and_freed();
     test_tracking_capacity_is_bounded();
+    test_deterministic_allocate_free_stress();
     test_invalid_arguments_and_map();
     test_overlap_rejected();
     puts("DODO physical allocator tests: PASS");
