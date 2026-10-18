@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "dodo/arch/x86_64/gdt.h"
 #include "dodo/arch/x86_64/interrupts.h"
 #include "dodo/arch/x86_64/paging.h"
 #include "dodo/boot/limine_protocol.h"
@@ -552,9 +553,15 @@ static void test_exception_handler(void) {
 __attribute__((noreturn))
 void kernel_main(void) {
     serial_init();
-    dodo_x86_64_idt_init();
-
     serial_write("\nDODO OS: kernel reached entry point\n");
+
+    dodo_x86_64_gdt_init();
+    if (!dodo_x86_64_gdt_verify()) {
+        report_boot_error("DODO's GDT installation self-check failed");
+    }
+    serial_write("DODO: own GDT loaded; kernel and user selectors verified\n");
+
+    dodo_x86_64_idt_init();
 
     if (limine_base_revision[2] != 0u) {
         report_boot_error("Limine base revision 3 was not accepted");
