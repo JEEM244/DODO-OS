@@ -26,6 +26,7 @@
 
 static uint64_t hhdm_offset;
 static uint64_t root_table_physical;
+static uint64_t kernel_root_table_physical;
 static int paging_initialized;
 static int nx_enabled;
 
@@ -132,6 +133,8 @@ static int probe_and_enable_nx(void) {
 enum dodo_paging_status dodo_x86_64_paging_init(uint64_t offset) {
     paging_initialized = 0;
     nx_enabled = 0;
+    root_table_physical = 0;
+    kernel_root_table_physical = 0;
 
     if ((offset & (DODO_PAGE_SIZE - 1u)) != 0u ||
         offset < DODO_HHDM_MINIMUM ||
@@ -325,6 +328,7 @@ enum dodo_paging_status dodo_x86_64_paging_clone_tree(
     }
 
     root_table_physical = cloned_root_physical;
+    kernel_root_table_physical = cloned_root_physical;
     *new_root_physical = cloned_root_physical;
     *tables_cloned = page_table_clone_count;
 
@@ -335,6 +339,72 @@ enum dodo_paging_status dodo_x86_64_paging_clone_tree(
 
 int dodo_x86_64_nx_enabled(void) {
     return nx_enabled;
+}
+
+uint64_t dodo_x86_64_kernel_root_physical(void) {
+    return kernel_root_table_physical;
+}
+
+enum dodo_paging_status dodo_x86_64_paging_create_user_root(
+    uint64_t user_root_physical) {
+    if (!paging_initialized || kernel_root_table_physical == 0u) {
+        return DODO_PAGING_INVALID_ARGUMENT;
+    }
+
+    if ((user_root_physical & (DODO_PAGE_SIZE - 1u)) != 0u ||
+        user_root_physical > DODO_PTE_ADDRESS_MASK ||
+        user_root_physical == kernel_root_table_physical) {
+        return DODO_PAGING_INVALID_ADDRESS;
+    }
+
+    volatile uint64_t *kernel_root;
+    volatile uint64_t *user_root;
+    if (!physical_to_hhdm(kernel_root_table_physical, &kernel_root) ||
+        !physical_to_hhdm(user_root_physical, &user_root)) {
+        return DODO_PAGING_INVALID_HHDM;
+    }
+
+    /* Never inherit any low-half mappings into a fresh user address space. */
+    zero_physical_page(user_root);
+    for (uint64_t index = DODO_PML4_FIRST_KERNEL_SLOT;
+         index < UINT64_C(512); ++index) {
+        user_root[index] = kernel_root[index];
+        if ((user_root[index] & DODO_PTE_USER) != 0u) {
+            /* A user-accessible top-level kernel mapping would defeat isolation. */
+            zero_physical_page(user_root);
+            return DODO_PAGING_PERMISSION_CONFLICT;
+        }
+    }
+
+    return DODO_PAGING_OK;
+}
+
+enum dodo_paging_status dodo_x86_64_paging_switch_root(
+    uint64_t new_root_physical) {
+    if (!paging_initialized) {
+        return DODO_PAGING_INVALID_ARGUMENT;
+    }
+
+    if ((new_root_physical & (DODO_PAGE_SIZE - 1u)) != 0u ||
+        new_root_physical > DODO_PTE_ADDRESS_MASK) {
+        return DODO_PAGING_INVALID_ADDRESS;
+    }
+
+    volatile uint64_t *root;
+    if (!physical_to_hhdm(new_root_physical, &root)) {
+        return DODO_PAGING_INVALID_HHDM;
+    }
+
+    __asm__ volatile ("mov %0, %%cr3"
+                      :
+                      : "r"(new_root_physical)
+                      : "memory");
+    if ((read_cr3() & DODO_PTE_ADDRESS_MASK) != new_root_physical) {
+        return DODO_PAGING_READBACK_FAILED;
+    }
+
+    root_table_physical = new_root_physical;
+    return DODO_PAGING_OK;
 }
 
 volatile void *dodo_x86_64_hhdm_pointer(uint64_t physical_address) {
