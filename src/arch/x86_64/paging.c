@@ -178,6 +178,7 @@ static enum dodo_paging_status clone_page_table(
     uint64_t old_physical,
     uint64_t level,
     dodo_paging_allocate_frame_fn allocate_frame,
+    dodo_paging_release_frame_fn release_frame,
     void *context,
     uint64_t *new_physical) {
     if (new_physical == 0 || level < 1u || level > 4u ||
@@ -254,7 +255,8 @@ static enum dodo_paging_status clone_page_table(
         const uint64_t old_child = entry & DODO_PTE_ADDRESS_MASK;
         uint64_t new_child = 0;
         const enum dodo_paging_status status = clone_page_table(
-            old_child, level - 1u, allocate_frame, context, &new_child);
+            old_child, level - 1u, allocate_frame, release_frame,
+            context, &new_child);
         if (status != DODO_PAGING_OK) {
             return status;
         }
@@ -269,10 +271,11 @@ static enum dodo_paging_status clone_page_table(
 
 enum dodo_paging_status dodo_x86_64_paging_clone_tree(
     dodo_paging_allocate_frame_fn allocate_frame,
+    dodo_paging_release_frame_fn release_frame,
     void *context,
     uint64_t *new_root_physical,
     uint64_t *tables_cloned) {
-    if (!paging_initialized || allocate_frame == 0 ||
+    if (!paging_initialized || allocate_frame == 0 || release_frame == 0 ||
         new_root_physical == 0 || tables_cloned == 0) {
         return DODO_PAGING_INVALID_ARGUMENT;
     }
@@ -282,10 +285,25 @@ enum dodo_paging_status dodo_x86_64_paging_clone_tree(
     uint64_t cloned_root_physical = 0;
 
     enum dodo_paging_status status = clone_page_table(
-        old_root_physical, 4u, allocate_frame, context,
+        old_root_physical, 4u, allocate_frame, release_frame, context,
         &cloned_root_physical);
     if (status != DODO_PAGING_OK) {
-        return status;
+        /*
+         * Nothing from a failed clone was installed in CR3. Roll back every
+         * frame recorded so far, in reverse order, to avoid a partial-tree leak.
+         */
+        int rollback_ok = 1;
+        for (uint64_t i = page_table_clone_count; i > 0; --i) {
+            const uint64_t frame =
+                page_table_clone_cache[i - 1u].new_physical;
+            if (!release_frame(context, frame)) {
+                rollback_ok = 0;
+            }
+            page_table_clone_cache[i - 1u].old_physical = 0;
+            page_table_clone_cache[i - 1u].new_physical = 0;
+        }
+        page_table_clone_count = 0;
+        return rollback_ok ? status : DODO_PAGING_ROLLBACK_FAILED;
     }
 
     __asm__ volatile ("mov %0, %%cr3"
