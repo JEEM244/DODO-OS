@@ -37,7 +37,7 @@ The current bootstrap reserves five page frames: three for intermediate page tab
 
 ## Virtual memory and permissions
 
-The x86-64 paging helper first reads the CR3 root provided by Limine and uses the higher-half direct map to access page-table pages. During bootstrap, DODO allocates a new physical frame, copies all 512 top-level entries, and activates that frame as DODO's own PML4 root. The previous root is not reclaimed. Lower-level tables are intentionally inherited until DODO has a complete ownership and reclamation policy. The mapper refuses unsupported five-level paging, invalid addresses, unknown flags, huge-page collisions, conflicting parent permissions, existing leaf mappings, and reused or unaligned table frames.
+The x86-64 paging helper first reads the CR3 root provided by Limine and uses the higher-half direct map to access table pages. During bootstrap, DODO recursively clones the active four-level page-table tree into newly allocated physical frames, preserving leaf physical targets and permissions while redirecting intermediate entries to the cloned tables. Shared table references and recursive root mappings are preserved through an old-to-new table cache; 1 GiB and 2 MiB huge-page leaves are copied without descending into them. DODO activates the cloned root with CR3 only after cloning completes. The old table frames are not reclaimed because their ownership and lifetime are not yet tracked. The mapper refuses unsupported five-level paging, invalid addresses, unknown flags, huge-page collisions, conflicting parent permissions, existing leaf mappings, and reused or unaligned table frames.
 
 It maps a test page into an unused kernel PML4 slot. The QEMU self-test verifies that the direct-map alias and the new virtual alias see the same contents.
 
@@ -49,10 +49,10 @@ Before enforcing supervisor read-only checks, DODO enables CR0.WP. If the CPU su
 Unhandled page faults remain fatal. These tests cover particular paths in QEMU; they are not a complete virtual-memory manager or a comprehensive security proof.
 
 Current limitations:
-- DODO now owns the active top-level PML4 root, but the lower-level page-table hierarchy is inherited from Limine.
-- The bootstrap still relies on inherited mappings and the higher-half direct map. It does not yet build a fully independent mapping hierarchy.
+- DODO owns a cloned four-level page-table tree and retains the inherited leaf mappings to the same physical pages.
+- DODO still relies on the Limine-provided HHDM layout and does not reclaim the old tree or manage per-process address spaces.
 - There is no virtual-memory area manager, allocation reclamation, demand paging, copy-on-write, per-process address space, or guard-page stack allocator.
-- DODO adds test mappings only in an unused kernel PML4 slot; the mapper intentionally never overwrites a present leaf.
+- DODO adds test mappings only in an unused kernel PML4 slot; the mapper intentionally never overwrites a present leaf. The initial clone is bounded to 8192 table frames and fails closed if that limit is reached.
 
 ## Exception handling
 
