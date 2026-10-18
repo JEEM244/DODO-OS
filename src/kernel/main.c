@@ -337,6 +337,33 @@ static void test_virtual_mapping(void) {
     serial_write("DODO: NX page protection ");
     serial_write(dodo_x86_64_nx_enabled() ? "enabled\n" : "not available\n");
 
+    /*
+     * Take ownership of a new PML4 root while copying every current entry.
+     * Lower-level tables remain inherited; this is a staged handoff, not yet
+     * a completely independent address-space hierarchy.
+     */
+    uint64_t new_root_physical = 0;
+    if (dodo_phys_alloc_page(&physical_allocator, &new_root_physical) !=
+        DODO_PHYS_OK) {
+        report_boot_error("could not allocate DODO's PML4 root");
+    }
+
+    uint64_t previous_root_physical = 0;
+    status = dodo_x86_64_paging_take_root(
+        new_root_physical, &previous_root_physical);
+    if (status != DODO_PAGING_OK) {
+        serial_write("DODO: PML4 root handoff error code = ");
+        serial_write_u64((uint64_t)status);
+        serial_write("\\n");
+        report_boot_error("could not activate DODO's PML4 root");
+    }
+
+    serial_write("DODO: previous PML4 root = ");
+    serial_write_hex64(previous_root_physical);
+    serial_write("\\nDODO: DODO-owned PML4 root installed = ");
+    serial_write_hex64(new_root_physical);
+    serial_write("\\n");
+
     uint64_t mapped_virtual_address = 0;
     status = dodo_x86_64_paging_self_test(
         bootstrap_reserved_frames, &mapped_virtual_address);
