@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include "dodo/arch/x86_64/interrupts.h"
+#include "dodo/arch/x86_64/paging.h"
 #include "dodo/boot/limine_protocol.h"
 #include "dodo/mm/phys.h"
 
@@ -35,6 +36,19 @@ static volatile struct dodo_limine_memmap_request limine_memmap_request = {
         0x0a82e883a194f07b,
         0x67cf3d9d378a806f,
         0xe304acdfc50c3c62
+    },
+    .revision = 0,
+    .response = NULL
+};
+
+/* Limine higher-half direct-map request. */
+__attribute__((used, section(".limine_requests"), aligned(8)))
+static volatile struct dodo_limine_hhdm_request limine_hhdm_request = {
+    .id = {
+        0xc7b1dd30df4c8b88,
+        0x0a82e883a194f07b,
+        0x48dcf1cb8ad2b852,
+        0x63984e959a98244b
     },
     .revision = 0,
     .response = NULL
@@ -262,6 +276,43 @@ static void inspect_memory_map(void) {
     serial_write("\n");
 }
 
+static void test_virtual_mapping(void) {
+    struct dodo_limine_hhdm_response *response = limine_hhdm_request.response;
+    if (response == NULL) {
+        report_boot_error("Limine did not provide the higher-half direct map");
+    }
+
+    serial_write("DODO: HHDM offset = ");
+    serial_write_hex64(response->offset);
+    serial_write("\n");
+
+    enum dodo_paging_status status =
+        dodo_x86_64_paging_init(response->offset);
+    if (status != DODO_PAGING_OK) {
+        serial_write("DODO: paging initialization error code = ");
+        serial_write_u64((uint64_t)status);
+        serial_write("\n");
+        report_boot_error("paging helper initialization failed");
+    }
+
+    serial_write("DODO: NX page protection ");
+    serial_write(dodo_x86_64_nx_enabled() ? "enabled\n" : "not available\n");
+
+    uint64_t mapped_virtual_address = 0;
+    status = dodo_x86_64_paging_self_test(
+        bootstrap_reserved_frames, &mapped_virtual_address);
+    if (status != DODO_PAGING_OK) {
+        serial_write("DODO: virtual mapping test error code = ");
+        serial_write_u64((uint64_t)status);
+        serial_write("\n");
+        report_boot_error("virtual page mapping self-test failed");
+    }
+
+    serial_write("DODO: virtual page mapping self-check passed; VA = ");
+    serial_write_hex64(mapped_virtual_address);
+    serial_write("\n");
+}
+
 static void test_exception_handler(void) {
     breakpoint_selftest_armed = 1;
     __asm__ volatile ("int3" : : : "memory");
@@ -293,6 +344,7 @@ void kernel_main(void) {
     serial_write("DODO: COM1 serial diagnostics ready\n");
     serial_write("DODO: exception IDT loaded\n");
     inspect_memory_map();
+    test_virtual_mapping();
     test_exception_handler();
     serial_write("DODO: all kernel bootstrap self-checks passed\n");
     kernel_halt();
