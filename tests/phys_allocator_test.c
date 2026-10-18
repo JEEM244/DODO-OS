@@ -278,6 +278,63 @@ static void test_deterministic_allocate_free_stress(void) {
     assert(allocator.allocated_pages == PAGE_COUNT);
 }
 
+static void test_add_region_after_reclamation(void) {
+    const struct dodo_limine_memmap_entry usable = {
+        .base = UINT64_C(0x1000),
+        .length = UINT64_C(0x4000),
+        .type = DODO_LIMINE_MEMMAP_USABLE
+    };
+    struct dodo_limine_memmap_entry *entries[] = {
+        (struct dodo_limine_memmap_entry *)&usable
+    };
+    const struct dodo_limine_memmap_response map = {
+        .revision = 0,
+        .entry_count = 1,
+        .entries = entries
+    };
+
+    struct dodo_phys_allocator allocator;
+    assert(dodo_phys_init(&allocator, &map) == DODO_PHYS_OK);
+    assert(allocator.region_count == 1);
+    assert(allocator.free_pages == 4);
+
+    assert(dodo_phys_add_region(
+        &allocator, UINT64_C(0x10000), UINT64_C(0x3000)) == DODO_PHYS_OK);
+    assert(allocator.region_count == 2);
+    assert(allocator.free_pages == 7);
+
+    /* Bad requests must not mutate the free-page count or region list. */
+    assert(dodo_phys_add_region(
+        &allocator, UINT64_C(0x11000), DODO_PHYS_PAGE_SIZE) ==
+        DODO_PHYS_REGION_OVERLAP);
+    assert(dodo_phys_add_region(
+        &allocator, UINT64_C(0x12001), DODO_PHYS_PAGE_SIZE) ==
+        DODO_PHYS_INVALID_ARGUMENT);
+    assert(dodo_phys_add_region(
+        &allocator, UINT64_C(0x12000), UINT64_C(0x1001)) ==
+        DODO_PHYS_INVALID_ARGUMENT);
+    assert(dodo_phys_add_region(
+        &allocator, UINT64_MAX - UINT64_C(0xfff), DODO_PHYS_PAGE_SIZE) ==
+        DODO_PHYS_INVALID_MAP);
+    assert(dodo_phys_add_region(
+        &allocator, UINT64_C(0x20000), 0) ==
+        DODO_PHYS_INVALID_ARGUMENT);
+    assert(allocator.region_count == 2);
+    assert(allocator.free_pages == 7);
+
+    for (uint64_t i = 0; i < 5; ++i) {
+        uint64_t page = UINT64_MAX;
+        assert(dodo_phys_alloc_page(&allocator, &page) == DODO_PHYS_OK);
+        if (i < 4) {
+            assert(page == UINT64_C(0x1000) + i * DODO_PHYS_PAGE_SIZE);
+        } else {
+            assert(page == UINT64_C(0x10000));
+        }
+    }
+    assert(allocator.allocated_pages == 5);
+    assert(allocator.free_pages == 2);
+}
+
 static void test_invalid_arguments_and_map(void) {
     struct dodo_phys_allocator allocator;
     assert(dodo_phys_init(0, 0) == DODO_PHYS_INVALID_ARGUMENT);
@@ -350,6 +407,7 @@ int main(void) {
     test_zero_physical_page_can_be_allocated_and_freed();
     test_tracking_capacity_is_bounded();
     test_deterministic_allocate_free_stress();
+    test_add_region_after_reclamation();
     test_invalid_arguments_and_map();
     test_overlap_rejected();
     puts("DODO physical allocator tests: PASS");
