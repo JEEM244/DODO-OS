@@ -15,6 +15,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 
 ## M1 — CPU and diagnostics
 
+- [x] Install a project-owned GDT while preserving Limine's initial selector layout and reserve user-mode code/data descriptors.
 - [x] Install an initial IDT for CPU exception vectors 0–31.
 - [x] Normalize exception stack frames and report breakpoint/page-fault details.
 - [x] Add a QEMU breakpoint self-test which resumes through iretq.
@@ -31,6 +32,8 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Implement a bootstrap physical page-frame allocator for complete 4 KiB usable frames.
 - [x] Test alignment, exhaustion, null/malformed entries, overflow, and overlapping usable ranges.
 - [x] Track active physical-frame allocations; support free/reuse, reject double frees and unknown frames, and enforce a fixed tracking cap.
+- [x] Add validated, non-overlapping regions that the kernel has independently determined safe to reclaim.
+- [x] Adopt the protocol-marked bootloader-reclaimable memory after replacing the active page-table tree and GDT/IDT; invalidate Limine response pointers afterward.
 - [x] Extend Limine's active 4-level page tables with a checked single-page mapper in an unused kernel PML4 slot.
 - [x] Verify physical/direct-map aliases and a new virtual mapping in QEMU.
 - [x] Verify read-only and NX page protection behavior in QEMU.
@@ -47,7 +50,8 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 
 ## M3 — Isolation primitives
 
-- [ ] User/kernel privilege separation.
+- [ ] Implement a verified privilege-level transition using the reserved ring-3 GDT selectors.
+- [ ] User/kernel privilege separation and user stack setup.
 - [ ] Process address spaces.
 - [ ] Context switching and scheduler.
 - [ ] IPC with validated message boundaries.
