@@ -359,6 +359,66 @@ static void inspect_memory_map(void) {
     serial_write("\n");
 }
 
+static void reclaim_bootloader_memory(void) {
+    struct dodo_limine_memmap_response *response =
+        limine_memmap_request.response;
+    if (response == NULL ||
+        response->entry_count > DODO_PHYS_MAX_REGIONS ||
+        (response->entry_count != 0u && response->entries == NULL)) {
+        report_boot_error("cannot safely inspect the final bootloader memory map");
+    }
+
+    const uint64_t free_pages_before = physical_allocator.free_pages;
+    uint64_t reclaimed_pages = 0;
+    uint64_t reclaimed_regions = 0;
+
+    /*
+     * Do this only after switching to DODO's cloned page-table tree and
+     * installing DODO's GDT/IDT and kernel stack. Limine's boot tables, GDT,
+     * stack, and response structures live in bootloader-reclaimable memory.
+     * No pointer from the response may be dereferenced after this function.
+     */
+    for (uint64_t i = 0; i < response->entry_count; ++i) {
+        struct dodo_limine_memmap_entry *entry = response->entries[i];
+        if (entry == NULL) {
+            report_boot_error("memory map contains a null entry during reclamation");
+        }
+
+        if (entry->type != DODO_LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE ||
+            entry->length == 0u) {
+            continue;
+        }
+
+        const enum dodo_phys_status status = dodo_phys_add_region(
+            &physical_allocator, entry->base, entry->length);
+        if (status != DODO_PHYS_OK) {
+            serial_write("DODO: reclaimed-region validation error = ");
+            serial_write_u64((uint64_t)status);
+            serial_write("\n");
+            report_boot_error("could not safely reclaim bootloader memory region");
+        }
+
+        const uint64_t region_pages = entry->length / DODO_PHYS_PAGE_SIZE;
+        if (region_pages > UINT64_MAX - reclaimed_pages) {
+            report_boot_error("reclaimed page count overflowed");
+        }
+        reclaimed_pages += region_pages;
+        reclaimed_regions++;
+    }
+
+    if (reclaimed_regions == 0u ||
+        reclaimed_pages > UINT64_MAX - free_pages_before ||
+        physical_allocator.free_pages != free_pages_before + reclaimed_pages) {
+        report_boot_error("bootloader memory reclamation count did not validate");
+    }
+
+    serial_write("DODO: bootloader reclaimable regions adopted = ");
+    serial_write_u64(reclaimed_regions);
+    serial_write("\nDODO: bootloader reclaimable pages returned to allocator = ");
+    serial_write_u64(reclaimed_pages);
+    serial_write("\n");
+}
+
 static void test_virtual_mapping(void) {
     struct dodo_limine_hhdm_response *response = limine_hhdm_request.response;
     if (response == NULL) {
@@ -573,6 +633,7 @@ void kernel_main(void) {
     inspect_memory_map();
     test_virtual_mapping();
     test_exception_handler();
+    reclaim_bootloader_memory();
     serial_write("DODO: all kernel bootstrap self-checks passed\n");
     kernel_halt();
 }
