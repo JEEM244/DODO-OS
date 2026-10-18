@@ -19,6 +19,7 @@
 #define DODO_EFER_MSR UINT32_C(0xc0000080)
 #define DODO_EFER_NXE (UINT64_C(1) << 11)
 #define DODO_CR4_LA57 (UINT64_C(1) << 12)
+#define DODO_CR0_WP (UINT64_C(1) << 16)
 #define DODO_MAX_TABLE_FRAMES UINT64_C(3)
 
 static uint64_t hhdm_offset;
@@ -65,6 +66,15 @@ static uint64_t read_cr4(void) {
     uint64_t value;
     __asm__ volatile ("mov %%cr4, %0" : "=r"(value));
     return value;
+}
+
+static int enable_supervisor_write_protect(void) {
+    uint64_t cr0;
+    __asm__ volatile ("mov %%cr0, %0" : "=r"(cr0));
+    cr0 |= DODO_CR0_WP;
+    __asm__ volatile ("mov %0, %%cr0" : : "r"(cr0) : "memory");
+    __asm__ volatile ("mov %%cr0, %0" : "=r"(cr0));
+    return (cr0 & DODO_CR0_WP) != 0u;
 }
 
 static void cpuid(uint32_t leaf, uint32_t subleaf, uint32_t *a,
@@ -138,6 +148,14 @@ enum dodo_paging_status dodo_x86_64_paging_init(uint64_t offset) {
     volatile uint64_t *root_table;
     if (!physical_to_hhdm(root_table_physical, &root_table)) {
         return DODO_PAGING_INVALID_HHDM;
+    }
+
+    /*
+     * Without CR0.WP, supervisor-mode writes can bypass read-only PTEs.
+     * Enable it before any protection self-test or security-sensitive mapping.
+     */
+    if (!enable_supervisor_write_protect()) {
+        return DODO_PAGING_NOT_SUPPORTED;
     }
 
     nx_enabled = probe_and_enable_nx();
