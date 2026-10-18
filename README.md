@@ -1,10 +1,10 @@
 # DODO OS
 
-**DODO is an experimental operating-system project built around a kernel of its own and security as a core system property.**
+**DODO is an experimental operating-system project with its own kernel and security as a core system property.**
 
 The goal is not to create another Linux distribution or a collection of security utilities. DODO aims to become a practical daily-use desktop operating system whose architecture limits what programs can access, makes their actions explainable, and allows risky work to happen in isolated environments.
 
-> **Current status:** early project scaffold. The first milestone is a bootable x86-64 kernel prototype. DODO is not yet a usable operating system, and security guarantees are not claimed until they are implemented and tested.
+> **Current status:** the repository now contains a freestanding x86-64 kernel entry, a pinned Limine boot path, an ISO build, and a QEMU serial smoke test. This is only an early kernel prototype, not a desktop OS. Check the latest GitHub Actions run before assuming the build or boot test has passed.
 
 ## Project principles
 
@@ -24,20 +24,33 @@ The initial research question is:
 
 This is a research hypothesis, not a claim of unprecedented invention. Existing work on capability systems, sandboxing, disposable environments, and transactional filesystems is relevant prior art and must be studied.
 
-## First target
+## Current kernel milestone
 
 - Architecture: x86-64.
-- Boot path: UEFI through the Limine boot protocol for the initial prototype.
-- Implementation: freestanding C and small amounts of x86-64 assembly only where required.
-- Development environment: QEMU before physical hardware.
-- Initial observable result: boot a DODO kernel and write a versioned status message to a serial console.
-- Initial safety boundary: no disk installation, no privileged host access, and no real network tools.
+- Boot path: Limine boot protocol using a pinned upstream binary release and checksum.
+- Implementation: freestanding C and a small x86-64 assembly entry point.
+- Link layout: higher-half kernel with separate request, executable, read-only, and writable ELF segments.
+- Diagnostics: COM1 serial output.
+- Test environment: QEMU before physical hardware.
+- Safety boundary: no disk installation, no privileged host access, and no real network tools.
 
-Using a bootloader is a deliberate bootstrap choice. DODO's kernel and operating-system services remain our own work; writing a bootloader, every driver, and all desktop applications at the same time would slow the first useful milestone without improving its security argument.
+Limine is deliberately used only to bootstrap the kernel. DODO's kernel and future operating-system services remain our own work; developing a custom bootloader, every driver, and all desktop applications at the same time would delay the first useful milestones.
+
+## Build and test
+
+Read [docs/BUILDING.md](docs/BUILDING.md) before building.
+
+```sh
+make clean all       # build kernel and bootable test ISO
+make run             # launch the ISO in QEMU
+make qemu-smoke      # verify kernel handoff via serial output
+```
+
+The initial kernel prints diagnostic messages and halts. A blank graphical display is expected until graphics support exists. The automated workflow also uploads the ISO as a short-lived artifact.
 
 ## Roadmap
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/BOOT-AND-ENTRY.md](docs/BOOT-AND-ENTRY.md).
 
 1. **Kernel bring-up:** boot, serial diagnostics, panic path, and repeatable build.
 2. **CPU and memory:** interrupt handling, physical/virtual memory, allocator, scheduler, and isolation.
@@ -51,17 +64,18 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/ARCHITECTURE.md](docs/ARCHITECT
 
 ```text
 .
-├── docs/                 # Architecture, threat model, roadmap, contribution notes
-├── src/kernel/           # Own freestanding kernel code
-├── linker/               # Kernel link layout
-├── config/               # Bootloader configuration
-├── scripts/              # Build/run helpers
-└── .github/workflows/    # Reproducible CI checks
+├── config/                  # Limine boot menu
+├── docs/                    # Architecture, build, threat model, and roadmap
+├── src/arch/x86_64/          # Architecture-specific entry code
+├── src/kernel/              # Freestanding kernel source
+├── linker/                  # ELF load layout
+├── Makefile                 # Kernel, ISO, and QEMU targets
+└── .github/workflows/       # Build and boot smoke test
 ```
 
-## Development status
+## Security status
 
-Nothing in the current scaffold should be considered production secure. The first goal is correctness and observability, then isolation primitives, and only later a desktop environment. Until the relevant checks exist and pass, do not install DODO on a daily-use machine.
+DODO is experimental and must not be used to protect sensitive data or as a production security boundary. A successful boot test only proves that the tested artifact reaches a particular point; it does not prove the absence of vulnerabilities. Do not install early builds on a daily-use computer.
 
 ## Contributing
 
