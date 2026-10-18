@@ -7,7 +7,7 @@
 #include "dodo/mm/phys.h"
 
 #define COM1_PORT 0x3F8u
-#define DODO_BOOT_TEST_FRAME_COUNT 4u
+#define DODO_BOOT_TEST_FRAME_COUNT 5u
 
 /*
  * Limine protocol markers and base revision 3.
@@ -62,11 +62,18 @@ static volatile uint64_t limine_requests_end_marker[2] = {
 
 static struct dodo_phys_allocator physical_allocator;
 /*
- * These four frames are deliberately retained after the bootstrap self-test.
- * Later page-table bootstrap code can use them; they are not returned to pool.
+ * The first four frames are retained by the paging self-test: three for
+ * intermediate tables and one for the data page. The fifth is a read-only/NX
+ * page used by controlled protection-fault tests.
  */
 static uint64_t bootstrap_reserved_frames[DODO_BOOT_TEST_FRAME_COUNT];
 static volatile uint64_t breakpoint_selftest_armed = 0;
+static volatile uint64_t page_fault_selftest_armed = 0;
+static volatile uint64_t expected_page_fault_address = 0;
+static volatile uint64_t expected_page_fault_kind = 0;
+
+#define DODO_EXPECT_WRITE_FAULT UINT64_C(1)
+#define DODO_EXPECT_EXECUTE_FAULT UINT64_C(2)
 
 static const char *const exception_names[32] = {
     "Divide Error",
@@ -185,7 +192,7 @@ static void report_boot_error(const char *message) {
 }
 
 int dodo_x86_64_exception_handler(
-    const struct dodo_x86_64_exception_frame *frame) {
+    struct dodo_x86_64_exception_frame *frame) {
     if (frame == NULL || frame->vector >= 32u) {
         serial_write("DODO: FATAL: invalid exception frame\n");
         return 0;
@@ -197,6 +204,38 @@ int dodo_x86_64_exception_handler(
         serial_write_hex64(frame->rip);
         serial_write("\n");
         return 1;
+    }
+
+    /*
+     * Only resume a page fault when the explicitly armed probe faulted at the
+     * exact expected address and the CPU error code matches the expected case.
+     * All other page faults remain fatal.
+     */
+    if (frame->vector == 14u && page_fault_selftest_armed != 0u) {
+        uint64_t fault_address;
+        __asm__ volatile ("mov %%cr2, %0" : "=r"(fault_address));
+
+        if (fault_address == expected_page_fault_address) {
+            const uint64_t error = frame->error_code;
+            if (expected_page_fault_kind == DODO_EXPECT_WRITE_FAULT &&
+                (error & UINT64_C(0x3)) == UINT64_C(0x3)) {
+                page_fault_selftest_armed = 0;
+                frame->rip = (uint64_t)(uintptr_t)
+                    dodo_x86_64_readonly_write_fault_resume;
+                serial_write("DODO: read-only page write was blocked\n");
+                return 1;
+            }
+
+            if (expected_page_fault_kind == DODO_EXPECT_EXECUTE_FAULT &&
+                (error & UINT64_C(0x11)) == UINT64_C(0x11) &&
+                (error & UINT64_C(0x2)) == 0u) {
+                page_fault_selftest_armed = 0;
+                frame->rip = (uint64_t)(uintptr_t)
+                    dodo_x86_64_nx_execute_fault_resume;
+                serial_write("DODO: NX instruction fetch was blocked\n");
+                return 1;
+            }
+        }
     }
 
     serial_write("DODO: FATAL exception: ");
@@ -311,6 +350,69 @@ static void test_virtual_mapping(void) {
     serial_write("DODO: virtual page mapping self-check passed; VA = ");
     serial_write_hex64(mapped_virtual_address);
     serial_write("\n");
+
+    /*
+     * Map an additional page read-only. The direct-map alias remains writable,
+     * so the contents can be initialized without violating the test mapping.
+     */
+    const uint64_t read_only_virtual_address =
+        mapped_virtual_address + DODO_PAGE_SIZE;
+    const uint64_t read_only_flags =
+        dodo_x86_64_nx_enabled() ? DODO_PAGE_NO_EXECUTE : 0u;
+    uint64_t frames_used = 0;
+    status = dodo_x86_64_map_page(
+        read_only_virtual_address, bootstrap_reserved_frames[4],
+        read_only_flags, NULL, 0, &frames_used);
+    if (status != DODO_PAGING_OK || frames_used != 0u) {
+        serial_write("DODO: read-only mapping error code = ");
+        serial_write_u64((uint64_t)status);
+        serial_write("\n");
+        report_boot_error("read-only page mapping failed");
+    }
+
+    volatile uint8_t *direct_alias = (volatile uint8_t *)
+        dodo_x86_64_hhdm_pointer(bootstrap_reserved_frames[4]);
+    if (direct_alias == NULL) {
+        report_boot_error("cannot access test frame through HHDM");
+    }
+
+    volatile uint64_t *direct_word =
+        (volatile uint64_t *)(direct_alias + sizeof(uint64_t));
+    volatile uint64_t *read_only_word =
+        (volatile uint64_t *)(uintptr_t)
+            (read_only_virtual_address + sizeof(uint64_t));
+    const uint64_t expected_value = UINT64_C(0x61c0ffee5a17b00b);
+    *direct_word = expected_value;
+
+    /* RET opcode: an NX page may be read but must not be instruction-fetched. */
+    direct_alias[0] = UINT8_C(0xc3);
+
+    if (*read_only_word != expected_value) {
+        report_boot_error("read-only alias did not read the mapped physical page");
+    }
+
+    expected_page_fault_address = (uint64_t)(uintptr_t)read_only_word;
+    expected_page_fault_kind = DODO_EXPECT_WRITE_FAULT;
+    page_fault_selftest_armed = 1;
+    const int write_result = dodo_x86_64_test_write_readonly(read_only_word);
+    if (page_fault_selftest_armed != 0u || write_result != 0) {
+        report_boot_error("read-only page write protection was not enforced");
+    }
+    serial_write("DODO: read-only page protection self-check passed\n");
+
+    if (dodo_x86_64_nx_enabled()) {
+        expected_page_fault_address = read_only_virtual_address;
+        expected_page_fault_kind = DODO_EXPECT_EXECUTE_FAULT;
+        page_fault_selftest_armed = 1;
+        const int execute_result = dodo_x86_64_test_execute_nx(
+            (void *)(uintptr_t)read_only_virtual_address);
+        if (page_fault_selftest_armed != 0u || execute_result != 0) {
+            report_boot_error("NX execution protection was not enforced");
+        }
+        serial_write("DODO: NX execution protection self-check passed\n");
+    } else {
+        serial_write("DODO: NX protection unavailable; execution test skipped\n");
+    }
 }
 
 static void test_exception_handler(void) {
