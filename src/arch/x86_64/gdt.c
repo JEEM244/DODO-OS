@@ -34,23 +34,12 @@ void dodo_x86_64_gdt_init(void) {
     };
 
     /*
-     * The ring-0 code descriptor is intentionally identical to the selector
-     * Limine provided at entry. Load the new table and replace data selectors
-     * first; an audited far-transfer path will be added before CPL transitions.
+     * Load the new table without reloading selectors yet. Limine enters with
+     * CS=0x28 and DS/ES/SS=0x30; this GDT deliberately preserves those slots
+     * and descriptors. The cached segments therefore remain valid while new
+     * trap/return transfers resolve selectors from the new GDT.
      */
-    __asm__ volatile (
-        "lgdt %0\n\t"
-        "movw $0x30, %%ax\n\t"
-        "movw %%ax, %%ds\n\t"
-        "movw %%ax, %%es\n\t"
-        "movw %%ax, %%ss\n\t"
-        "xorw %%ax, %%ax\n\t"
-        "movw %%ax, %%fs\n\t"
-        "movw %%ax, %%gs\n\t"
-        :
-        : "m"(gdtr)
-        : "rax", "memory"
-    );
+    __asm__ volatile ("lgdt %0" : : "m"(gdtr) : "memory");
 }
 
 int dodo_x86_64_gdt_verify(void) {
