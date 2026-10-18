@@ -362,7 +362,7 @@ static void test_virtual_mapping(void) {
     serial_write_hex64(previous_root_physical);
     serial_write("\nDODO: DODO-owned PML4 root installed = ");
     serial_write_hex64(new_root_physical);
-    serial_write("\\n");
+    serial_write("\n");
 
     uint64_t mapped_virtual_address = 0;
     status = dodo_x86_64_paging_self_test(
