@@ -875,17 +875,6 @@ static void test_user_mode_transitions(void) {
     serial_write("DODO: separate user root mapping self-check passed\\n");
 
     /*
-     * Minimal userspace syscall program:
-     *   write(user_code_va + 96, message_len)
-     *   write(0xffffffff80000000, 1)  -> must be rejected without dereference
-     *   exit(7) -> returns to the kernel with status 7
-     *
-     * This uses hand-written machine bytes so the first ABI can be tested
-     * without a userspace compiler or C runtime.
-     */
-    static const char user_message[] = "DODO says hello from CPL3";
-    const uint64_t user_message_length = sizeof(user_message) - 1u;
-    /*
      * Assemble a tiny userspace program for the current test ABI:
      *   write(user_message, len)  -> return len
      *   write(kernel_pointer, 1)  -> return ERROR, no dereference
