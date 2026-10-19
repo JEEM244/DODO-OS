@@ -7,6 +7,11 @@ static int valid_span(uint64_t base, uint64_t length, uint64_t *end) {
  if (length == 0u || !aligned(base) || !aligned(length) || base > UINT64_MAX-length) return 0;
  *end=base+length; return 1;
 }
+static int valid_space(const struct dodo_vaddr_space *space) {
+ return space != NULL && aligned(space->start) && aligned(space->end) &&
+        space->start < space->end && space->end <= DODO_USER_LIMIT &&
+        space->count <= DODO_VADDR_MAX_RANGES;
+}
 enum dodo_vaddr_status dodo_vaddr_init(struct dodo_vaddr_space *space,uint64_t start,uint64_t end) {
  if(space==NULL) return DODO_VADDR_INVALID_ARGUMENT;
  if(!aligned(start)||!aligned(end)||start>=end||end>DODO_USER_LIMIT) return DODO_VADDR_INVALID_RANGE;
@@ -15,6 +20,7 @@ enum dodo_vaddr_status dodo_vaddr_init(struct dodo_vaddr_space *space,uint64_t s
 enum dodo_vaddr_status dodo_vaddr_reserve(struct dodo_vaddr_space *space,uint64_t base,uint64_t length) {
  uint64_t end;
  if(space==NULL) return DODO_VADDR_INVALID_ARGUMENT;
+ if(!valid_space(space)) return DODO_VADDR_INVALID_ARGUMENT;
  if(!valid_span(base,length,&end)||base<space->start||end>space->end) return DODO_VADDR_INVALID_RANGE;
  uint64_t position=0;
  while(position<space->count&&space->allocated[position].base<base) ++position;
@@ -26,6 +32,7 @@ enum dodo_vaddr_status dodo_vaddr_reserve(struct dodo_vaddr_space *space,uint64_
 }
 enum dodo_vaddr_status dodo_vaddr_allocate(struct dodo_vaddr_space *space,uint64_t length,uint64_t alignment,uint64_t *base) {
  if(space==NULL||base==NULL) return DODO_VADDR_INVALID_ARGUMENT;
+ if(!valid_space(space)) return DODO_VADDR_INVALID_ARGUMENT;
  if(length==0u||!aligned(length)||alignment<DODO_VADDR_PAGE_SIZE||(alignment&(alignment-1u))!=0u||!aligned(alignment)) return DODO_VADDR_INVALID_RANGE;
  uint64_t candidate=space->start;
  if(candidate>UINT64_MAX-(alignment-1u)) return DODO_VADDR_NO_SPACE;
@@ -47,6 +54,7 @@ enum dodo_vaddr_status dodo_vaddr_allocate(struct dodo_vaddr_space *space,uint64
 }
 enum dodo_vaddr_status dodo_vaddr_release(struct dodo_vaddr_space *space,uint64_t base,uint64_t length) {
  if(space==NULL) return DODO_VADDR_INVALID_ARGUMENT;
+ if(!valid_space(space)) return DODO_VADDR_INVALID_ARGUMENT;
  uint64_t end;
  if(!valid_span(base,length,&end)) return DODO_VADDR_INVALID_RANGE;
  for(uint64_t i=0;i<space->count;++i) if(space->allocated[i].base==base&&space->allocated[i].length==length) {
