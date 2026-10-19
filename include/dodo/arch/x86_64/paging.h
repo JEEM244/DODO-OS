@@ -106,8 +106,8 @@ void dodo_x86_64_nx_execute_fault_resume(void);
  * lower half. User mappings may not be global because global TLB entries
  * can survive CR3 switches. Missing intermediate tables inherit the required
  * U/S permission; an existing supervisor-only ancestor is never widened
- * implicitly. If the
- * operation fails after creating intermediate tables, those new links are
+ * implicitly. If the operation fails after creating intermediate tables,
+ * those new links are
  * rolled back. frames_used still reports supplied frames consumed/zeroed by
  * the attempt so the caller can reclaim them. This prototype supports 4-level
  * paging only.
