@@ -667,20 +667,42 @@ enum dodo_paging_status dodo_x86_64_map_page(
         (virtual_address >> 21) & UINT64_C(0x1ff)
     };
 
+    /*
+     * Mapping is transactional with respect to page-table links: if a later
+     * level rejects the request, unlink every intermediate table created by
+     * this call. The caller still owns the supplied frames and can reclaim the
+     * first *frames_used entries after failure; no dangling PTE is left behind.
+     */
+    volatile uint64_t *created_entries[3] = { 0, 0, 0 };
+    uint64_t created_count = 0;
+
     for (uint64_t level = 0; level < 3u; ++level) {
+        volatile uint64_t *parent_entry = &table[indexes[level]];
+        const int entry_was_empty = *parent_entry == 0u;
         volatile uint64_t *child = 0;
-        status = get_or_create_child(&table[indexes[level]], level,
-                                     flags, page_table_frames,
+        status = get_or_create_child(parent_entry, level, flags,
+                                     page_table_frames,
                                      page_table_frame_count, frames_used,
                                      &child);
         if (status != DODO_PAGING_OK) {
+            while (created_count > 0u) {
+                *created_entries[--created_count] = 0u;
+            }
+            __asm__ volatile ("invlpg (%0)" : : "r"(virtual_address) : "memory");
             return status;
+        }
+        if (entry_was_empty) {
+            created_entries[created_count++] = parent_entry;
         }
         table = child;
     }
 
     const uint64_t leaf_index = (virtual_address >> 12) & UINT64_C(0x1ff);
     if ((table[leaf_index] & DODO_PTE_PRESENT) != 0u) {
+        while (created_count > 0u) {
+            *created_entries[--created_count] = 0u;
+        }
+        __asm__ volatile ("invlpg (%0)" : : "r"(virtual_address) : "memory");
         return DODO_PAGING_ALREADY_MAPPED;
     }
 
