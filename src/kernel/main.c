@@ -668,6 +668,26 @@ static void test_virtual_mapping(void) {
     serial_write_u64(tables_cloned);
     serial_write("\n");
 
+    /*
+     * The paging self-test writes to its fourth frame through a virtual alias.
+     * Supplying the active root as that data frame must be rejected before any
+     * writes occur, and the caller's output must remain untouched on failure.
+     */
+    const uint64_t invalid_self_test_frames[4] = {
+        bootstrap_reserved_frames[0],
+        bootstrap_reserved_frames[1],
+        bootstrap_reserved_frames[2],
+        new_root_physical
+    };
+    uint64_t rejected_test_address = UINT64_MAX;
+    status = dodo_x86_64_paging_self_test(
+        invalid_self_test_frames, &rejected_test_address);
+    if (status != DODO_PAGING_INVALID_ADDRESS ||
+        rejected_test_address != UINT64_MAX) {
+        report_boot_error("paging self-test accepted the live root as its data frame");
+    }
+    serial_write("DODO: live-root data-frame rejection self-check passed\\n");
+
     uint64_t mapped_virtual_address = 0;
     status = dodo_x86_64_paging_self_test(
         bootstrap_reserved_frames, &mapped_virtual_address);
