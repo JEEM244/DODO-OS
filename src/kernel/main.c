@@ -80,6 +80,7 @@ static volatile uint64_t user_cross_root_isolation_passed = 0;
 static volatile uint64_t user_write_syscall_passed = 0;
 static volatile uint64_t user_invalid_pointer_denied = 0;
 static volatile uint64_t user_invalid_length_denied = 0;
+static volatile uint64_t user_address_limit_denied = 0;
 static volatile uint64_t user_unknown_syscall_denied = 0;
 static volatile uint64_t user_cross_page_write_passed = 0;
 
@@ -293,6 +294,11 @@ int dodo_x86_64_exception_handler(
                     frame->rsi == 1u) {
                     user_invalid_pointer_denied = 1;
                     serial_write("DODO: invalid user syscall pointer rejected\n");
+                } else if (frame->rdi ==
+                               DODO_X86_64_USER_ADDRESS_LIMIT - 1u &&
+                           frame->rsi == 2u) {
+                    user_address_limit_denied = 1;
+                    serial_write("DODO: user buffer crossing address limit rejected\n");
                 }
                 frame->rax = DODO_X86_64_SYSCALL_ERROR;
                 return DODO_EXCEPTION_RESUME;
@@ -963,6 +969,31 @@ static void test_user_mode_transitions(void) {
     emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x0f);
     emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x0b);
 
+    /*
+     * A two-byte user span beginning at USER_ADDRESS_LIMIT - 1 crosses from
+     * the valid lower half into the non-user address range and must be rejected
+     * before any page-table walk or byte copy.
+     */
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xb8);
+    emit_user_test_u32(syscall_test_code, code_capacity, &code_length,
+        (uint32_t)DODO_X86_64_SYSCALL_WRITE);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x48);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xbf);
+    emit_user_test_u64(syscall_test_code, code_capacity, &code_length,
+        DODO_X86_64_USER_ADDRESS_LIMIT - 1u);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xbe);
+    emit_user_test_u32(syscall_test_code, code_capacity, &code_length, 2u);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xcd);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x80);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x48);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x83);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xf8);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xff);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x74);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x02);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x0f);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x0b);
+
     /* Unknown syscall numbers must return ERROR rather than panic the kernel. */
     emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xb8);
     emit_user_test_u32(syscall_test_code, code_capacity, &code_length,
@@ -1019,6 +1050,7 @@ static void test_user_mode_transitions(void) {
     user_write_syscall_passed = 0;
     user_invalid_pointer_denied = 0;
     user_invalid_length_denied = 0;
+    user_address_limit_denied = 0;
     user_unknown_syscall_denied = 0;
     dodo_x86_64_enter_user(user_code_virtual, user_stack_pointer, user_root_frame);
 
@@ -1039,6 +1071,10 @@ static void test_user_mode_transitions(void) {
         report_boot_error("kernel pointer passed to user syscall was not rejected");
     }
     serial_write("DODO: invalid user syscall pointer rejection self-check passed\n");
+    if (user_address_limit_denied == 0u) {
+        report_boot_error("user buffer crossing the lower-half limit was not rejected");
+    }
+    serial_write("DODO: user address-limit rejection self-check passed\n");
     if (user_invalid_length_denied == 0u) {
         report_boot_error("oversized user write length was not rejected");
     }
