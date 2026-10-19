@@ -45,7 +45,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Preserve shared table references and recursive root mappings during cloning.
 - [x] Add allocation-failure injection during page-table cloning and verify rollback restores allocator counts.
 - [ ] Track table/frame ownership, reclaim the obsolete bootloader tree safely, and stress rollback failure paths.
-- [ ] Build a full virtual-memory manager and guard-page support.
+- [x] Add a bounded, host-tested low-half virtual-range allocator with first-fit allocation, explicit reservation/release, and overlap checks (metadata only; not yet wired to page tables).\n- [ ] Build a full virtual-memory manager and guard-page support.
 - [ ] Define physical-frame release, ownership transfer, and lifetime rules.
 
 **Acceptance:** host allocator tests cover free/reuse and invalid frees; QEMU checks mapping/protection and a failed-clone rollback. DODO activates a cloned four-level table tree, but retains the same leaf physical mappings and does not yet reclaim the old tree or support per-process address spaces. The allocator is not yet SMP-safe.
@@ -57,7 +57,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Verify user mappings stay absent from the kernel root and cannot read the tested supervisor-only kernel address.
 - [x] Create two user roots concurrently and verify the second root faults when it reads a lower-half page mapped only in the first.
 - [x] Tear down the two test roots after returning to kernel CR3, free their explicitly tracked code/stack/private-table/root frames, and verify allocator counters return to baseline.
-- [ ] Replace the test-specific cleanup list with a reusable address-space creation/switch/teardown API that tracks all owned frames and handles partial failures.
+- [ ] Replace the test-specific cleanup list with a reusable address-space creation/switch/teardown API that tracks all owned frames and handles partial failures.\n- [ ] Connect the virtual-range allocator to page mapping and owned page-table lifecycle operations.
 - [ ] Replace global one-shot test state with per-thread/per-process trap context and independent kernel stacks.
 - [x] Exercise a prototype CPL3 write/exit ABI with validated user pointers, bounded write lengths, zero-length and unmapped-buffer rejection, unknown-call rejection, cross-page copies, and user-half boundary rejection.
 - [ ] Replace the test-only interrupt ABI with a stable kernel-entry/syscall ABI and per-thread trap context.
