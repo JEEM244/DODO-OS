@@ -69,6 +69,7 @@ static struct dodo_phys_allocator physical_allocator;
  * page used by controlled protection-fault tests.
  */
 static uint64_t bootstrap_reserved_frames[DODO_BOOT_TEST_FRAME_COUNT];
+static uint64_t shared_kernel_test_virtual_address = 0;
 static volatile uint64_t breakpoint_selftest_armed = 0;
 static volatile uint64_t page_fault_selftest_armed = 0;
 static volatile uint64_t expected_page_fault_address = 0;
@@ -698,6 +699,7 @@ static void test_virtual_mapping(void) {
         report_boot_error("virtual page mapping self-test failed");
     }
 
+    shared_kernel_test_virtual_address = mapped_virtual_address;
     serial_write("DODO: virtual page mapping self-check passed; VA = ");
     serial_write_hex64(mapped_virtual_address);
     serial_write("\n");
@@ -1329,7 +1331,7 @@ static void test_user_mode_transitions(void) {
      */
     frames_used = UINT64_MAX;
     paging_status = dodo_x86_64_map_page(
-        mapped_virtual_address + 2u * DODO_PAGE_SIZE,
+        shared_kernel_test_virtual_address + 2u * DODO_PAGE_SIZE,
         second_user_code_frame, DODO_PAGE_WRITABLE,
         NULL, 0u, &frames_used);
     if (paging_status != DODO_PAGING_INVALID_ADDRESS || frames_used != 0u) {
@@ -1339,7 +1341,7 @@ static void test_user_mode_transitions(void) {
     uint64_t shared_kernel_physical = UINT64_MAX;
     uint64_t shared_kernel_flags = UINT64_MAX;
     paging_status = dodo_x86_64_unmap_page(
-        mapped_virtual_address, &shared_kernel_physical, &shared_kernel_flags);
+        shared_kernel_test_virtual_address, &shared_kernel_physical, &shared_kernel_flags);
     if (paging_status != DODO_PAGING_INVALID_ADDRESS ||
         shared_kernel_physical != UINT64_MAX ||
         shared_kernel_flags != UINT64_MAX) {
