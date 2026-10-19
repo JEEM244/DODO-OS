@@ -168,6 +168,10 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "DODO: invalid user syscall pointer rejection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: user buffer crossing address limit rejected" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: user address-limit rejection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: unmapped user pointer rejected" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: unmapped user pointer rejection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: zero-length user write rejected" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: zero-length user write rejection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: oversized user write length rejected" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: oversized user write length rejection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: unknown user syscall rejected" $(BUILD_DIR)/qemu-serial.log; \
