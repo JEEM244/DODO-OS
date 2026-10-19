@@ -228,6 +228,136 @@ static void serial_write_u64(uint64_t value) {
     }
 }
 
+
+static int serial_getc(void) {
+    for (;;) {
+        if ((inb((uint16_t)(COM1_PORT + 5u)) & 0x01u) != 0u) {
+            return (int)inb((uint16_t)(COM1_PORT + 0u));
+        }
+        __asm__ volatile ("pause");
+    }
+}
+
+static int string_equal(const char *left, const char *right) {
+    if (left == NULL || right == NULL) {
+        return 0;
+    }
+    while (*left != '\0' && *right != '\0') {
+        if (*left++ != *right++) {
+            return 0;
+        }
+    }
+    return *left == '\0' && *right == '\0';
+}
+
+static void serial_readline(char *buffer, size_t capacity) {
+    size_t length = 0;
+    static int skip_lf_after_cr = 0;
+    if (buffer == NULL || capacity == 0u) {
+        return;
+    }
+    buffer[0] = '\0';
+    for (;;) {
+        const int input = serial_getc();
+        const char ch = (char)input;
+        if (skip_lf_after_cr != 0) {
+            skip_lf_after_cr = 0;
+            if (ch == '\n') {
+                continue;
+            }
+        }
+        if (ch == '\r' || ch == '\n') {
+            if (ch == '\r') {
+                skip_lf_after_cr = 1;
+            }
+            serial_write("\n");
+            buffer[length] = '\0';
+            return;
+        }
+        if (ch == '\b' || input == 0x7f) {
+            if (length > 0u) {
+                --length;
+                buffer[length] = '\0';
+                serial_write("\b \b");
+            }
+            continue;
+        }
+        if (input == 0x03) {
+            length = 0;
+            buffer[0] = '\0';
+            serial_write("^C\n");
+            serial_write("dodo> ");
+            continue;
+        }
+        if (input >= 0x20 && input <= 0x7e && length + 1u < capacity) {
+            buffer[length++] = ch;
+            buffer[length] = '\0';
+            serial_putc(ch);
+        }
+    }
+}
+
+static void run_serial_shell(void) {
+    char line[128];
+    serial_write("\nDODO OS interactive serial console\n");
+    serial_write("Type 'help' to see available commands.\n\n");
+    for (;;) {
+        serial_write("dodo> ");
+        serial_readline(line, sizeof(line));
+        char *command = line;
+        while (*command == ' ' || *command == '\t') {
+            ++command;
+        }
+        if (*command == '\0') {
+            continue;
+        }
+        if (string_equal(command, "help")) {
+            serial_write("Commands:\n");
+            serial_write("  help     Show this command list\n");
+            serial_write("  about    Explain the current build\n");
+            serial_write("  version  Show the kernel prototype version\n");
+            serial_write("  mem      Show physical allocator counters\n");
+            serial_write("  echo TXT Print TXT back to the console\n");
+            serial_write("  clear    Clear a compatible terminal\n");
+            serial_write("  halt     Stop the virtual CPU\n");
+            serial_write("Input currently uses the QEMU serial terminal.\n");
+        } else if (string_equal(command, "about")) {
+            serial_write("DODO is an experimental x86-64 operating-system kernel.\n");
+            serial_write("This build has tested memory mapping and ring-3 isolation probes.\n");
+            serial_write("It is not yet a daily-use OS and has no disk filesystem or GUI.\n");
+        } else if (string_equal(command, "version")) {
+            serial_write("DODO OS kernel prototype 0.1.0\n");
+            serial_write("Architecture: x86_64 | Boot: Limine BIOS/UEFI ISO\n");
+        } else if (string_equal(command, "mem")) {
+            serial_write("Physical memory allocator:\n  free pages:      ");
+            serial_write_u64(physical_allocator.free_pages);
+            serial_write("\n  allocated pages: ");
+            serial_write_u64(physical_allocator.allocated_pages);
+            serial_write("\n  known regions:   ");
+            serial_write_u64(physical_allocator.region_count);
+            serial_write("\n  page size:       4096 bytes\n");
+        } else if (command[0] == 'e' && command[1] == 'c' &&
+                   command[2] == 'h' && command[3] == 'o' &&
+                   (command[4] == ' ' || command[4] == '\0')) {
+            const char *message = command + 4;
+            if (*message == ' ') {
+                ++message;
+            }
+            serial_write(message);
+            serial_write("\n");
+        } else if (string_equal(command, "clear")) {
+            serial_write("\x1b[2J\x1b[H");
+        } else if (string_equal(command, "halt")) {
+            serial_write("DODO: CPU halted by console command.\n");
+            kernel_halt();
+        } else {
+            serial_write("Unknown command: ");
+            serial_write(command);
+            serial_write("\nType 'help' for available commands.\n");
+        }
+    }
+}
+
 static void serial_write_hex64(uint64_t value) {
     static const char hex_digits[] = "0123456789ABCDEF";
     serial_write("0x");
@@ -1543,5 +1673,5 @@ void kernel_main(void) {
     test_exception_handler();
     reclaim_bootloader_memory();
     serial_write("DODO: all kernel bootstrap self-checks passed\n");
-    kernel_halt();
+    run_serial_shell();
 }
