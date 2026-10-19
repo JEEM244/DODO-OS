@@ -229,6 +229,8 @@ static void serial_write_u64(uint64_t value) {
 }
 
 
+static void kernel_halt(void) __attribute__((noreturn));
+
 static int serial_getc(void) {
     for (;;) {
         if ((inb((uint16_t)(COM1_PORT + 5u)) & 0x01u) != 0u) {
@@ -296,6 +298,8 @@ static void serial_readline(char *buffer, size_t capacity) {
         }
     }
 }
+
+static void run_serial_shell(void) __attribute__((noreturn));
 
 static void run_serial_shell(void) {
     char line[128];
