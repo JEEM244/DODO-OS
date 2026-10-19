@@ -630,7 +630,9 @@ enum dodo_paging_status dodo_x86_64_map_page(
         physical_address > DODO_PTE_ADDRESS_MASK ||
         (flags & ~DODO_PTE_ALLOWED_FLAGS) != 0u ||
         ((flags & DODO_PAGE_USER_ACCESSIBLE) != 0u &&
-         virtual_address >= DODO_USER_ADDRESS_LIMIT)) {
+         virtual_address >= DODO_USER_ADDRESS_LIMIT) ||
+        ((flags & (DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_GLOBAL)) ==
+         (DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_GLOBAL))) {
         return DODO_PAGING_INVALID_ADDRESS;
     }
 
