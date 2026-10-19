@@ -16,7 +16,7 @@ int main(void) {
  assert(dodo_vaddr_release(&s,0x12000,PAGE)==DODO_VADDR_OK);
  assert(dodo_vaddr_reserve(&s,0x12000,PAGE)==DODO_VADDR_OK);
  assert(dodo_vaddr_reserve(&s,0x11000,2*PAGE)==DODO_VADDR_OVERLAP);
- assert(dodo_vaddr_release(&s,0x14000,PAGE)==DODO_VADDR_OK);
+ assert(dodo_vaddr_release(&s,0x12000,PAGE)==DODO_VADDR_OK);
  assert(dodo_vaddr_allocate(&s,PAGE,3*PAGE,&a)==DODO_VADDR_INVALID_RANGE);
  assert(dodo_vaddr_init(&s,0x10001,0x20000)==DODO_VADDR_INVALID_RANGE);
  assert(dodo_vaddr_init(&s,UINT64_C(0x00007ffffffff000),UINT64_C(0x0000800000000000))==DODO_VADDR_OK);
