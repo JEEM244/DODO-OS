@@ -164,7 +164,8 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "DODO: invalid user syscall pointer rejected" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: validated user write syscall self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: invalid user syscall pointer rejection self-check passed" $(BUILD_DIR)/qemu-serial.log; \
-	grep -Fq "DODO: ring-3 software interrupt reached kernel handler" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: userspace exit syscall reached kernel" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: userspace exit status verified" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: ring-3 entry and controlled return self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: ring-3 read of supervisor memory was blocked" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: ring-3 supervisor-isolation self-check passed" $(BUILD_DIR)/qemu-serial.log; \
