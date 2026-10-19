@@ -102,9 +102,10 @@ void dodo_x86_64_nx_execute_fault_resume(void);
  * page-table root. page_table_frames must contain caller-owned, unused
  * physical frames for missing intermediate tables; never pass a frame already
  * used by any live page table. frames_used reports how many were consumed.
- * Existing mappings are never overwritten. The active root may receive a
+ * Existing mappings are never overwritten. The kernel root may receive a
  * supervisor mapping, or a user-accessible mapping only in the canonical
- * lower half. User mappings may not be global because global TLB entries
+ * lower half. When a user root is active, this API only modifies the lower
+ * half because its higher-half page-table branches are shared with the kernel. User mappings may not be global because global TLB entries
  * can survive CR3 switches. Missing intermediate tables inherit the required
  * U/S permission; an existing supervisor-only ancestor is never widened
  * implicitly. If the operation fails after creating intermediate tables,
