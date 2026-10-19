@@ -299,15 +299,16 @@ int dodo_x86_64_exception_handler(
             return DODO_EXCEPTION_RESUME;
         }
 
-        if (frame->rax == DODO_X86_64_USER_TEST_MAGIC) {
+        if (frame->rax == DODO_X86_64_SYSCALL_EXIT) {
             user_mode_test_armed = 0;
-            user_mode_return_marker = frame->rax;
-            serial_write("DODO: ring-3 software interrupt reached kernel handler\n");
+            user_mode_return_marker = frame->rdi;
+            serial_write("DODO: userspace exit syscall reached kernel\\n");
             return DODO_EXCEPTION_RETURN_TO_KERNEL;
         }
 
-        serial_write("DODO: FATAL: unknown user syscall number\n");
-        return DODO_EXCEPTION_FATAL;
+        /* An unknown syscall is an error for the caller, not a kernel panic. */
+        frame->rax = DODO_X86_64_SYSCALL_ERROR;
+        return DODO_EXCEPTION_RESUME;
     }
 
     if (frame->vector >= 32u) {
@@ -842,7 +843,7 @@ static void test_user_mode_transitions(void) {
      * Minimal userspace syscall program:
      *   write(user_code_va + 96, message_len)
      *   write(0xffffffff80000000, 1)  -> must be rejected without dereference
-     *   exit-to-test-kernel via the one-shot marker
+     *   exit(7) -> returns to the kernel with status 7
      *
      * This uses hand-written machine bytes so the first ABI can be tested
      * without a userspace compiler or C runtime.
@@ -862,8 +863,9 @@ static void test_user_mode_transitions(void) {
         UINT8_C(0xbe), UINT8_C(0x01), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
         UINT8_C(0xb8), UINT8_C(0x01), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
         UINT8_C(0xcd), UINT8_C(0x80),
-        UINT8_C(0xb8), UINT8_C(0xde), UINT8_C(0xc0),
-        UINT8_C(0xd0), UINT8_C(0xd0), UINT8_C(0xcd), UINT8_C(0x80),
+        UINT8_C(0xb8), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
+        UINT8_C(0xbf), UINT8_C(0x07), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
+        UINT8_C(0xcd), UINT8_C(0x80),
         UINT8_C(0x0f), UINT8_C(0x0b)
     };
 
@@ -891,16 +893,17 @@ static void test_user_mode_transitions(void) {
 
     const uint64_t user_stack_pointer =
         user_stack_virtual + DODO_PAGE_SIZE - UINT64_C(16);
-    user_mode_return_marker = 0;
+    user_mode_return_marker = UINT64_MAX;
     user_mode_test_armed = 1;
     user_write_syscall_passed = 0;
     user_invalid_pointer_denied = 0;
     dodo_x86_64_enter_user(user_code_virtual, user_stack_pointer, user_root_frame);
 
     if (user_mode_test_armed != 0u ||
-        user_mode_return_marker != DODO_X86_64_USER_TEST_MAGIC) {
-        report_boot_error("ring-3 entry or controlled interrupt return failed");
+        user_mode_return_marker != DODO_X86_64_USER_TEST_EXIT_STATUS) {
+        report_boot_error("ring-3 exit syscall or controlled interrupt return failed");
     }
+    serial_write("DODO: userspace exit status verified\\n");
     if (user_write_syscall_passed == 0u) {
         report_boot_error("valid user write syscall was not serviced");
     }
