@@ -1312,6 +1312,50 @@ static void test_user_mode_transitions(void) {
     serial_write("DODO: independent user-root isolation self-check passed\n");
 
     /*
+     * Exercise leaf unmapping and reuse in root B after the CPL3 test is done.
+     * Unmapping must invalidate the TLB but must not free the data frame or the
+     * intermediate tables; a second mapping can therefore reuse those tables.
+     */
+    if (dodo_x86_64_paging_switch_root(second_user_root_frame) != DODO_PAGING_OK) {
+        report_boot_error("could not activate second root for unmap self-check");
+    }
+
+    uint64_t unmapped_physical = UINT64_MAX;
+    uint64_t unmapped_flags = UINT64_MAX;
+    paging_status = dodo_x86_64_unmap_page(
+        second_user_code_virtual, &unmapped_physical, &unmapped_flags);
+    if (paging_status != DODO_PAGING_OK ||
+        unmapped_physical != second_user_code_frame ||
+        (unmapped_flags & DODO_PAGE_USER_ACCESSIBLE) == 0u) {
+        report_boot_error("user page unmapping did not return its original frame and flags");
+    }
+
+    frames_used = UINT64_MAX;
+    paging_status = dodo_x86_64_map_page(
+        second_user_code_virtual, second_user_code_frame,
+        DODO_PAGE_USER_ACCESSIBLE, NULL, 0u, &frames_used);
+    if (paging_status != DODO_PAGING_OK || frames_used != 0u) {
+        report_boot_error("unmapped user page could not be mapped again using retained tables");
+    }
+
+    paging_status = dodo_x86_64_unmap_page(
+        second_user_code_virtual, &unmapped_physical, &unmapped_flags);
+    if (paging_status != DODO_PAGING_OK ||
+        unmapped_physical != second_user_code_frame) {
+        report_boot_error("second user page unmapping failed");
+    }
+
+    unmapped_physical = UINT64_MAX;
+    unmapped_flags = UINT64_MAX;
+    paging_status = dodo_x86_64_unmap_page(
+        second_user_code_virtual, &unmapped_physical, &unmapped_flags);
+    if (paging_status != DODO_PAGING_NOT_MAPPED ||
+        unmapped_physical != UINT64_MAX || unmapped_flags != UINT64_MAX) {
+        report_boot_error("unmap accepted an absent leaf or changed failure outputs");
+    }
+    serial_write("DODO: user-page unmap/remap self-check passed\n");
+
+    /*
      * No user root is active after the trampoline returns. Reinstall the kernel
      * CR3 explicitly, then release only frames allocated for these two test
      * roots; the shared supervisor-only upper-half tables are not ours to free.
