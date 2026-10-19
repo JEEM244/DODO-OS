@@ -60,7 +60,7 @@ Current limitations:
 
 ## Virtual-address range allocator (initial groundwork)
 
-The host-tested module in `include/dodo/mm/vaddr.h` and `src/mm/vaddr.c` manages a bounded, sorted list of reserved virtual ranges inside a caller-selected canonical low-half interval. It supports page-aligned first-fit allocation, explicit reservation, exact release, overlap rejection, alignment constraints, and a fixed metadata capacity. Host tests cover alignment, overlap, out-of-range spans, exact-release requirements, reuse after release, and the upper user-half boundary.
+The host-tested module in `include/dodo/mm/vaddr.h` and `src/mm/vaddr.c` manages a bounded, sorted list of reserved virtual ranges inside a caller-selected canonical low-half interval. It supports page-aligned first-fit allocation, explicit reservation, exact release, overlap rejection, alignment constraints, and a fixed metadata capacity. Host tests cover alignment, overlap, out-of-range spans, exact-release requirements, reuse after release, the upper user-half boundary, range-table capacity, corrupt metadata counts, and preservation of the output address on failure.
 
 This module is metadata only: it does not create page-table mappings, allocate physical frames, track page-table ownership, or make concurrent access safe. It is groundwork for a future address-space object, not yet the address-space lifecycle API. Callers must coordinate range metadata with mapping and teardown operations and must not treat releasing metadata as unmapping memory.
 
