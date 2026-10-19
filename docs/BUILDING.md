@@ -32,7 +32,7 @@ The physical allocator tests exercise synthetic memory maps, including:
 
 These tests check allocator logic separately from hardware boot. They do not prove that every physical memory map emitted by every firmware is valid, and the allocator is not yet safe for concurrent SMP use. The QEMU run also exercises a controlled failure during page-table cloning and verifies that the physical allocator's free/live counts return to their pre-test values.
 
-The virtual-range tests exercise the metadata-only low-half range allocator, including:
+The virtual-range tests are compiled with UndefinedBehaviorSanitizer and exercise the metadata-only low-half range allocator, including:
 - aligned first-fit allocation with larger alignment requirements;
 - explicit reservation, overlap rejection, exact release, and reuse after release;
 - invalid and overflowing ranges, the user-half boundary, and no-space behavior;
