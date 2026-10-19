@@ -745,6 +745,30 @@ static void test_virtual_mapping(void) {
     }
 }
 
+static void emit_user_test_byte(
+    uint8_t *buffer, size_t capacity, size_t *length, uint8_t value) {
+    if (*length >= capacity) {
+        report_boot_error("userspace test bytecode exceeded its fixed buffer");
+    }
+    buffer[(*length)++] = value;
+}
+
+static void emit_user_test_u32(
+    uint8_t *buffer, size_t capacity, size_t *length, uint32_t value) {
+    for (uint64_t i = 0; i < 4u; ++i) {
+        emit_user_test_byte(buffer, capacity, length,
+            (uint8_t)(value >> (i * 8u)));
+    }
+}
+
+static void emit_user_test_u64(
+    uint8_t *buffer, size_t capacity, size_t *length, uint64_t value) {
+    for (uint64_t i = 0; i < 8u; ++i) {
+        emit_user_test_byte(buffer, capacity, length,
+            (uint8_t)(value >> (i * 8u)));
+    }
+}
+
 static void test_user_mode_transitions(void) {
     const uint64_t free_pages_before_user_tests = physical_allocator.free_pages;
     const uint64_t allocated_pages_before_user_tests =
@@ -861,40 +885,123 @@ static void test_user_mode_transitions(void) {
      */
     static const char user_message[] = "DODO says hello from CPL3";
     const uint64_t user_message_length = sizeof(user_message) - 1u;
-    uint8_t syscall_test_code[] = {
-        UINT8_C(0xb8), UINT8_C(0x01), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
-        UINT8_C(0x48), UINT8_C(0xbf),
-        UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
-        UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
-        UINT8_C(0xbe), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
-        UINT8_C(0xcd), UINT8_C(0x80),
-        UINT8_C(0x48), UINT8_C(0xbf),
-        UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x80),
-        UINT8_C(0xff), UINT8_C(0xff), UINT8_C(0xff), UINT8_C(0xff),
-        UINT8_C(0xbe), UINT8_C(0x01), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
-        UINT8_C(0xb8), UINT8_C(0x01), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
-        UINT8_C(0xcd), UINT8_C(0x80),
-        UINT8_C(0xb8), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
-        UINT8_C(0xbf), UINT8_C(0x07), UINT8_C(0x00), UINT8_C(0x00), UINT8_C(0x00),
-        UINT8_C(0xcd), UINT8_C(0x80),
-        UINT8_C(0x0f), UINT8_C(0x0b)
-    };
+    /*
+     * Assemble a tiny userspace program for the current test ABI:
+     *   write(user_message, len)  -> return len
+     *   write(kernel_pointer, 1)  -> return ERROR, no dereference
+     *   write(user_message, 97)   -> return ERROR, length cap
+     *   unknown syscall          -> return ERROR, kernel stays alive
+     *   exit(7)                   -> return to the test harness with status 7
+     *
+     * This program is assembled from a few x86-64 opcodes in-kernel so this
+     * milestone needs no userspace compiler or C runtime yet.
+     */
+    static const char user_message[] = "DODO says hello from CPL3";
+    const uint64_t user_message_length = sizeof(user_message) - 1u;
+    const uint64_t user_message_offset = UINT64_C(256);
+    const uint64_t user_message_address =
+        user_code_virtual + user_message_offset;
+    uint8_t syscall_test_code[256] = { 0 };
+    size_t code_length = 0;
+    const size_t code_capacity = sizeof(syscall_test_code);
 
-    const uint64_t user_message_address = user_code_virtual + UINT64_C(96);
-    for (uint64_t i = 0; i < sizeof(uint64_t); ++i) {
-        syscall_test_code[7u + i] =
-            (uint8_t)(user_message_address >> (i * 8u));
+    /* write(user_message, message_length) */
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xb8); /* mov eax, imm32 */
+    emit_user_test_u32(syscall_test_code, code_capacity, &code_length,
+        (uint32_t)DODO_X86_64_SYSCALL_WRITE);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x48);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xbf); /* movabs rdi, imm64 */
+    emit_user_test_u64(syscall_test_code, code_capacity, &code_length, user_message_address);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xbe); /* mov esi, imm32 */
+    emit_user_test_u32(syscall_test_code, code_capacity, &code_length, (uint32_t)user_message_length);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xcd);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x80);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x83); /* cmp eax, message length */
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xf8);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, (uint8_t)user_message_length);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x74); /* je over UD2 on success */
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x02);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x0f);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x0b);
+
+    /* write(kernel_pointer, 1) must be rejected before dereferencing the pointer. */
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x48);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xbf);
+    emit_user_test_u64(syscall_test_code, code_capacity, &code_length,
+        UINT64_C(0xffffffff80000000));
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xbe);
+    emit_user_test_u32(syscall_test_code, code_capacity, &code_length, 1u);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xb8);
+    emit_user_test_u32(syscall_test_code, code_capacity, &code_length,
+        (uint32_t)DODO_X86_64_SYSCALL_WRITE);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xcd);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x80);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x48); /* cmp rax, -1 */
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x83);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xf8);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xff);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x74);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x02);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x0f);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x0b);
+
+    /* write(user_message, MAX_WRITE + 1) must fail at the length check. */
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xb8);
+    emit_user_test_u32(syscall_test_code, code_capacity, &code_length,
+        (uint32_t)DODO_X86_64_SYSCALL_WRITE);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x48);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xbf);
+    emit_user_test_u64(syscall_test_code, code_capacity, &code_length, user_message_address);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xbe);
+    emit_user_test_u32(syscall_test_code, code_capacity, &code_length,
+        (uint32_t)(DODO_X86_64_SYSCALL_MAX_WRITE + 1u));
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xcd);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x80);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x48);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x83);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xf8);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xff);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x74);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x02);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x0f);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x0b);
+
+    /* Unknown syscall numbers must return ERROR rather than panic the kernel. */
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xb8);
+    emit_user_test_u32(syscall_test_code, code_capacity, &code_length,
+        (uint32_t)DODO_X86_64_SYSCALL_UNKNOWN_TEST);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xcd);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x80);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x48);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x83);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xf8);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xff);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x74);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x02);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x0f);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x0b);
+
+    /* exit(7) returns to the boot harness and exposes the caller's status. */
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xb8);
+    emit_user_test_u32(syscall_test_code, code_capacity, &code_length,
+        (uint32_t)DODO_X86_64_SYSCALL_EXIT);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xbf);
+    emit_user_test_u32(syscall_test_code, code_capacity, &code_length,
+        (uint32_t)DODO_X86_64_USER_TEST_EXIT_STATUS);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0xcd);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x80);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x0f);
+    emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x0b);
+
+    if (code_length >= user_message_offset ||
+        user_message_offset + sizeof(user_message) > DODO_PAGE_SIZE) {
+        report_boot_error("userspace test bytecode/data layout exceeds one page");
     }
-    syscall_test_code[16] = (uint8_t)user_message_length;
-    syscall_test_code[17] = 0;
-    syscall_test_code[18] = 0;
-    syscall_test_code[19] = 0;
-
-    for (size_t i = 0; i < sizeof(syscall_test_code); ++i) {
+    for (size_t i = 0; i < code_length; ++i) {
         user_code[i] = syscall_test_code[i];
     }
     for (size_t i = 0; i < sizeof(user_message); ++i) {
-        user_code[96u + i] = (uint8_t)user_message[i];
+        user_code[user_message_offset + i] = (uint8_t)user_message[i];
     }
 
     /* Restore the kernel root before calling the assembly transition stub. */
