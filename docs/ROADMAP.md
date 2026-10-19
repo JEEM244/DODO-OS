@@ -41,6 +41,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Add checked 4 KiB leaf unmapping with TLB invalidation and a QEMU unmap/remap regression test (physical frames and empty page tables are not reclaimed).
 - [x] Reject global-TLB flags on user leaves to prevent stale global translations across address-space switches, with a QEMU regression test.
 - [x] Reject the active and kernel page-table roots from caller-supplied intermediate-frame pools, with a QEMU regression test.
+- [x] Reject destructive reinitialization of the root currently loaded in CR3, with a QEMU regression test that confirms existing mappings survive.
 - [x] Verify physical/direct-map aliases and a new virtual mapping in QEMU.
 - [x] Verify read-only and NX page protection behavior in QEMU.
 - [x] Verify the mapper rejects remapping a present page and rejects non-canonical virtual addresses.
