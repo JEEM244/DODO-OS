@@ -4,10 +4,18 @@
 #include <stdint.h>
 
 #define DODO_X86_64_USER_TEST_VECTOR UINT64_C(128)
-#define DODO_X86_64_USER_TEST_MAGIC UINT64_C(0x00000000d0d0c0de)
+#define DODO_X86_64_SYSCALL_EXIT UINT64_C(0)
 #define DODO_X86_64_SYSCALL_WRITE UINT64_C(1)
 #define DODO_X86_64_SYSCALL_MAX_WRITE UINT64_C(96)
 #define DODO_X86_64_SYSCALL_ERROR UINT64_MAX
+#define DODO_X86_64_USER_TEST_EXIT_STATUS UINT64_C(7)
+
+/*
+ * Prototype syscall ABI via int 0x80:
+ * RAX = number; EXIT uses RDI=status; WRITE uses RDI=user pointer, RSI=length.
+ * Return values are placed in RAX; UINT64_MAX means rejected/error.
+ * This is a boot-time test ABI, not yet a stable public interface.
+ */
 
 /*
  * Enter ring 3 using iretq. A one-shot interrupt/page-fault test handler will
