@@ -99,8 +99,9 @@ void dodo_x86_64_nx_execute_fault_resume(void);
 
 /*
  * Map one 4 KiB physical page at one canonical virtual address in the current
- * page-table root. page_table_frames is a pool of usable physical frames for
- * any missing intermediate tables; frames_used reports how many were consumed.
+ * page-table root. page_table_frames must contain caller-owned, unused
+ * physical frames for missing intermediate tables; never pass a frame already
+ * used by any live page table. frames_used reports how many were consumed.
  * Existing mappings are never overwritten. The active root may receive a
  * supervisor mapping, or a user-accessible mapping only in the canonical
  * lower half. User mappings may not be global because global TLB entries
