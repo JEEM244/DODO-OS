@@ -79,6 +79,8 @@ static volatile uint64_t user_supervisor_read_test_passed = 0;
 static volatile uint64_t user_cross_root_isolation_passed = 0;
 static volatile uint64_t user_write_syscall_passed = 0;
 static volatile uint64_t user_invalid_pointer_denied = 0;
+static volatile uint64_t user_invalid_length_denied = 0;
+static volatile uint64_t user_unknown_syscall_denied = 0;
 
 #define DODO_EXPECT_WRITE_FAULT UINT64_C(1)
 #define DODO_EXPECT_EXECUTE_FAULT UINT64_C(2)
