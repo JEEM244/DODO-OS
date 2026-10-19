@@ -103,8 +103,11 @@ void dodo_x86_64_nx_execute_fault_resume(void);
  * Existing mappings are never overwritten. The active root may receive a
  * supervisor mapping, or a user-accessible mapping only in the canonical
  * lower half. Missing intermediate tables inherit the required U/S permission;
- * an existing supervisor-only ancestor is never widened implicitly. This
- * prototype supports 4-level paging only.
+ * an existing supervisor-only ancestor is never widened implicitly. If the
+ * operation fails after creating intermediate tables, those new links are
+ * rolled back. frames_used still reports supplied frames consumed/zeroed by
+ * the attempt so the caller can reclaim them. This prototype supports 4-level
+ * paging only.
  */
 enum dodo_paging_status dodo_x86_64_map_page(
     uint64_t virtual_address,
