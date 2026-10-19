@@ -65,6 +65,12 @@ int main(void) {
  assert(dodo_vaddr_reserve(&s,0x10000,PAGE)==DODO_VADDR_INVALID_ARGUMENT);
 
  assert(dodo_vaddr_init(&s,0x10000,0x20000)==DODO_VADDR_OK);
+ s.count=1;
+ s.allocated[0].base=0x10000;
+ s.allocated[0].length=0;
+ assert(dodo_vaddr_reserve(&s,0x12000,PAGE)==DODO_VADDR_INVALID_ARGUMENT);
+
+ assert(dodo_vaddr_init(&s,0x10000,0x20000)==DODO_VADDR_OK);
  assert(dodo_vaddr_reserve(&s,0x14000,PAGE)==DODO_VADDR_OK);
  assert(dodo_vaddr_reserve(&s,0x10000,PAGE)==DODO_VADDR_OK);
  assert(dodo_vaddr_reserve(&s,0x12000,PAGE)==DODO_VADDR_OK);
