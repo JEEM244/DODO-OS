@@ -1015,6 +1015,8 @@ static void test_user_mode_transitions(void) {
     user_mode_test_armed = 1;
     user_write_syscall_passed = 0;
     user_invalid_pointer_denied = 0;
+    user_invalid_length_denied = 0;
+    user_unknown_syscall_denied = 0;
     dodo_x86_64_enter_user(user_code_virtual, user_stack_pointer, user_root_frame);
 
     if (user_mode_test_armed != 0u ||
@@ -1030,6 +1032,14 @@ static void test_user_mode_transitions(void) {
         report_boot_error("kernel pointer passed to user syscall was not rejected");
     }
     serial_write("DODO: invalid user syscall pointer rejection self-check passed\\n");
+    if (user_invalid_length_denied == 0u) {
+        report_boot_error("oversized user write length was not rejected");
+    }
+    serial_write("DODO: oversized user write length rejection self-check passed\\n");
+    if (user_unknown_syscall_denied == 0u) {
+        report_boot_error("unknown userspace syscall was not rejected safely");
+    }
+    serial_write("DODO: unknown user syscall rejection self-check passed\\n");
     serial_write("DODO: ring-3 entry and controlled return self-check passed\\n");
 
     /*
