@@ -100,8 +100,11 @@ void dodo_x86_64_nx_execute_fault_resume(void);
  * Map one 4 KiB physical page at one canonical virtual address in the current
  * page-table root. page_table_frames is a pool of usable physical frames for
  * any missing intermediate tables; frames_used reports how many were consumed.
- * Existing mappings are never overwritten. This prototype supports 4-level
- * paging and supervisor mappings only.
+ * Existing mappings are never overwritten. The active root may receive a
+ * supervisor mapping, or a user-accessible mapping only in the canonical
+ * lower half. Missing intermediate tables inherit the required U/S permission;
+ * an existing supervisor-only ancestor is never widened implicitly. This
+ * prototype supports 4-level paging only.
  */
 enum dodo_paging_status dodo_x86_64_map_page(
     uint64_t virtual_address,
