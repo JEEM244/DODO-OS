@@ -1251,6 +1251,20 @@ static void test_user_mode_transitions(void) {
     serial_write("DODO: user-global mapping rejection self-check passed\n");
 
     /*
+     * Never accept either active root as a table-frame allocation candidate:
+     * zeroing a caller-supplied frame must not be able to erase live mappings.
+     */
+    const uint64_t forbidden_root_frame[1] = { kernel_root_frame };
+    frames_used = UINT64_MAX;
+    paging_status = dodo_x86_64_map_page(
+        second_user_code_virtual, second_user_code_frame,
+        DODO_PAGE_USER_ACCESSIBLE, forbidden_root_frame, 1u, &frames_used);
+    if (paging_status != DODO_PAGING_INVALID_ADDRESS || frames_used != 0u) {
+        report_boot_error("page mapper accepted the active kernel root as a table frame");
+    }
+    serial_write("DODO: live-root table-frame rejection self-check passed\n");
+
+    /*
      * Force a partial page-table construction failure: one frame is enough
      * for the PML4 child but not the next level. The mapper must unlink that
      * child and report the frame it consumed so the caller can reuse it.
