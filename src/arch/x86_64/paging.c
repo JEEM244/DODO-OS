@@ -647,7 +647,9 @@ enum dodo_paging_status dodo_x86_64_map_page(
         const uint64_t frame = page_table_frames[i];
         if ((frame & (DODO_PAGE_SIZE - 1u)) != 0u ||
             frame > DODO_PTE_ADDRESS_MASK ||
-            frame == physical_address) {
+            frame == physical_address ||
+            frame == root_table_physical ||
+            frame == kernel_root_table_physical) {
             return DODO_PAGING_INVALID_ADDRESS;
         }
         for (uint64_t j = 0; j < i; ++j) {
