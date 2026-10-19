@@ -27,7 +27,8 @@ enum dodo_paging_status {
     DODO_PAGING_READBACK_FAILED = 11,
     DODO_PAGING_CLONE_CAPACITY_EXCEEDED = 12,
     DODO_PAGING_ROLLBACK_FAILED = 13,
-    DODO_PAGING_NO_FREE_USER_SLOT = 14
+    DODO_PAGING_NO_FREE_USER_SLOT = 14,
+    DODO_PAGING_NOT_MAPPED = 15
 };
 
 /*
@@ -116,6 +117,16 @@ enum dodo_paging_status dodo_x86_64_map_page(
     const uint64_t *page_table_frames,
     uint64_t page_table_frame_count,
     uint64_t *frames_used);
+
+/*
+ * Unmap a present 4 KiB leaf from the active root. Returns the physical frame
+ * and leaf flags on success, but never frees either the data frame or now-empty
+ * intermediate tables. Output parameters remain unchanged on failure.
+ */
+enum dodo_paging_status dodo_x86_64_unmap_page(
+    uint64_t virtual_address,
+    uint64_t *physical_address,
+    uint64_t *flags);
 
 /* Map one page in an unused kernel PML4 slot, test both aliases, keep mapping. */
 enum dodo_paging_status dodo_x86_64_paging_self_test(
