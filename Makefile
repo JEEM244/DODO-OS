@@ -32,15 +32,16 @@ OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/gdt.o \
            $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/paging_test.o \
            $(BUILD_DIR)/user_mode.o
 PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
+VADDR_TEST := $(BUILD_DIR)/vaddr_allocator_test
 
-.PHONY: all kernel iso run qemu-smoke test-phys test clean check-tools
+.PHONY: all kernel iso run qemu-smoke test-phys test-vaddr test clean check-tools
 all: iso
 
 kernel: check-tools $(KERNEL_ELF)
 
 iso: check-tools $(ISO_IMAGE)
 
-test: test-phys
+test: test-phys test-vaddr
 
 check-tools:
 	@command -v $(CC) >/dev/null || (echo "Missing C compiler: $(CC)" >&2; exit 1)
@@ -79,6 +80,13 @@ $(BUILD_DIR)/user_mode.o: src/arch/x86_64/user_mode.S | $(BUILD_DIR)
 $(KERNEL_ELF): $(OBJECTS) linker/x86_64.ld
 	$(LD) $(LDFLAGS) -o $@ $(OBJECTS)
 	@echo "Built $@"
+
+$(VADDR_TEST): src/mm/vaddr.c tests/vaddr_allocator_test.c include/dodo/mm/vaddr.h | $(BUILD_DIR)
+	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -Iinclude \\
+		src/mm/vaddr.c tests/vaddr_allocator_test.c -o $@
+
+test-vaddr: $(VADDR_TEST)
+	$(VADDR_TEST)
 
 $(PHYS_TEST): src/mm/phys.c tests/phys_allocator_test.c $(HEADERS) | $(BUILD_DIR)
 	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -Iinclude \
