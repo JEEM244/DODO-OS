@@ -816,6 +816,16 @@ enum dodo_paging_status dodo_x86_64_paging_self_test(
         }
     }
 
+    /*
+     * The final frame is mapped as test data and written through both aliases.
+     * Never let that write target a live root page, even if the caller passes
+     * a page-aligned physical address that otherwise looks valid.
+     */
+    if (frames[3] == root_table_physical ||
+        frames[3] == kernel_root_table_physical) {
+        return DODO_PAGING_INVALID_ADDRESS;
+    }
+
     uint64_t test_virtual_address = 0;
     enum dodo_paging_status status =
         find_unused_kernel_slot(&test_virtual_address);
