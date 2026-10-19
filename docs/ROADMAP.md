@@ -39,6 +39,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Extend Limine's active 4-level page tables with a checked single-page mapper in an unused kernel PML4 slot.
 - [x] Roll back newly linked intermediate tables when a page mapping fails partway through, with a QEMU regression test.
 - [x] Add checked 4 KiB leaf unmapping with TLB invalidation and a QEMU unmap/remap regression test (physical frames and empty page tables are not reclaimed).
+- [x] Reject global-TLB flags on user leaves to prevent stale global translations across address-space switches, with a QEMU regression test.
 - [x] Verify physical/direct-map aliases and a new virtual mapping in QEMU.
 - [x] Verify read-only and NX page protection behavior in QEMU.
 - [x] Verify the mapper rejects remapping a present page and rejects non-canonical virtual addresses.
