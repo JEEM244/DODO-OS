@@ -20,7 +20,9 @@ int main(void) {
  assert(dodo_vaddr_allocate(&s,PAGE,3*PAGE,&a)==DODO_VADDR_INVALID_RANGE);
  assert(dodo_vaddr_init(&s,0x10001,0x20000)==DODO_VADDR_INVALID_RANGE);
  assert(dodo_vaddr_init(&s,UINT64_C(0x00007ffffffff000),UINT64_C(0x0000800000000000))==DODO_VADDR_OK);
+ a=UINT64_C(0xdeadbeef);
  assert(dodo_vaddr_allocate(&s,2*PAGE,PAGE,&a)==DODO_VADDR_NO_SPACE);
+ assert(a==UINT64_C(0xdeadbeef));
  assert(dodo_vaddr_init(&s,0x30000,0x30000)==DODO_VADDR_INVALID_RANGE);
  assert(dodo_vaddr_init(NULL,0x10000,0x20000)==DODO_VADDR_INVALID_ARGUMENT);
  assert(dodo_vaddr_reserve(NULL,0x10000,PAGE)==DODO_VADDR_INVALID_ARGUMENT);
@@ -34,5 +36,7 @@ int main(void) {
  }
  assert(s.count==DODO_VADDR_MAX_RANGES);
  assert(dodo_vaddr_reserve(&s,0x10000+DODO_VADDR_MAX_RANGES*2*PAGE,PAGE)==DODO_VADDR_CAPACITY);
+ s.count=DODO_VADDR_MAX_RANGES+1u;
+ assert(dodo_vaddr_reserve(&s,0x10000,PAGE)==DODO_VADDR_INVALID_ARGUMENT);
  puts("virtual-address range allocator tests passed"); return 0;
 }
