@@ -630,6 +630,16 @@ enum dodo_paging_status dodo_x86_64_map_page(
 
     *frames_used = 0;
 
+    /*
+     * User roots share higher-half page-table branches with the kernel root.
+     * Mutating any higher-half leaf through a user root would therefore mutate
+     * kernel mappings too. This API only edits low-half mappings on user roots.
+     */
+    if (root_table_physical != kernel_root_table_physical &&
+        virtual_address >= DODO_USER_ADDRESS_LIMIT) {
+        return DODO_PAGING_INVALID_ADDRESS;
+    }
+
     if (!is_canonical(virtual_address) ||
         (virtual_address & (DODO_PAGE_SIZE - 1u)) != 0u ||
         (physical_address & (DODO_PAGE_SIZE - 1u)) != 0u ||
@@ -728,6 +738,15 @@ enum dodo_paging_status dodo_x86_64_unmap_page(
     if (!paging_initialized || physical_address == 0 || flags == 0) {
         return DODO_PAGING_INVALID_ARGUMENT;
     }
+    /*
+     * Higher-half branches are shared with the kernel root. A user-root unmap
+     * must never clear a kernel leaf through that shared page-table tree.
+     */
+    if (root_table_physical != kernel_root_table_physical &&
+        virtual_address >= DODO_USER_ADDRESS_LIMIT) {
+        return DODO_PAGING_INVALID_ADDRESS;
+    }
+
     if (!is_canonical(virtual_address) ||
         (virtual_address & (DODO_PAGE_SIZE - 1u)) != 0u) {
         return DODO_PAGING_INVALID_ADDRESS;
