@@ -58,6 +58,12 @@ Current limitations:
 - There is no virtual-memory area manager, demand paging, copy-on-write, per-process address space, or guard-page stack allocator. Frame release is limited to tracked physical pages and requires external proof that a frame is no longer referenced.
 - DODO adds test mappings only in an unused kernel PML4 slot; the mapper intentionally never overwrites a present leaf. The initial clone is bounded to 8192 table frames and fails closed if that limit is reached.
 
+## Virtual-address range allocator (initial groundwork)
+
+The host-tested module in `include/dodo/mm/vaddr.h` and `src/mm/vaddr.c` manages a bounded, sorted list of reserved virtual ranges inside a caller-selected canonical low-half interval. It supports page-aligned first-fit allocation, explicit reservation, exact release, overlap rejection, alignment constraints, and a fixed metadata capacity. Host tests cover alignment, overlap, out-of-range spans, exact-release requirements, reuse after release, and the upper user-half boundary.
+
+This module is metadata only: it does not create page-table mappings, allocate physical frames, track page-table ownership, or make concurrent access safe. It is groundwork for a future address-space object, not yet the address-space lifecycle API. Callers must coordinate range metadata with mapping and teardown operations and must not treat releasing metadata as unmapping memory.
+
 ## Exception handling
 
 The initial IDT installs CPU exception vectors 0–31. Assembly stubs normalize exception error-code layouts and preserve general-purpose register state before invoking a C handler. One DPL3 gate is installed for the intentional user-mode test interrupt; other software interrupt vectors remain inaccessible from CPL3.
