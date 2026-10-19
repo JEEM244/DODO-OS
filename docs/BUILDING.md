@@ -21,7 +21,7 @@ The build downloads the pinned Limine binary release. A SHA-256 checksum is chec
 make test
 ```
 
-These host-side tests exercise the physical page allocator with synthetic memory maps, including:
+The physical allocator tests exercise synthetic memory maps, including:
 - whole-page alignment, ignored reserved ranges, and allocation exhaustion;
 - invalid pointers, malformed memory maps, integer overflow, and overlapping usable ranges;
 - returning a page, reusing the same frame, and rejecting double frees or pages that were never allocated;
@@ -31,6 +31,15 @@ These host-side tests exercise the physical page allocator with synthetic memory
 - 20,000 deterministic allocate/free operations with uniqueness and page-count invariants checked after every operation.
 
 These tests check allocator logic separately from hardware boot. They do not prove that every physical memory map emitted by every firmware is valid, and the allocator is not yet safe for concurrent SMP use. The QEMU run also exercises a controlled failure during page-table cloning and verifies that the physical allocator's free/live counts return to their pre-test values.
+
+The virtual-range tests exercise the metadata-only low-half range allocator, including:
+- aligned first-fit allocation with larger alignment requirements;
+- explicit reservation, overlap rejection, exact release, and reuse after release;
+- invalid and overflowing ranges, the user-half boundary, and no-space behavior;
+- null arguments, invalid alignment, fixed reservation capacity, and invalid metadata counts;
+- leaving the caller's output address unchanged when allocation fails.
+
+The virtual-range allocator does not map pages or own physical frames. Passing these host tests does not establish that real process address spaces are isolated or safely reclaimed.
 
 ## Build
 
