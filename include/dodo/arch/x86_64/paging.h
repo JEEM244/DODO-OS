@@ -133,6 +133,8 @@ enum dodo_paging_status dodo_x86_64_unmap_page(
     uint64_t *flags);
 
 /* Map one page in an unused kernel PML4 slot, test both aliases, keep mapping. */
+/* The test writes through the fourth frame; it must be caller-owned data,
+ * not the active/kernel root or any live page-table frame. */
 enum dodo_paging_status dodo_x86_64_paging_self_test(
     const uint64_t frames[4],
     uint64_t *mapped_virtual_address);
