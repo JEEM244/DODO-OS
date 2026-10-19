@@ -1236,6 +1236,27 @@ static void test_user_mode_transitions(void) {
         second_user_stack[i] = 0;
     }
 
+    /*
+     * Force a partial page-table construction failure: one frame is enough
+     * for the PML4 child but not the next level. The mapper must unlink that
+     * child and report the frame it consumed so the caller can reuse it.
+     */
+    frames_used = 0;
+    paging_status = dodo_x86_64_map_page(
+        second_user_code_virtual, second_user_code_frame,
+        DODO_PAGE_USER_ACCESSIBLE, second_user_table_frames, 1u, &frames_used);
+    if (paging_status != DODO_PAGING_NO_TABLE_FRAMES || frames_used != 1u) {
+        report_boot_error("partial user mapping failure was not reported cleanly");
+    }
+
+    uint64_t region_after_rollback = 0;
+    paging_status = dodo_x86_64_find_unused_user_region(&region_after_rollback);
+    if (paging_status != DODO_PAGING_OK ||
+        region_after_rollback != second_user_region_base) {
+        report_boot_error("failed user mapping left a dangling PML4 entry");
+    }
+    serial_write("DODO: partial page-table mapping rollback self-check passed\n");
+
     paging_status = dodo_x86_64_map_page(
         second_user_code_virtual, second_user_code_frame,
         DODO_PAGE_USER_ACCESSIBLE, second_user_table_frames, 3u, &frames_used);
