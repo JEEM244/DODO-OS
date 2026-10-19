@@ -313,7 +313,11 @@ int dodo_x86_64_exception_handler(
             return DODO_EXCEPTION_RETURN_TO_KERNEL;
         }
 
-        /* An unknown syscall is an error for the caller, not a kernel panic. */
+        /* Unknown syscall numbers are rejected without panicking the kernel. */
+        if (frame->rax == DODO_X86_64_SYSCALL_UNKNOWN_TEST) {
+            user_unknown_syscall_denied = 1;
+            serial_write("DODO: unknown user syscall rejected\\n");
+        }
         frame->rax = DODO_X86_64_SYSCALL_ERROR;
         return DODO_EXCEPTION_RESUME;
     }
