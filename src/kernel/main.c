@@ -1345,7 +1345,7 @@ static void test_user_mode_transitions(void) {
         shared_kernel_flags != UINT64_MAX) {
         report_boot_error("user root was allowed to unmap a shared kernel mapping");
     }
-    serial_write("DODO: shared kernel mapping mutation rejection self-check passed\\n");
+    serial_write("DODO: shared kernel mapping mutation rejection self-check passed\n");
 
     /*
      * Creating a root is destructive because it initializes the whole page.
