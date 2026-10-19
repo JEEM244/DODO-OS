@@ -1303,6 +1303,33 @@ static void test_user_mode_transitions(void) {
     }
 
     /*
+     * Creating a root is destructive because it initializes the whole page.
+     * Passing the root currently loaded in CR3 must be rejected before that
+     * initialization, or the kernel can erase its active mappings.
+     */
+    paging_status =
+        dodo_x86_64_paging_create_user_root(second_user_root_frame);
+    if (paging_status != DODO_PAGING_INVALID_ADDRESS) {
+        report_boot_error("user-root creation accepted the active CR3 root");
+    }
+
+    uint64_t active_root_leaf = UINT64_MAX;
+    uint64_t active_root_flags = UINT64_MAX;
+    paging_status = dodo_x86_64_unmap_page(
+        second_user_code_virtual, &active_root_leaf, &active_root_flags);
+    if (paging_status != DODO_PAGING_OK ||
+        active_root_leaf != second_user_code_frame) {
+        report_boot_error("active-root rejection damaged existing user mappings");
+    }
+    paging_status = dodo_x86_64_map_page(
+        second_user_code_virtual, second_user_code_frame,
+        DODO_PAGE_USER_ACCESSIBLE, NULL, 0u, &frames_used);
+    if (paging_status != DODO_PAGING_OK || frames_used != 0u) {
+        report_boot_error("could not restore mapping after active-root rejection test");
+    }
+    serial_write("DODO: active-root recreation rejection self-check passed\\n");
+
+    /*
      * movabs rax, first_root_code_va; mov rax, [rax]; ud2
      * The immediate is encoded little-endian, so derive it from the first
      * root's actual user code address instead of assuming a fixed PML4 slot.
