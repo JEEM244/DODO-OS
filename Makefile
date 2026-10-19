@@ -139,7 +139,8 @@ run: $(ISO_IMAGE)
 
 # CI smoke test: QEMU is expected to keep running after the kernel halts.
 qemu-smoke: $(ISO_IMAGE)
-	@set +e; timeout 12s qemu-system-x86_64 -M q35 -m 512M \
+	@set +e; (sleep 3; printf 'help\rversion\rmem\recho DODO_SHELL_INPUT_OK\r') | \
+		timeout 12s qemu-system-x86_64 -M q35 -m 512M \
 		-cdrom $(ISO_IMAGE) -display none -serial stdio \
 		-no-reboot -no-shutdown > $(BUILD_DIR)/qemu-serial.log 2>&1; \
 	status=$$?; set -e; cat $(BUILD_DIR)/qemu-serial.log; \
@@ -194,7 +195,12 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "DODO: exception IDT loaded" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: IDT breakpoint self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: exception handler resumed after INT3" $(BUILD_DIR)/qemu-serial.log; \
-	grep -Fq "DODO: all kernel bootstrap self-checks passed" $(BUILD_DIR)/qemu-serial.log
+	grep -Fq "DODO: all kernel bootstrap self-checks passed" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO OS interactive serial console" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "Commands:" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO OS kernel prototype 0.1.0" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "Physical memory allocator:" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO_SHELL_INPUT_OK" $(BUILD_DIR)/qemu-serial.log
 
 clean:
 	rm -rf $(BUILD_DIR)
