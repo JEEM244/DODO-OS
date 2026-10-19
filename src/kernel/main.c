@@ -81,6 +81,7 @@ static volatile uint64_t user_write_syscall_passed = 0;
 static volatile uint64_t user_invalid_pointer_denied = 0;
 static volatile uint64_t user_invalid_length_denied = 0;
 static volatile uint64_t user_unknown_syscall_denied = 0;
+static volatile uint64_t user_cross_page_write_passed = 0;
 
 #define DODO_EXPECT_WRITE_FAULT UINT64_C(1)
 #define DODO_EXPECT_EXECUTE_FAULT UINT64_C(2)
@@ -295,6 +296,12 @@ int dodo_x86_64_exception_handler(
                 }
                 frame->rax = DODO_X86_64_SYSCALL_ERROR;
                 return DODO_EXCEPTION_RESUME;
+            }
+
+            if ((frame->rdi & (DODO_PAGE_SIZE - 1u)) + frame->rsi >
+                DODO_PAGE_SIZE) {
+                user_cross_page_write_passed = 1;
+                serial_write("DODO: user write crossed 4 KiB boundary\\n");
             }
 
             kernel_buffer[frame->rsi] = '\0';
@@ -887,7 +894,8 @@ static void test_user_mode_transitions(void) {
      */
     static const char user_message[] = "DODO says hello from CPL3";
     const uint64_t user_message_length = sizeof(user_message) - 1u;
-    const uint64_t user_message_offset = UINT64_C(256);
+    /* Start eight bytes before the page boundary to test a cross-page copy. */
+    const uint64_t user_message_offset = DODO_PAGE_SIZE - UINT64_C(8);
     const uint64_t user_message_address =
         user_code_virtual + user_message_offset;
     uint8_t syscall_test_code[256] = { 0 };
@@ -983,14 +991,20 @@ static void test_user_mode_transitions(void) {
     emit_user_test_byte(syscall_test_code, code_capacity, &code_length, 0x0b);
 
     if (code_length >= user_message_offset ||
-        user_message_offset + sizeof(user_message) > DODO_PAGE_SIZE) {
-        report_boot_error("userspace test bytecode/data layout exceeds one page");
+        user_message_offset + sizeof(user_message) > 2u * DODO_PAGE_SIZE) {
+        report_boot_error("userspace test bytecode/data layout exceeds two mapped pages");
     }
     for (size_t i = 0; i < code_length; ++i) {
         user_code[i] = syscall_test_code[i];
     }
     for (size_t i = 0; i < sizeof(user_message); ++i) {
-        user_code[user_message_offset + i] = (uint8_t)user_message[i];
+        const uint64_t absolute_offset = user_message_offset + i;
+        if (absolute_offset < DODO_PAGE_SIZE) {
+            user_code[absolute_offset] = (uint8_t)user_message[i];
+        } else {
+            user_stack[absolute_offset - DODO_PAGE_SIZE] =
+                (uint8_t)user_message[i];
+        }
     }
 
     /* Restore the kernel root before calling the assembly transition stub. */
@@ -1017,6 +1031,10 @@ static void test_user_mode_transitions(void) {
         report_boot_error("valid user write syscall was not serviced");
     }
     serial_write("DODO: validated user write syscall self-check passed\\n");
+    if (user_cross_page_write_passed == 0u) {
+        report_boot_error("user write crossing a page boundary was not verified");
+    }
+    serial_write("DODO: cross-page user write self-check passed\\n");
     if (user_invalid_pointer_denied == 0u) {
         report_boot_error("kernel pointer passed to user syscall was not rejected");
     }
