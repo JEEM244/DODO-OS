@@ -44,6 +44,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Reject destructive reinitialization of the root currently loaded in CR3, with a QEMU regression test that confirms existing mappings survive.
 - [x] Verify physical/direct-map aliases and a new virtual mapping in QEMU.
 - [x] Reject the active/kernel page-table root as the paging self-test's writable data frame, with a QEMU regression test.
+- [x] Prevent a user root from mapping or unmapping the shared higher-half kernel page-table branches, with QEMU regression checks.
 - [x] Verify read-only and NX page protection behavior in QEMU.
 - [x] Verify the mapper rejects remapping a present page and rejects non-canonical virtual addresses.
 - [ ] Add broader allocator stress tests, locking/SMP safety, and complete frame ownership transfer rules.
