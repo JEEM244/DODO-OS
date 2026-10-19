@@ -21,7 +21,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes build-essential binutils curl xorriso qemu-system-x86
 
-      - name: Test physical page allocator with host fixtures
+      - name: Run host memory allocator tests
         run: make test
 
       - name: Build kernel and bootable ISO
