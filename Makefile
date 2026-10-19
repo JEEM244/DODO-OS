@@ -139,7 +139,7 @@ run: $(ISO_IMAGE)
 
 # CI smoke test: QEMU is expected to keep running after the kernel halts.
 qemu-smoke: $(ISO_IMAGE)
-	@set +e; (sleep 3; printf 'help\rversion\rmem\recho DODO_SHELL_INPUT_OK\r') | \
+	@set +e; (sleep 3; printf '\r'; sleep 1; printf 'help\rversion\rmem\recho DODO_SHELL_INPUT_OK\r') | \
 		timeout 12s qemu-system-x86_64 -M q35 -m 512M \
 		-cdrom $(ISO_IMAGE) -display none -serial stdio \
 		-no-reboot -no-shutdown > $(BUILD_DIR)/qemu-serial.log 2>&1; \
