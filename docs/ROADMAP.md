@@ -37,6 +37,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Adopt the protocol-marked bootloader-reclaimable memory after replacing the active page-table tree and GDT/IDT; invalidate Limine response pointers afterward.
 - [x] Allocate and free a test frame directly from an adopted region, confirming allocator accounting returns to its prior state.
 - [x] Extend Limine's active 4-level page tables with a checked single-page mapper in an unused kernel PML4 slot.
+- [x] Roll back newly linked intermediate tables when a page mapping fails partway through, with a QEMU regression test.
 - [x] Verify physical/direct-map aliases and a new virtual mapping in QEMU.
 - [x] Verify read-only and NX page protection behavior in QEMU.
 - [x] Verify the mapper rejects remapping a present page and rejects non-canonical virtual addresses.
