@@ -3,6 +3,31 @@
 #include <stdio.h>
 #include "dodo/mm/vaddr.h"
 #define PAGE UINT64_C(4096)
+
+static uint64_t next_random(uint64_t *state) {
+    *state ^= *state << 13;
+    *state ^= *state >> 7;
+    *state ^= *state << 17;
+    return *state;
+}
+
+static void check_invariants(const struct dodo_vaddr_space *space) {
+    assert(space->count <= DODO_VADDR_MAX_RANGES);
+    for (uint64_t i = 0; i < space->count; ++i) {
+        const struct dodo_vaddr_range *range = &space->allocated[i];
+        assert((range->base & (PAGE - 1u)) == 0u);
+        assert((range->length & (PAGE - 1u)) == 0u);
+        assert(range->length > 0u);
+        assert(range->base >= space->start);
+        assert(range->base + range->length <= space->end);
+        if (i > 0u) {
+            const struct dodo_vaddr_range *previous =
+                &space->allocated[i - 1u];
+            assert(previous->base < range->base);
+            assert(previous->base + previous->length <= range->base);
+        }
+    }
+}
 int main(void) {
  struct dodo_vaddr_space s; uint64_t a=0;
  assert(dodo_vaddr_init(&s,0x10000,0x20000)==DODO_VADDR_OK);
@@ -38,5 +63,31 @@ int main(void) {
  assert(dodo_vaddr_reserve(&s,0x10000+DODO_VADDR_MAX_RANGES*2*PAGE,PAGE)==DODO_VADDR_CAPACITY);
  s.count=DODO_VADDR_MAX_RANGES+1u;
  assert(dodo_vaddr_reserve(&s,0x10000,PAGE)==DODO_VADDR_INVALID_ARGUMENT);
+
+ assert(dodo_vaddr_init(&s,0x10000,0x10000+1024*PAGE)==DODO_VADDR_OK);
+ uint64_t random_state = UINT64_C(0x6d2b79f5a4c31e87);
+ for (uint64_t step = 0; step < 10000u; ++step) {
+  const uint64_t random_value = next_random(&random_state);
+  if (s.count > 0u && (random_value & 3u) == 0u) {
+   const uint64_t index = next_random(&random_state) % s.count;
+   const uint64_t base = s.allocated[index].base;
+   const uint64_t length = s.allocated[index].length;
+   assert(dodo_vaddr_release(&s,base,length)==DODO_VADDR_OK);
+  } else {
+   const uint64_t length = (1u + (random_value % 4u)) * PAGE;
+   const uint64_t alignment = PAGE << ((random_value >> 8) % 3u);
+   a = UINT64_C(0xdeadbeef);
+   const enum dodo_vaddr_status status =
+       dodo_vaddr_allocate(&s,length,alignment,&a);
+   if (status == DODO_VADDR_OK) {
+    assert((a & (alignment - 1u)) == 0u);
+   } else {
+    assert(status == DODO_VADDR_NO_SPACE ||
+           status == DODO_VADDR_CAPACITY);
+    assert(a == UINT64_C(0xdeadbeef));
+   }
+  }
+  check_invariants(&s);
+ }
  puts("virtual-address range allocator tests passed"); return 0;
 }
