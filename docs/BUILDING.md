@@ -36,7 +36,7 @@ The virtual-range tests exercise the metadata-only low-half range allocator, inc
 - aligned first-fit allocation with larger alignment requirements;
 - explicit reservation, overlap rejection, exact release, and reuse after release;
 - invalid and overflowing ranges, the user-half boundary, and no-space behavior;
-- null arguments, invalid alignment, fixed reservation capacity, and invalid metadata counts;
+- null arguments, invalid alignment, fixed reservation capacity, and invalid metadata counts;\n- 10,000 deterministic allocate/release operations checking sorted, non-overlapping ranges after each operation;
 - leaving the caller's output address unchanged when allocation fails.
 
 The virtual-range allocator does not map pages or own physical frames. Passing these host tests does not establish that real process address spaces are isolated or safely reclaimed.
