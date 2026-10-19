@@ -1237,6 +1237,20 @@ static void test_user_mode_transitions(void) {
     }
 
     /*
+     * Global TLB entries can survive a CR3 switch when PGE is enabled. User
+     * leaves must therefore never request the global bit across address spaces.
+     */
+    frames_used = UINT64_MAX;
+    paging_status = dodo_x86_64_map_page(
+        second_user_code_virtual, second_user_code_frame,
+        DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_GLOBAL,
+        second_user_table_frames, 3u, &frames_used);
+    if (paging_status != DODO_PAGING_INVALID_ADDRESS || frames_used != 0u) {
+        report_boot_error("user mapping accepted the global TLB flag");
+    }
+    serial_write("DODO: user-global mapping rejection self-check passed\n");
+
+    /*
      * Force a partial page-table construction failure: one frame is enough
      * for the PML4 child but not the next level. The mapper must unlink that
      * child and report the frame it consumed so the caller can reuse it.
