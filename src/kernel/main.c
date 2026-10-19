@@ -250,7 +250,7 @@ static void report_boot_error(const char *message) {
 int dodo_x86_64_exception_handler(
     struct dodo_x86_64_exception_frame *frame) {
     if (frame == NULL) {
-        serial_write("DODO: FATAL: null exception frame\\n");
+        serial_write("DODO: FATAL: null exception frame\n");
         return 0;
     }
 
@@ -278,7 +278,7 @@ int dodo_x86_64_exception_handler(
                 if (frame->rdi < DODO_X86_64_USER_ADDRESS_LIMIT &&
                     frame->rsi == DODO_X86_64_SYSCALL_MAX_WRITE + 1u) {
                     user_invalid_length_denied = 1;
-                    serial_write("DODO: oversized user write length rejected\\n");
+                    serial_write("DODO: oversized user write length rejected\n");
                 }
                 frame->rax = DODO_X86_64_SYSCALL_ERROR;
                 return DODO_EXCEPTION_RESUME;
@@ -301,7 +301,7 @@ int dodo_x86_64_exception_handler(
             if ((frame->rdi & (DODO_PAGE_SIZE - 1u)) + frame->rsi >
                 DODO_PAGE_SIZE) {
                 user_cross_page_write_passed = 1;
-                serial_write("DODO: user write crossed 4 KiB boundary\\n");
+                serial_write("DODO: user write crossed 4 KiB boundary\n");
             }
 
             kernel_buffer[frame->rsi] = '\0';
@@ -316,21 +316,21 @@ int dodo_x86_64_exception_handler(
         if (frame->rax == DODO_X86_64_SYSCALL_EXIT) {
             user_mode_test_armed = 0;
             user_mode_return_marker = frame->rdi;
-            serial_write("DODO: userspace exit syscall reached kernel\\n");
+            serial_write("DODO: userspace exit syscall reached kernel\n");
             return DODO_EXCEPTION_RETURN_TO_KERNEL;
         }
 
         /* Unknown syscall numbers are rejected without panicking the kernel. */
         if (frame->rax == DODO_X86_64_SYSCALL_UNKNOWN_TEST) {
             user_unknown_syscall_denied = 1;
-            serial_write("DODO: unknown user syscall rejected\\n");
+            serial_write("DODO: unknown user syscall rejected\n");
         }
         frame->rax = DODO_X86_64_SYSCALL_ERROR;
         return DODO_EXCEPTION_RESUME;
     }
 
     if (frame->vector >= 32u) {
-        serial_write("DODO: FATAL: invalid exception vector\\n");
+        serial_write("DODO: FATAL: invalid exception vector\n");
         return 0;
     }
 
@@ -338,7 +338,7 @@ int dodo_x86_64_exception_handler(
         breakpoint_selftest_armed = 0;
         serial_write("DODO: IDT breakpoint self-check passed; RIP=");
         serial_write_hex64(frame->rip);
-        serial_write("\\n");
+        serial_write("\n");
         return 1;
     }
 
@@ -358,7 +358,7 @@ int dodo_x86_64_exception_handler(
                 page_fault_selftest_armed = 0;
                 frame->rip = (uint64_t)(uintptr_t)
                     dodo_x86_64_readonly_write_fault_resume;
-                serial_write("DODO: read-only page write was blocked\\n");
+                serial_write("DODO: read-only page write was blocked\n");
                 return 1;
             }
 
@@ -368,7 +368,7 @@ int dodo_x86_64_exception_handler(
                 page_fault_selftest_armed = 0;
                 frame->rip = (uint64_t)(uintptr_t)
                     dodo_x86_64_nx_execute_fault_resume;
-                serial_write("DODO: NX instruction fetch was blocked\\n");
+                serial_write("DODO: NX instruction fetch was blocked\n");
                 return 1;
             }
 
@@ -377,7 +377,7 @@ int dodo_x86_64_exception_handler(
                 (error & UINT64_C(0x7)) == UINT64_C(0x5)) {
                 page_fault_selftest_armed = 0;
                 user_supervisor_read_test_passed = 1;
-                serial_write("DODO: ring-3 read of supervisor memory was blocked\\n");
+                serial_write("DODO: ring-3 read of supervisor memory was blocked\n");
                 return DODO_EXCEPTION_RETURN_TO_KERNEL;
             }
 
@@ -386,7 +386,7 @@ int dodo_x86_64_exception_handler(
                 (error & UINT64_C(0x7)) == UINT64_C(0x4)) {
                 page_fault_selftest_armed = 0;
                 user_cross_root_isolation_passed = 1;
-                serial_write("DODO: second user root could not read first root mapping\\n");
+                serial_write("DODO: second user root could not read first root mapping\n");
                 return DODO_EXCEPTION_RETURN_TO_KERNEL;
             }
         }
@@ -396,18 +396,18 @@ int dodo_x86_64_exception_handler(
     serial_write(exception_names[frame->vector]);
     serial_write(" (vector ");
     serial_write_u64(frame->vector);
-    serial_write(")\\nDODO: error code = ");
+    serial_write(")\nDODO: error code = ");
     serial_write_hex64(frame->error_code);
-    serial_write("\\nDODO: instruction pointer = ");
+    serial_write("\nDODO: instruction pointer = ");
     serial_write_hex64(frame->rip);
-    serial_write("\\n");
+    serial_write("\n");
 
     if (frame->vector == 14u) {
         uint64_t fault_address;
         __asm__ volatile ("mov %%cr2, %0" : "=r"(fault_address));
         serial_write("DODO: page-fault address = ");
         serial_write_hex64(fault_address);
-        serial_write("\\n");
+        serial_write("\n");
     }
 
     return 0;
@@ -803,7 +803,7 @@ static void test_user_mode_transitions(void) {
     if (paging_status != DODO_PAGING_OK) {
         serial_write("DODO: user root creation error = ");
         serial_write_u64((uint64_t)paging_status);
-        serial_write("\\n");
+        serial_write("\n");
         report_boot_error("could not create isolated user page-table root");
     }
 
@@ -818,7 +818,7 @@ static void test_user_mode_transitions(void) {
     if (paging_status != DODO_PAGING_OK) {
         serial_write("DODO: user region selection error = ");
         serial_write_u64((uint64_t)paging_status);
-        serial_write("\\n");
+        serial_write("\n");
         report_boot_error("could not find an empty user PML4 slot");
     }
 
@@ -849,7 +849,7 @@ static void test_user_mode_transitions(void) {
     if (paging_status != DODO_PAGING_OK || frames_used != 3u) {
         serial_write("DODO: user code mapping error = ");
         serial_write_u64((uint64_t)paging_status);
-        serial_write("\\n");
+        serial_write("\n");
         report_boot_error("could not create a user executable page mapping");
     }
 
@@ -862,7 +862,7 @@ static void test_user_mode_transitions(void) {
     if (paging_status != DODO_PAGING_OK || frames_used != 0u) {
         serial_write("DODO: user stack mapping error = ");
         serial_write_u64((uint64_t)paging_status);
-        serial_write("\\n");
+        serial_write("\n");
         report_boot_error("could not create a user stack mapping");
     }
 
@@ -879,7 +879,7 @@ static void test_user_mode_transitions(void) {
         (user_root_table[user_pml4_index] & (UINT64_C(1) << 2)) == 0u) {
         report_boot_error("user mapping leaked into kernel root or lacks U/S permission");
     }
-    serial_write("DODO: separate user root mapping self-check passed\\n");
+    serial_write("DODO: separate user root mapping self-check passed\n");
 
     /*
      * Assemble a tiny userspace program for the current test ABI:
@@ -1026,28 +1026,28 @@ static void test_user_mode_transitions(void) {
         user_mode_return_marker != DODO_X86_64_USER_TEST_EXIT_STATUS) {
         report_boot_error("ring-3 exit syscall or controlled interrupt return failed");
     }
-    serial_write("DODO: userspace exit status verified\\n");
+    serial_write("DODO: userspace exit status verified\n");
     if (user_write_syscall_passed == 0u) {
         report_boot_error("valid user write syscall was not serviced");
     }
-    serial_write("DODO: validated user write syscall self-check passed\\n");
+    serial_write("DODO: validated user write syscall self-check passed\n");
     if (user_cross_page_write_passed == 0u) {
         report_boot_error("user write crossing a page boundary was not verified");
     }
-    serial_write("DODO: cross-page user write self-check passed\\n");
+    serial_write("DODO: cross-page user write self-check passed\n");
     if (user_invalid_pointer_denied == 0u) {
         report_boot_error("kernel pointer passed to user syscall was not rejected");
     }
-    serial_write("DODO: invalid user syscall pointer rejection self-check passed\\n");
+    serial_write("DODO: invalid user syscall pointer rejection self-check passed\n");
     if (user_invalid_length_denied == 0u) {
         report_boot_error("oversized user write length was not rejected");
     }
-    serial_write("DODO: oversized user write length rejection self-check passed\\n");
+    serial_write("DODO: oversized user write length rejection self-check passed\n");
     if (user_unknown_syscall_denied == 0u) {
         report_boot_error("unknown userspace syscall was not rejected safely");
     }
-    serial_write("DODO: unknown user syscall rejection self-check passed\\n");
-    serial_write("DODO: ring-3 entry and controlled return self-check passed\\n");
+    serial_write("DODO: unknown user syscall rejection self-check passed\n");
+    serial_write("DODO: ring-3 entry and controlled return self-check passed\n");
 
     /*
      * Try to read supervisor-only kernel memory from CPL3. If the U/S bits are
@@ -1081,7 +1081,7 @@ static void test_user_mode_transitions(void) {
         user_supervisor_read_test_passed == 0u) {
         report_boot_error("user mode read a supervisor-only page or faulted unexpectedly");
     }
-    serial_write("DODO: ring-3 supervisor-isolation self-check passed\\n");
+    serial_write("DODO: ring-3 supervisor-isolation self-check passed\n");
 
     /*
      * Build a second independent user root. It maps its own code at +2 pages
@@ -1188,7 +1188,7 @@ static void test_user_mode_transitions(void) {
         user_cross_root_isolation_passed == 0u) {
         report_boot_error("second user root could access first root's mapping");
     }
-    serial_write("DODO: independent user-root isolation self-check passed\\n");
+    serial_write("DODO: independent user-root isolation self-check passed\n");
 
     /*
      * No user root is active after the trampoline returns. Reinstall the kernel
@@ -1222,7 +1222,7 @@ static void test_user_mode_transitions(void) {
         report_boot_error("user-root teardown changed physical allocator accounting");
     }
 
-    serial_write("DODO: user-root teardown/reclaim self-check passed\\n");
+    serial_write("DODO: user-root teardown/reclaim self-check passed\n");
 }
 
 static void test_exception_handler(void) {
