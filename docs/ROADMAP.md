@@ -59,7 +59,9 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Tear down the two test roots after returning to kernel CR3, free their explicitly tracked code/stack/private-table/root frames, and verify allocator counters return to baseline.
 - [ ] Replace the test-specific cleanup list with a reusable address-space creation/switch/teardown API that tracks all owned frames and handles partial failures.
 - [ ] Replace global one-shot test state with per-thread/per-process trap context and independent kernel stacks.
-- [ ] Add safe user-page allocation/reclamation, validated syscall arguments, and a stable kernel-entry ABI.
+- [x] Exercise a prototype CPL3 write/exit ABI with validated user pointers, bounded write lengths, unknown-call rejection, cross-page copies, and user-half boundary rejection.
+- [ ] Replace the test-only interrupt ABI with a stable kernel-entry/syscall ABI and per-thread trap context.
+- [ ] Add general user-page allocation/reclamation through a reusable address-space lifecycle API.
 - [ ] Context switching and scheduler.
 - [ ] IPC with validated message boundaries.
 - [ ] Capability table and deny-by-default resource access.
