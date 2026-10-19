@@ -20,12 +20,24 @@ static int valid_span(uint64_t base, uint64_t length, uint64_t *end) {
 }
 
 static int valid_space(const struct dodo_vaddr_space *space) {
-    return space != NULL &&
-           aligned(space->start) &&
-           aligned(space->end) &&
-           space->start < space->end &&
-           space->end <= DODO_USER_LIMIT &&
-           space->count <= DODO_VADDR_MAX_RANGES;
+    if (space == NULL || !aligned(space->start) || !aligned(space->end) ||
+        space->start >= space->end || space->end > DODO_USER_LIMIT ||
+        space->count > DODO_VADDR_MAX_RANGES) {
+        return 0;
+    }
+
+    uint64_t previous_end = space->start;
+    for (uint64_t i = 0; i < space->count; ++i) {
+        const struct dodo_vaddr_range *range = &space->allocated[i];
+        uint64_t range_end;
+        if (!valid_span(range->base, range->length, &range_end) ||
+            range->base < space->start || range_end > space->end ||
+            range->base < previous_end) {
+            return 0;
+        }
+        previous_end = range_end;
+    }
+    return 1;
 }
 
 enum dodo_vaddr_status dodo_vaddr_init(
