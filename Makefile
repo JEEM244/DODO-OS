@@ -80,9 +80,9 @@ $(BUILD_DIR)/user_mode.o: src/arch/x86_64/user_mode.S | $(BUILD_DIR)
 $(KERNEL_ELF): $(OBJECTS) linker/x86_64.ld
 	$(LD) $(LDFLAGS) -o $@ $(OBJECTS)
 	@echo "Built $@"
-	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -Iinclude \
+
 $(VADDR_TEST): src/mm/vaddr.c tests/vaddr_allocator_test.c include/dodo/mm/vaddr.h | $(BUILD_DIR)
-	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -Iinclude \\
+	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -Iinclude \
 		src/mm/vaddr.c tests/vaddr_allocator_test.c -o $@
 
 test-vaddr: $(VADDR_TEST)
