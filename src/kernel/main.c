@@ -1323,6 +1323,31 @@ static void test_user_mode_transitions(void) {
     }
 
     /*
+     * User roots share higher-half page-table branches with the kernel root.
+     * Mapping or unmapping a kernel VA while this root is active must be
+     * rejected, otherwise the shared kernel mapping could be changed.
+     */
+    frames_used = UINT64_MAX;
+    paging_status = dodo_x86_64_map_page(
+        mapped_virtual_address + 2u * DODO_PAGE_SIZE,
+        second_user_code_frame, DODO_PAGE_WRITABLE,
+        NULL, 0u, &frames_used);
+    if (paging_status != DODO_PAGING_INVALID_ADDRESS || frames_used != 0u) {
+        report_boot_error("user root was allowed to map into the shared kernel half");
+    }
+
+    uint64_t shared_kernel_physical = UINT64_MAX;
+    uint64_t shared_kernel_flags = UINT64_MAX;
+    paging_status = dodo_x86_64_unmap_page(
+        mapped_virtual_address, &shared_kernel_physical, &shared_kernel_flags);
+    if (paging_status != DODO_PAGING_INVALID_ADDRESS ||
+        shared_kernel_physical != UINT64_MAX ||
+        shared_kernel_flags != UINT64_MAX) {
+        report_boot_error("user root was allowed to unmap a shared kernel mapping");
+    }
+    serial_write("DODO: shared kernel mapping mutation rejection self-check passed\\n");
+
+    /*
      * Creating a root is destructive because it initializes the whole page.
      * Passing the root currently loaded in CR3 must be rejected before that
      * initialization, or the kernel can erase its active mappings.
