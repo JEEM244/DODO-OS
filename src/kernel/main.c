@@ -1353,6 +1353,13 @@ static void test_user_mode_transitions(void) {
         unmapped_physical != UINT64_MAX || unmapped_flags != UINT64_MAX) {
         report_boot_error("unmap accepted an absent leaf or changed failure outputs");
     }
+
+    paging_status = dodo_x86_64_unmap_page(
+        DODO_X86_64_USER_ADDRESS_LIMIT, &unmapped_physical, &unmapped_flags);
+    if (paging_status != DODO_PAGING_INVALID_ADDRESS ||
+        unmapped_physical != UINT64_MAX || unmapped_flags != UINT64_MAX) {
+        report_boot_error("unmap accepted a non-canonical user-half boundary");
+    }
     serial_write("DODO: user-page unmap/remap self-check passed\n");
 
     /*
