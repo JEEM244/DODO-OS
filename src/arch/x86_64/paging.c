@@ -351,9 +351,15 @@ enum dodo_paging_status dodo_x86_64_paging_create_user_root(
         return DODO_PAGING_INVALID_ARGUMENT;
     }
 
+    /*
+     * Never clear a root that is currently loaded in CR3. In particular, a
+     * caller may accidentally ask to "create" the active user root; zeroing
+     * it would destroy the very mappings used to return safely to the kernel.
+     */
     if ((user_root_physical & (DODO_PAGE_SIZE - 1u)) != 0u ||
         user_root_physical > DODO_PTE_ADDRESS_MASK ||
-        user_root_physical == kernel_root_table_physical) {
+        user_root_physical == kernel_root_table_physical ||
+        user_root_physical == root_table_physical) {
         return DODO_PAGING_INVALID_ADDRESS;
     }
 
