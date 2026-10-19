@@ -686,7 +686,7 @@ static void test_virtual_mapping(void) {
         rejected_test_address != UINT64_MAX) {
         report_boot_error("paging self-test accepted the live root as its data frame");
     }
-    serial_write("DODO: live-root data-frame rejection self-check passed\\n");
+    serial_write("DODO: live-root data-frame rejection self-check passed\n");
 
     uint64_t mapped_virtual_address = 0;
     status = dodo_x86_64_paging_self_test(
