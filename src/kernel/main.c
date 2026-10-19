@@ -274,6 +274,11 @@ int dodo_x86_64_exception_handler(
         if (frame->rax == DODO_X86_64_SYSCALL_WRITE) {
             if (frame->rsi == 0u ||
                 frame->rsi > DODO_X86_64_SYSCALL_MAX_WRITE) {
+                if (frame->rdi < DODO_USER_ADDRESS_LIMIT &&
+                    frame->rsi == DODO_X86_64_SYSCALL_MAX_WRITE + 1u) {
+                    user_invalid_length_denied = 1;
+                    serial_write("DODO: oversized user write length rejected\\n");
+                }
                 frame->rax = DODO_X86_64_SYSCALL_ERROR;
                 return DODO_EXCEPTION_RESUME;
             }
