@@ -1327,7 +1327,7 @@ static void test_user_mode_transitions(void) {
     if (paging_status != DODO_PAGING_OK || frames_used != 0u) {
         report_boot_error("could not restore mapping after active-root rejection test");
     }
-    serial_write("DODO: active-root recreation rejection self-check passed\\n");
+    serial_write("DODO: active-root recreation rejection self-check passed\n");
 
     /*
      * movabs rax, first_root_code_va; mov rax, [rax]; ud2
