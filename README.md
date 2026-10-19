@@ -4,7 +4,7 @@
 
 The goal is not to create another Linux distribution or a collection of security utilities. DODO aims to become a practical daily-use desktop operating system whose architecture limits what programs can access, makes their actions explainable, and allows risky work to happen in isolated environments.
 
-> **Current status:** DODO has a freestanding x86-64 kernel, a pinned Limine boot path, a BIOS/UEFI test ISO, a tracked physical page allocator, a project-owned GDT/TSS/IDT, and a cloned DODO-owned four-level page-table tree. The latest successful QEMU run also verifies controlled CPL3 execution in separate roots: user A's mapping stays absent from the kernel root, and user B cannot read a virtual address mapped only in user A. The test then returns to the kernel CR3, releases both temporary user roots plus their private table/code/stack frames, and verifies the allocator counts return to their starting values. Bootloader-reclaimable memory is adopted only after its response pointers are no longer needed. This remains an early kernel prototype, not a desktop OS or a complete process-isolation system.
+> **Current status:** DODO has a freestanding x86-64 kernel, a pinned Limine boot path, a BIOS/UEFI test ISO, a tracked physical page allocator, a project-owned GDT/TSS/IDT, and a cloned DODO-owned four-level page-table tree. Successful QEMU smoke tests cover separate CPL3 roots, supervisor-memory denial, test-root teardown and allocator accounting, plus a test-only `int 0x80` `write`/`exit` ABI. The prototype rejects kernel pointers, oversized writes, buffers that cross the user-half address limit, and unknown call numbers; it also verifies copying a user buffer across two mapped pages. This is still an early kernel prototype: the syscall interface is not a stable process ABI, and DODO is not yet a desktop OS or a complete process-isolation system.
 
 ## Project principles
 
@@ -32,7 +32,7 @@ This is a research hypothesis, not a claim of unprecedented invention. Existing 
 - **Physical memory:** validates the bootloader map and allocates complete 4 KiB physical frames from usable ranges. A bounded ownership ledger tracks live frames; the allocator can release/reuse them, reject double frees and unknown pages, and add checked, non-overlapping reclaimed regions. After switching to DODO-owned tables and GDT/IDT, the kernel adds Limine's reclaimable regions, proves it can allocate and return a frame from one, and clears response pointers so freed metadata isn't reused accidentally.
 - **Virtual memory:** clones the active four-level page-table tree into DODO-owned frames, switches CR3 to the new root, preserves leaf mappings, and attempts rollback if cloning fails before activation. QEMU currently reports ten cloned table frames for its test memory map.
 - **Page protections:** explicitly enables CR0.WP; when supported, enables EFER.NXE. QEMU tests verify read-only/NX faults, rejection of non-canonical addresses, and refusal to overwrite a present mapping.
-- **Address-space isolation prototype:** DODO creates separate user PML4 roots with empty low halves and supervisor-only kernel-half mappings. QEMU verifies a user mapping is absent from the kernel root and that a second user root faults when attempting to read a page mapped only in the first. A CPL3 `int 0x80` round trip and supervisor-memory denial also pass. Both test roots and their private frames are returned after switching back to the kernel root, with allocator accounting checked. This remains a single-threaded architecture test, not a scheduler or a hardened process model.
+- **Address-space/syscall prototype:** DODO creates separate user PML4 roots with empty low halves and supervisor-only kernel-half mappings. QEMU verifies cross-root read denial, test-root teardown, and allocator accounting. The test-only CPL3 `int 0x80` ABI handles a bounded `write` and `exit`; QEMU checks cross-page copying and rejects kernel pointers, oversized lengths, user-half boundary-crossing buffers, and unknown call numbers. It remains single-threaded and has no stable public syscall ABI or scheduler.
 - **Diagnostics:** COM1 serial output.
 - **Test environment:** QEMU before physical hardware.
 - **Safety boundary:** no disk installation, no privileged host access, and no real network tools.
@@ -47,7 +47,7 @@ Read [docs/BUILDING.md](docs/BUILDING.md) before building.
 make test            # host-side physical allocator, free/reuse and capacity tests
 make clean all       # build kernel and bootable test ISO
 make run             # launch the ISO in QEMU
-make qemu-smoke      # verify boot, memory protections, and the CPL3 test
+make qemu-smoke      # verify boot, memory protections, isolation, and syscall checks
 ~~~
 
 The prototype prints diagnostic messages over COM1 serial output and eventually halts after its self-tests. A blank graphical display is expected: DODO does not yet have graphics support or a desktop.
@@ -58,7 +58,7 @@ See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE
 
 1. **Kernel bring-up:** repeatable boot, serial diagnostics, and exception handling.
 2. **Memory:** DODO owns a cloned four-level page-table tree; next are frame reclamation/ownership, a full virtual-memory manager, and guard pages.
-3. **Isolation primitives:** the first CPL3 transition and supervisor-memory denial are verified; next are independent process address spaces, controlled syscalls, IPC, a scheduler, and capability enforcement.
+3. **Isolation primitives:** separate test roots and a narrow validated syscall prototype are verified; next are reusable address-space lifecycles, a stable kernel-entry ABI, IPC, scheduling, and capability enforcement.
 4. **SOMBRA prototype:** isolated workload, change journal, review, and discard tests.
 5. **Useful system services:** storage, networking, input, graphics, and update/recovery.
 6. **Daily-use evaluation:** hardware support, reliability, usability, application strategy, and independent testing.
