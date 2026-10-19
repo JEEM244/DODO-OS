@@ -64,6 +64,15 @@ int main(void) {
  s.count=DODO_VADDR_MAX_RANGES+1u;
  assert(dodo_vaddr_reserve(&s,0x10000,PAGE)==DODO_VADDR_INVALID_ARGUMENT);
 
+ assert(dodo_vaddr_init(&s,0x10000,0x20000)==DODO_VADDR_OK);
+ assert(dodo_vaddr_reserve(&s,0x14000,PAGE)==DODO_VADDR_OK);
+ assert(dodo_vaddr_reserve(&s,0x10000,PAGE)==DODO_VADDR_OK);
+ assert(dodo_vaddr_reserve(&s,0x12000,PAGE)==DODO_VADDR_OK);
+ assert(s.allocated[0].base==0x10000);
+ assert(s.allocated[1].base==0x12000);
+ assert(s.allocated[2].base==0x14000);
+ check_invariants(&s);
+
  assert(dodo_vaddr_init(&s,0x10000,0x10000+1024*PAGE)==DODO_VADDR_OK);
  uint64_t random_state = UINT64_C(0x6d2b79f5a4c31e87);
  for (uint64_t step = 0; step < 10000u; ++step) {
