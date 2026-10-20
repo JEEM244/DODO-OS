@@ -34,8 +34,8 @@ static char escape_parameters[8];
 static uint8_t escape_length;
 
 static uint32_t make_mask(uint8_t size, uint8_t shift) {
-    if (size == 0u || size > 8u || shift >= 32u ||
-        (uint16_t)shift + (uint16_t)size > 32u) {
+    if (size == 0u || size > UINT8_C(8) || shift >= UINT8_C(32) ||
+        (uint16_t)shift + (uint16_t)size > UINT16_C(32)) {
         return 0u;
     }
 
@@ -133,7 +133,7 @@ static void advance_line(void) {
 
 static void draw_character(char character) {
     uint8_t code = (uint8_t)character;
-    if (code >= 128u) {
+    if (code >= UINT8_C(128)) {
         code = (uint8_t)'?';
     }
 
@@ -146,10 +146,10 @@ static void draw_character(char character) {
     const uint32_t foreground = foreground_color();
     const uint32_t background = background_color();
 
-    for (uint8_t row = 0u; row < 8u; ++row) {
+    for (uint8_t row = 0u; row < UINT8_C(8); ++row) {
         const uint8_t bitmap = dodo_font8x8_basic[code][row];
-        for (uint8_t repeat = 0u; repeat < 2u; ++repeat) {
-            for (uint8_t column = 0u; column < 8u; ++column) {
+        for (uint8_t repeat = 0u; repeat < UINT8_C(2); ++repeat) {
+            for (uint8_t column = 0u; column < UINT8_C(8); ++column) {
                 const uint32_t color =
                     (bitmap & (uint8_t)(UINT8_C(1) << column)) != 0u
                     ? foreground : background;
@@ -217,7 +217,7 @@ static void handle_escape_character(char character) {
     }
 
     if ((character >= '0' && character <= '9') || character == ';') {
-        if (escape_length < sizeof(escape_parameters)) {
+        if ((uint64_t)escape_length < sizeof(escape_parameters)) {
             escape_parameters[escape_length++] = character;
         } else {
             reset_escape();
@@ -350,8 +350,8 @@ void dodo_x86_64_console_putc(char character) {
             return;
         }
         default:
-            if ((uint8_t)character >= 0x20u &&
-                (uint8_t)character <= 0x7eu) {
+            if ((uint32_t)(uint8_t)character >= UINT32_C(0x20) &&
+                (uint32_t)(uint8_t)character <= UINT32_C(0x7e)) {
                 draw_character(character);
             }
             return;
