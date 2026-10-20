@@ -49,7 +49,7 @@ static void test_scheduler_invariant_validation(void) {
     /* Active task names must remain NUL-terminated inside the fixed field. */
     scheduler.tasks[0].name[DODO_TASK_NAME_MAX] = 'X';
     assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_INVALID_ARGUMENT);
-    scheduler.tasks[0].name[DODO_TASK_NAME_MAX] = '\\0';
+    scheduler.tasks[0].name[DODO_TASK_NAME_MAX] = '\0';
     assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
 }
 
