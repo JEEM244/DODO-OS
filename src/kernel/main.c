@@ -377,19 +377,56 @@ static void kernel_halt(void) {
     }
 }
 
+/*
+ * One terminal failure path for boot-time errors and unexpected CPU faults.
+ * It deliberately avoids allocation, formatting libraries, and locks so it
+ * remains usable while the kernel is only partially initialized.
+ */
+__attribute__((noreturn))
+static void kernel_panic(
+    const char *reason,
+    const struct dodo_x86_64_exception_frame *frame) {
+    __asm__ volatile ("cli" : : : "memory");
+    serial_write("\n\n=== DODO KERNEL PANIC ===\n");
+    serial_write("Reason: ");
+    serial_write(reason != NULL ? reason : "unspecified fatal error");
+    serial_write("\n");
+
+    if (frame != NULL) {
+        serial_write("Vector: ");
+        serial_write_u64(frame->vector);
+        serial_write("\nError:  ");
+        serial_write_hex64(frame->error_code);
+        serial_write("\nRIP:    ");
+        serial_write_hex64(frame->rip);
+        serial_write("\nCS:     ");
+        serial_write_hex64(frame->cs);
+        serial_write("\nRFLAGS: ");
+        serial_write_hex64(frame->rflags);
+        serial_write("\n");
+
+        if (frame->vector == 14u) {
+            uint64_t fault_address;
+            __asm__ volatile ("mov %%cr2, %0" : "=r"(fault_address));
+            serial_write("CR2:    ");
+            serial_write_hex64(fault_address);
+            serial_write("\n");
+        }
+    }
+
+    serial_write("System halted. Reboot the VM after collecting this report.\n");
+    kernel_halt();
+}
+
 __attribute__((noreturn))
 static void report_boot_error(const char *message) {
-    serial_write("DODO: ERROR: ");
-    serial_write(message);
-    serial_write("\n");
-    kernel_halt();
+    kernel_panic(message, NULL);
 }
 
 int dodo_x86_64_exception_handler(
     struct dodo_x86_64_exception_frame *frame) {
     if (frame == NULL) {
-        serial_write("DODO: FATAL: null exception frame\n");
-        return 0;
+        kernel_panic("null CPU exception frame", NULL);
     }
 
     /*
@@ -400,8 +437,7 @@ int dodo_x86_64_exception_handler(
     if (frame->vector == DODO_X86_64_USER_TEST_VECTOR) {
         if ((frame->cs & UINT64_C(3)) != UINT64_C(3) ||
             user_mode_test_armed == 0u) {
-            serial_write("DODO: FATAL: unexpected vector-128 software interrupt\n");
-            return DODO_EXCEPTION_FATAL;
+            kernel_panic("unexpected vector-128 software interrupt", frame);
         }
 
         /*
@@ -481,8 +517,7 @@ int dodo_x86_64_exception_handler(
     }
 
     if (frame->vector >= 32u) {
-        serial_write("DODO: FATAL: invalid exception vector\n");
-        return 0;
+        kernel_panic("invalid CPU exception vector", frame);
     }
 
     if (frame->vector == 3u && breakpoint_selftest_armed != 0u) {
@@ -543,25 +578,7 @@ int dodo_x86_64_exception_handler(
         }
     }
 
-    serial_write("DODO: FATAL exception: ");
-    serial_write(exception_names[frame->vector]);
-    serial_write(" (vector ");
-    serial_write_u64(frame->vector);
-    serial_write(")\nDODO: error code = ");
-    serial_write_hex64(frame->error_code);
-    serial_write("\nDODO: instruction pointer = ");
-    serial_write_hex64(frame->rip);
-    serial_write("\n");
-
-    if (frame->vector == 14u) {
-        uint64_t fault_address;
-        __asm__ volatile ("mov %%cr2, %0" : "=r"(fault_address));
-        serial_write("DODO: page-fault address = ");
-        serial_write_hex64(fault_address);
-        serial_write("\n");
-    }
-
-    return 0;
+    kernel_panic(exception_names[frame->vector], frame);
 }
 
 static void inspect_memory_map(void) {
