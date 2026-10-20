@@ -76,7 +76,8 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Exercise a prototype CPL3 write/exit ABI with validated user pointers, bounded write lengths, zero-length and unmapped-buffer rejection, unknown-call rejection, cross-page copies, and user-half boundary rejection.
 - [ ] Replace the test-only interrupt ABI with a stable kernel-entry/syscall ABI and per-thread trap context.
 - [ ] Add general user-page allocation/reclamation through a reusable address-space lifecycle API.
-- [ ] Context switching and scheduler.
+- [x] Add a fixed-capacity round-robin scheduler state machine with task creation, wake/block/exit transitions, and host-side edge-case tests; this is metadata only and does not switch CPU execution.
+- [ ] Connect tasks to owned kernel stacks and saved interrupt frames; implement and QEMU-test real CPU context switching.
 - [ ] IPC with validated message boundaries.
 - [ ] Capability table and deny-by-default resource access.
 
