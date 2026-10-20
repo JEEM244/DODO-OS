@@ -67,6 +67,9 @@ $(BUILD_DIR)/idt.o: src/arch/x86_64/idt.c $(HEADERS) | $(BUILD_DIR)
 $(BUILD_DIR)/timer.o: src/arch/x86_64/timer.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/keyboard.o: src/arch/x86_64/keyboard.c $(HEADERS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/paging.o: src/arch/x86_64/paging.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
