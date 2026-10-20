@@ -51,7 +51,8 @@ enum dodo_task_status dodo_scheduler_validate(
 
         if (task->state < DODO_TASK_READY || task->state > DODO_TASK_ZOMBIE ||
             task->id == DODO_TASK_INVALID_ID || task->id >= scheduler->next_id ||
-            task->saved_stack_pointer == 0u || task->address_space_root == 0u) {
+            task->saved_stack_pointer == 0u || task->address_space_root == 0u ||
+            task->name[0] == '\0') {
             return DODO_TASK_INVALID_ARGUMENT;
         }
 
