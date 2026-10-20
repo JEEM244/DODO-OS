@@ -16,6 +16,8 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 
 ## M1 — CPU and diagnostics
 
+- [x] Remap the legacy PIC, configure PIT channel 0 at approximately 100 Hz, and count IRQ0 ticks; the `uptime` shell command reports ticks and approximate elapsed seconds. Only IRQ0 is unmasked, and the QEMU smoke test checks that ticks advance.
+
 - [x] Install a project-owned GDT while preserving Limine's initial selector layout and reserve user-mode code/data descriptors.
 - [x] Install the TSS with a dedicated RSP0 stack for privilege transitions.
 - [x] Install an initial IDT for CPU exception vectors 0–31 and a controlled DPL3 interrupt gate.

@@ -56,6 +56,7 @@ DODO_ISR_NOERR 28
 DODO_ISR_ERR   29
 DODO_ISR_ERR   30
 DODO_ISR_NOERR 31
+DODO_ISR_NOERR 32
 
 /* DPL3 software interrupt used only by the controlled ring-3 self-test. */
 .global dodo_isr_128
@@ -152,6 +153,7 @@ dodo_isr_table:
     .quad dodo_isr_20, dodo_isr_21, dodo_isr_22, dodo_isr_23
     .quad dodo_isr_24, dodo_isr_25, dodo_isr_26, dodo_isr_27
     .quad dodo_isr_28, dodo_isr_29, dodo_isr_30, dodo_isr_31
+    .quad dodo_isr_32
 .size dodo_isr_table, . - dodo_isr_table
 
 .section .note.GNU-stack,"",@progbits

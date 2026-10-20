@@ -63,6 +63,7 @@ static volatile uint64_t limine_requests_end_marker[2] = {
 };
 
 static struct dodo_phys_allocator physical_allocator;
+static volatile uint64_t timer_ticks = 0;
 /*
  * The first four frames are retained by the paging self-test: three for
  * intermediate tables and one for the data page. The fifth is a read-only/NX
@@ -228,6 +229,38 @@ static void serial_write_u64(uint64_t value) {
     }
 }
 
+/*
+ * Remap the legacy 8259 PIC away from CPU exceptions and program PIT channel 0
+ * for approximately 100 ticks per second. Only IRQ0 is unmasked in this stage.
+ */
+static void timer_init(void) {
+    outb(0x21u, 0xffu);
+    outb(0xa1u, 0xffu);
+
+    outb(0x20u, 0x11u);
+    outb(0x80u, 0u);
+    outb(0xa0u, 0x11u);
+    outb(0x80u, 0u);
+    outb(0x21u, 0x20u);
+    outb(0xa1u, 0x28u);
+    outb(0x21u, 0x04u);
+    outb(0xa1u, 0x02u);
+    outb(0x21u, 0x01u);
+    outb(0xa1u, 0x01u);
+
+    /* Keep every legacy IRQ masked except the PIT clock (IRQ0). */
+    outb(0x21u, 0xfeu);
+    outb(0xa1u, 0xffu);
+
+    const uint16_t divisor = 11932u; /* 1,193,182 Hz / 100 Hz */
+    outb(0x43u, 0x36u);
+    outb(0x40u, (uint8_t)(divisor & 0xffu));
+    outb(0x40u, (uint8_t)(divisor >> 8));
+
+    serial_write("DODO: legacy PIC remapped; PIT configured for 100 Hz\n");
+    __asm__ volatile ("sti" : : : "memory");
+}
+
 
 static void kernel_halt(void) __attribute__((noreturn));
 
@@ -321,6 +354,7 @@ static void run_serial_shell(void) {
             serial_write("  about    Explain the current build\n");
             serial_write("  version  Show the kernel prototype version\n");
             serial_write("  mem      Show physical allocator counters\n");
+            serial_write("  uptime   Show ticks and approximate uptime\n");
             serial_write("  echo TXT Print TXT back to the console\n");
             serial_write("  clear    Clear a compatible terminal\n");
             serial_write("  halt     Stop the virtual CPU\n");
@@ -340,6 +374,13 @@ static void run_serial_shell(void) {
             serial_write("\n  known regions:   ");
             serial_write_u64(physical_allocator.region_count);
             serial_write("\n  page size:       4096 bytes\n");
+        } else if (string_equal(command, "uptime")) {
+            const uint64_t ticks = timer_ticks;
+            serial_write("Timer frequency: 100 Hz\nTimer ticks: ");
+            serial_write_u64(ticks);
+            serial_write("\nUptime: ");
+            serial_write_u64(ticks / 100u);
+            serial_write(" seconds (approximate)\n");
         } else if (command[0] == 'e' && command[1] == 'c' &&
                    command[2] == 'h' && command[3] == 'o' &&
                    (command[4] == ' ' || command[4] == '\0')) {
@@ -513,6 +554,13 @@ int dodo_x86_64_exception_handler(
             serial_write("DODO: unknown user syscall rejected\n");
         }
         frame->rax = DODO_X86_64_SYSCALL_ERROR;
+        return DODO_EXCEPTION_RESUME;
+    }
+
+    if (frame->vector == 32u) {
+        /* PIT IRQ0: keep the handler short and acknowledge the master PIC. */
+        timer_ticks++;
+        outb(0x20u, 0x20u);
         return DODO_EXCEPTION_RESUME;
     }
 
@@ -1694,5 +1742,6 @@ void kernel_main(void) {
     test_exception_handler();
     reclaim_bootloader_memory();
     serial_write("DODO: all kernel bootstrap self-checks passed\n");
+    timer_init();
     run_serial_shell();
 }
