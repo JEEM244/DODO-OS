@@ -50,6 +50,34 @@ static void test_no_runnable_tasks_and_invalid_scheduler(void) {
     assert(selected == id);
 }
 
+static void test_saved_stack_pointer_requires_current_running_task(void) {
+    struct dodo_scheduler scheduler;
+    uint32_t first = 0u, second = 0u, selected = 0u;
+    dodo_scheduler_init(&scheduler);
+    assert(dodo_scheduler_save_stack_pointer(NULL, 1u, 0x9000u) ==
+        DODO_TASK_INVALID_ARGUMENT);
+    assert(dodo_scheduler_create(&scheduler, "first", 0x1000u, 0x2000u,
+        &first) == DODO_TASK_OK);
+    assert(dodo_scheduler_create(&scheduler, "second", 0x3000u, 0x4000u,
+        &second) == DODO_TASK_OK);
+    assert(dodo_scheduler_save_stack_pointer(&scheduler, first, 0u) ==
+        DODO_TASK_INVALID_ARGUMENT);
+    assert(dodo_scheduler_save_stack_pointer(&scheduler, second, 0x5000u) ==
+        DODO_TASK_INVALID_STATE);
+    assert(dodo_scheduler_save_stack_pointer(&scheduler, 999u, 0x5000u) ==
+        DODO_TASK_NOT_FOUND);
+    assert(dodo_scheduler_schedule(&scheduler, &selected) == DODO_TASK_OK);
+    assert(selected == first);
+    assert(dodo_scheduler_save_stack_pointer(&scheduler, first, 0x9000u) ==
+        DODO_TASK_OK);
+    assert(dodo_scheduler_find(&scheduler, first)->saved_stack_pointer ==
+        UINT64_C(0x9000));
+    assert(dodo_scheduler_set_current_state(&scheduler, DODO_TASK_BLOCKED, 0u) ==
+        DODO_TASK_OK);
+    assert(dodo_scheduler_save_stack_pointer(&scheduler, first, 0xa000u) ==
+        DODO_TASK_INVALID_STATE);
+}
+
 static void test_zombie_reaping_and_slot_reuse(void) {
     struct dodo_scheduler scheduler;
     uint32_t first = 0u, second = 0u, selected = 0u;
@@ -114,6 +142,7 @@ int main(void) {
     test_round_robin_and_states();
     test_no_runnable_tasks_and_invalid_scheduler();
     test_zombie_reaping_and_slot_reuse();
+    test_saved_stack_pointer_requires_current_running_task();
     test_name_is_safely_truncated();
     test_validation_and_capacity();
     puts("Task scheduler tests passed.");

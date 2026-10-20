@@ -56,6 +56,12 @@ enum dodo_task_status dodo_scheduler_create(
 enum dodo_task_status dodo_scheduler_schedule(
     struct dodo_scheduler *scheduler, uint32_t *task_id);
 
+/* Save a nonzero stack pointer for the currently RUNNING task only. */
+enum dodo_task_status dodo_scheduler_save_stack_pointer(
+    struct dodo_scheduler *scheduler,
+    uint32_t task_id,
+    uint64_t saved_stack_pointer);
+
 /* Mark the current task READY, BLOCKED, or ZOMBIE. */
 enum dodo_task_status dodo_scheduler_set_current_state(
     struct dodo_scheduler *scheduler,

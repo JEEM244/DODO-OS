@@ -114,6 +114,27 @@ enum dodo_task_status dodo_scheduler_schedule(
     return DODO_TASK_NO_RUNNABLE_TASK;
 }
 
+enum dodo_task_status dodo_scheduler_save_stack_pointer(
+    struct dodo_scheduler *scheduler,
+    uint32_t task_id,
+    uint64_t saved_stack_pointer) {
+    if (!valid_scheduler(scheduler) || task_id == DODO_TASK_INVALID_ID ||
+        saved_stack_pointer == 0u) {
+        return DODO_TASK_INVALID_ARGUMENT;
+    }
+
+    struct dodo_task *task = dodo_scheduler_find(scheduler, task_id);
+    if (task == NULL) {
+        return DODO_TASK_NOT_FOUND;
+    }
+    if (scheduler->current_id != task_id || task->state != DODO_TASK_RUNNING) {
+        return DODO_TASK_INVALID_STATE;
+    }
+
+    task->saved_stack_pointer = saved_stack_pointer;
+    return DODO_TASK_OK;
+}
+
 enum dodo_task_status dodo_scheduler_set_current_state(
     struct dodo_scheduler *scheduler,
     enum dodo_task_state state,
