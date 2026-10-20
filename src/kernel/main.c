@@ -12,6 +12,9 @@
 #define COM1_PORT 0x3F8u
 #define DODO_BOOT_TEST_FRAME_COUNT 5u
 
+static void serial_write_hex64(uint64_t value);
+__attribute__((noreturn)) static void report_boot_error(const char *message);
+
 /*
  * Limine protocol markers and base revision 3.
  * The loader updates the requested base-revision value when it accepts it.
