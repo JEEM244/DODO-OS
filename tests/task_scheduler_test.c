@@ -39,6 +39,18 @@ static void test_scheduler_invariant_validation(void) {
     assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_INVALID_ARGUMENT);
     scheduler.task_count = 2u;
     assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
+
+    /* Free slots must not retain stale resource metadata after reaping. */
+    scheduler.tasks[2].saved_stack_pointer = UINT64_C(0xdead000);
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_INVALID_ARGUMENT);
+    scheduler.tasks[2].saved_stack_pointer = 0u;
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
+
+    /* Active task names must remain NUL-terminated inside the fixed field. */
+    scheduler.tasks[0].name[DODO_TASK_NAME_MAX] = 'X';
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_INVALID_ARGUMENT);
+    scheduler.tasks[0].name[DODO_TASK_NAME_MAX] = '\\0';
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
 }
 
 static void test_round_robin_and_states(void) {
