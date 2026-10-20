@@ -26,6 +26,7 @@ HEADERS := include/dodo/boot/limine_protocol.h \
            include/dodo/arch/x86_64/gdt.h \
            include/dodo/arch/x86_64/interrupts.h \
            include/dodo/arch/x86_64/timer.h \
+           include/dodo/arch/x86_64/keyboard.h \
            include/dodo/arch/x86_64/paging.h \
            include/dodo/arch/x86_64/user_mode.h
 OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/gdt.o \
@@ -207,6 +208,7 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "Physical allocator check passed." $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "allocator counters unchanged" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: legacy PIC remapped; PIT configured for 100 Hz" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: PS/2 keyboard IRQ1 enabled" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "Timer frequency: 100 Hz" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Eq "Timer ticks: [1-9][0-9]*" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "Sleeping for 1 seconds..." $(BUILD_DIR)/qemu-serial.log; \

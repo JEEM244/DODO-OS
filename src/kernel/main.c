@@ -4,6 +4,7 @@
 #include "dodo/arch/x86_64/gdt.h"
 #include "dodo/arch/x86_64/interrupts.h"
 #include "dodo/arch/x86_64/timer.h"
+#include "dodo/arch/x86_64/keyboard.h"
 #include "dodo/arch/x86_64/paging.h"
 #include "dodo/arch/x86_64/user_mode.h"
 #include "dodo/boot/limine_protocol.h"
@@ -238,6 +239,10 @@ static void kernel_halt(void) __attribute__((noreturn));
 
 static int serial_getc(void) {
     for (;;) {
+        char keyboard_character;
+        if (dodo_x86_64_keyboard_try_getc(&keyboard_character)) {
+            return (int)(uint8_t)keyboard_character;
+        }
         if ((inb((uint16_t)(COM1_PORT + 5u)) & 0x01u) != 0u) {
             return (int)inb((uint16_t)(COM1_PORT + 0u));
         }
@@ -360,7 +365,7 @@ static void run_serial_shell(void) {
             serial_write("  echo TXT Print TXT back to the console\n");
             serial_write("  clear    Clear a compatible terminal\n");
             serial_write("  halt     Stop the virtual CPU\n");
-            serial_write("Input currently uses the QEMU serial terminal.\n");
+            serial_write("Input accepts the QEMU serial terminal and PS/2 keyboard.\n");
         } else if (string_equal(command, "about")) {
             serial_write("DODO is an experimental x86-64 operating-system kernel.\n");
             serial_write("This build has tested memory mapping and ring-3 isolation probes.\n");
@@ -617,6 +622,11 @@ int dodo_x86_64_exception_handler(
     if (frame->vector == 32u) {
         /* PIT IRQ0: keep the handler short and acknowledge the master PIC. */
         dodo_x86_64_timer_handle_irq();
+        return DODO_EXCEPTION_RESUME;
+    }
+
+    if (frame->vector == 33u) {
+        dodo_x86_64_keyboard_handle_irq();
         return DODO_EXCEPTION_RESUME;
     }
 
@@ -1799,6 +1809,8 @@ void kernel_main(void) {
     reclaim_bootloader_memory();
     serial_write("DODO: all kernel bootstrap self-checks passed\n");
     dodo_x86_64_timer_init();
+    dodo_x86_64_keyboard_init();
     serial_write("DODO: legacy PIC remapped; PIT configured for 100 Hz\n");
+    serial_write("DODO: PS/2 keyboard IRQ1 enabled\n");
     run_serial_shell();
 }

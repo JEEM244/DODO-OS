@@ -31,6 +31,7 @@ static struct dodo_idt_gate idt[DODO_IDT_ENTRIES] __attribute__((aligned(16)));
 extern void (*dodo_isr_table[DODO_IDT_EXCEPTION_COUNT])(void);
 extern void dodo_isr_128(void);
 extern void dodo_isr_32(void);
+extern void dodo_isr_33(void);
 
 static void set_gate(uint8_t vector, uintptr_t handler,
                      uint16_t code_selector, uint8_t attributes) {
@@ -65,6 +66,10 @@ void dodo_x86_64_idt_init(void) {
 
     /* IRQ0 is routed to vector 32 after the legacy PIC is remapped. */
     set_gate(32u, (uintptr_t)dodo_isr_32, code_selector,
+             DODO_IDT_INTERRUPT_GATE);
+
+    /* IRQ1 is the legacy PS/2 keyboard after PIC remapping. */
+    set_gate(33u, (uintptr_t)dodo_isr_33, code_selector,
              DODO_IDT_INTERRUPT_GATE);
 
     /* Only this intentional test interrupt is callable from CPL3. */
