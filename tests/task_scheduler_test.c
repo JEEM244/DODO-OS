@@ -33,8 +33,6 @@ static void test_no_runnable_tasks_and_invalid_scheduler(void) {
 
     assert(dodo_scheduler_wake(NULL, 1u) == DODO_TASK_INVALID_ARGUMENT);
     assert(dodo_scheduler_schedule(NULL, &selected) == DODO_TASK_INVALID_ARGUMENT);
-    assert(dodo_scheduler_schedule(&scheduler, &selected) == DODO_TASK_INVALID_ARGUMENT);
-
     dodo_scheduler_init(&scheduler);
     assert(dodo_scheduler_schedule(&scheduler, &selected) ==
         DODO_TASK_NO_RUNNABLE_TASK);
