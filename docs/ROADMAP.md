@@ -25,8 +25,9 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Add a QEMU breakpoint self-test which resumes through iretq.
 - [x] Test controlled read-only and NX page faults, resuming only explicitly armed test cases.
 - [x] Add a reusable terminal panic path with structured CPU-fault diagnostics (reason, vector, error code, RIP, CS, RFLAGS, and CR2 for page faults).\n- [ ] Add assertion helpers and dedicated QEMU tests for unexpected fatal exception paths.
-- [ ] Add a timer interrupt and deterministic timer test hooks.
+- [x] Add a PIT timer interrupt, tick counter, and QEMU shell checks for uptime/sleep.
 - [ ] Add tests for more fatal exception paths, including an intentional page fault outside the armed self-test.
+- [x] Route PS/2 keyboard IRQ1 into the shell and verify virtual keyboard input with a QEMU monitor-driven integration test.
 
 **Acceptance:** tested INT3, read-only write, NX instruction-fetch, and the armed ring-3 supervisor-read fault produce the expected results; only explicitly armed tests resume. Other exceptions remain fatal. This does not mean the entire exception model is complete.
 

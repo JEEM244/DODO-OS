@@ -4,7 +4,7 @@
 
 The goal is not to create another Linux distribution or a collection of security utilities. DODO aims to become a practical daily-use desktop operating system whose architecture limits what programs can access, makes their actions explainable, and allows risky work to happen in isolated environments.
 
-> **Current status:** DODO has a freestanding x86-64 kernel, a pinned Limine boot path, a BIOS/UEFI test ISO, a tracked physical page allocator, a host-tested bounded virtual-range metadata allocator (not yet wired to page tables), a project-owned GDT/TSS/IDT, and a cloned DODO-owned four-level page-table tree. Successful QEMU smoke tests cover separate CPL3 roots, supervisor-memory denial, test-root teardown and allocator accounting, plus a test-only `int 0x80` `write`/`exit` ABI. The prototype rejects kernel pointers, unmapped user pointers, zero-length and oversized writes, buffers that cross the user-half address limit, and unknown call numbers; it also verifies copying a user buffer across two mapped pages. The kernel now also remaps the legacy PIC and counts PIT timer interrupts at approximately 100 Hz; `uptime` exposes the tick count. This is still an early kernel prototype: the syscall interface is not a stable process ABI, and DODO is not yet a desktop OS or a complete process-isolation system.
+> **Current status:** DODO has a freestanding x86-64 kernel, a pinned Limine boot path, a BIOS/UEFI test ISO, a tracked physical page allocator, a host-tested bounded virtual-range metadata allocator (not yet wired to page tables), a project-owned GDT/TSS/IDT, and a cloned DODO-owned four-level page-table tree. Successful QEMU smoke tests cover separate CPL3 roots, supervisor-memory denial, test-root teardown and allocator accounting, plus a test-only `int 0x80` `write`/`exit` ABI. The prototype rejects kernel pointers, unmapped user pointers, zero-length and oversized writes, buffers that cross the user-half address limit, and unknown call numbers; it also verifies copying a user buffer across two mapped pages. The kernel now also remaps the legacy PIC, counts PIT timer interrupts at approximately 100 Hz, and accepts PS/2 keyboard input through IRQ1; `uptime` exposes the tick count. `make qemu-keyboard-smoke` injects real virtual key events through QEMU's monitor and checks the shell response. This is still an early kernel prototype: the syscall interface is not a stable process ABI, and DODO is not yet a desktop OS or a complete process-isolation system.
 
 ## Project principles
 
@@ -49,6 +49,7 @@ make test            # host-side physical and virtual-range allocator tests
 make clean all       # build kernel and bootable test ISO
 make run             # launch the ISO in QEMU
 make qemu-smoke      # verify boot, memory protections, isolation, and syscall checks
+make qemu-keyboard-smoke # verify the PS/2 keyboard path through QEMU
 ~~~
 
 The prototype prints diagnostic messages over COM1 serial output and opens an interactive serial shell after its self-tests. Commands include `help`, `about`, `version`, `mem`, `memcheck`, `uptime`, `sleep N`, `echo TXT`, `clear`, and `halt`. A blank graphical display is expected: DODO does not yet have graphics support or a desktop.

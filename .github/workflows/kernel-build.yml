@@ -23,7 +23,7 @@ jobs:
       - name: Install build and test tools
         run: |
           sudo apt-get update
-          sudo apt-get install --yes build-essential binutils curl xorriso qemu-system-x86
+          sudo apt-get install --yes build-essential binutils curl xorriso qemu-system-x86 python3
 
       - name: Run host memory allocator tests
         run: make test
@@ -41,6 +41,9 @@ jobs:
 
       - name: Boot ISO and verify kernel serial output
         run: make qemu-smoke
+
+      - name: Verify PS/2 keyboard input through QEMU
+        run: make qemu-keyboard-smoke
 
       - name: Upload bootable ISO
         uses: actions/upload-artifact@v4

@@ -36,7 +36,7 @@ OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/gdt.o \
 PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
 VADDR_TEST := $(BUILD_DIR)/vaddr_allocator_test
 
-.PHONY: all kernel iso run qemu-smoke test-phys test-vaddr test clean check-tools
+.PHONY: all kernel iso run qemu-smoke qemu-keyboard-smoke test-phys test-vaddr test clean check-tools
 all: iso
 
 kernel: check-tools $(KERNEL_ELF)
@@ -217,6 +217,10 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "Sleeping for 1 seconds..." $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "Sleep complete." $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO_SHELL_INPUT_OK" $(BUILD_DIR)/qemu-serial.log
+
+# Exercise the real PS/2 IRQ1 path by injecting keys through QEMU's monitor.
+qemu-keyboard-smoke: $(ISO_IMAGE)
+	python3 tests/qemu_keyboard_smoke.py --iso $(ISO_IMAGE) --log $(BUILD_DIR)/qemu-keyboard-serial.log
 
 clean:
 	rm -rf $(BUILD_DIR)

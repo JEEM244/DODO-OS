@@ -13,6 +13,7 @@ static volatile uint8_t input_tail;
 static uint8_t left_shift;
 static uint8_t right_shift;
 static uint8_t caps_lock;
+static uint8_t caps_lock_down;
 static uint8_t extended_scancode;
 
 static const char keymap[128] = {
@@ -57,6 +58,7 @@ void dodo_x86_64_keyboard_init(void) {
     left_shift = 0;
     right_shift = 0;
     caps_lock = 0;
+    caps_lock_down = 0;
     extended_scancode = 0;
 
     /* IRQ1 must remain masked until its IDT gate and handler are installed. */
@@ -89,7 +91,13 @@ void dodo_x86_64_keyboard_handle_irq(void) {
     } else if (scan == 0xb6u) {
         right_shift = 0;
     } else if (scan == 0x3au) {
-        caps_lock ^= 1u;
+        /* Ignore typematic make codes while Caps Lock is held down. */
+        if (caps_lock_down == 0u) {
+            caps_lock ^= 1u;
+            caps_lock_down = 1u;
+        }
+    } else if (scan == 0xbau) {
+        caps_lock_down = 0u;
     } else if ((scan & 0x80u) == 0u && scan < 128u) {
         const uint8_t shifted = (uint8_t)(left_shift | right_shift);
         char character = shifted_keymap[scan];
