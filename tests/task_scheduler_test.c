@@ -26,6 +26,47 @@ static void test_round_robin_and_states(void) {
     assert(dodo_scheduler_find(&scheduler, b)->state == DODO_TASK_ZOMBIE);
 }
 
+static void test_no_runnable_tasks_and_invalid_scheduler(void) {
+    struct dodo_scheduler scheduler;
+    uint32_t id = 0u;
+    uint32_t selected = UINT32_C(0xfeed);
+
+    assert(dodo_scheduler_wake(NULL, 1u) == DODO_TASK_INVALID_ARGUMENT);
+    assert(dodo_scheduler_schedule(NULL, &selected) == DODO_TASK_INVALID_ARGUMENT);
+    assert(dodo_scheduler_schedule(&scheduler, &selected) == DODO_TASK_INVALID_ARGUMENT);
+
+    dodo_scheduler_init(&scheduler);
+    assert(dodo_scheduler_schedule(&scheduler, &selected) ==
+        DODO_TASK_NO_RUNNABLE_TASK);
+    assert(dodo_scheduler_create(&scheduler, "idle-test", 0x1000u,
+        0x2000u, &id) == DODO_TASK_OK);
+    assert(dodo_scheduler_schedule(&scheduler, &selected) == DODO_TASK_OK);
+    assert(selected == id);
+    assert(dodo_scheduler_set_current_state(&scheduler, DODO_TASK_BLOCKED, 0u) ==
+        DODO_TASK_OK);
+    assert(dodo_scheduler_schedule(&scheduler, &selected) ==
+        DODO_TASK_NO_RUNNABLE_TASK);
+    assert(scheduler.current_id == DODO_TASK_INVALID_ID);
+    assert(dodo_scheduler_wake(&scheduler, id) == DODO_TASK_OK);
+    assert(dodo_scheduler_schedule(&scheduler, &selected) == DODO_TASK_OK);
+    assert(selected == id);
+}
+
+static void test_name_is_safely_truncated(void) {
+    struct dodo_scheduler scheduler;
+    uint32_t id = 0u;
+    const char long_name[] =
+        "123456789012345678901234567890-this-suffix-must-not-copy";
+    dodo_scheduler_init(&scheduler);
+    assert(dodo_scheduler_create(&scheduler, long_name, 0x1000u, 0x2000u,
+        &id) == DODO_TASK_OK);
+    struct dodo_task *task = dodo_scheduler_find(&scheduler, id);
+    assert(task != NULL);
+    assert(strlen(task->name) == DODO_TASK_NAME_MAX);
+    assert(task->name[DODO_TASK_NAME_MAX] == '\\0');
+    assert(strncmp(task->name, long_name, DODO_TASK_NAME_MAX) == 0);
+}
+
 static void test_validation_and_capacity(void) {
     struct dodo_scheduler scheduler;
     dodo_scheduler_init(&scheduler);
@@ -48,6 +89,8 @@ static void test_validation_and_capacity(void) {
 
 int main(void) {
     test_round_robin_and_states();
+    test_no_runnable_tasks_and_invalid_scheduler();
+    test_name_is_safely_truncated();
     test_validation_and_capacity();
     puts("Task scheduler tests passed.");
     return 0;

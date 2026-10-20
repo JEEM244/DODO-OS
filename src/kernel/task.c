@@ -139,6 +139,13 @@ enum dodo_task_status dodo_scheduler_set_current_state(
 
 enum dodo_task_status dodo_scheduler_wake(
     struct dodo_scheduler *scheduler, uint32_t task_id) {
+    /*
+     * Keep malformed scheduler state distinct from a valid scheduler that
+     * simply has no task with this ID. This makes caller error handling sane.
+     */
+    if (!valid_scheduler(scheduler)) {
+        return DODO_TASK_INVALID_ARGUMENT;
+    }
     struct dodo_task *task = dodo_scheduler_find(scheduler, task_id);
     if (task == NULL) {
         return DODO_TASK_NOT_FOUND;
