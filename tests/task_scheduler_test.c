@@ -98,6 +98,16 @@ static void test_zombie_reaping_and_slot_reuse(void) {
     assert(selected == first);
     assert(dodo_scheduler_set_current_state(&scheduler, DODO_TASK_ZOMBIE, 42u) ==
         DODO_TASK_OK);
+    uint32_t exit_code = UINT32_C(0xfeed);
+    assert(dodo_scheduler_get_exit_code(NULL, first, &exit_code) ==
+        DODO_TASK_INVALID_ARGUMENT);
+    assert(dodo_scheduler_get_exit_code(&scheduler, first, NULL) ==
+        DODO_TASK_INVALID_ARGUMENT);
+    assert(dodo_scheduler_get_exit_code(&scheduler, first, &exit_code) ==
+        DODO_TASK_OK);
+    assert(exit_code == 42u);
+    assert(dodo_scheduler_get_exit_code(&scheduler, second, &exit_code) ==
+        DODO_TASK_NOT_FOUND);
     assert(dodo_scheduler_reap(&scheduler, first) == DODO_TASK_OK);
     assert(scheduler.task_count == 0u);
     assert(dodo_scheduler_find(&scheduler, first) == NULL);

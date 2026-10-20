@@ -178,6 +178,27 @@ enum dodo_task_status dodo_scheduler_wake(
     return DODO_TASK_OK;
 }
 
+enum dodo_task_status dodo_scheduler_get_exit_code(
+    struct dodo_scheduler *scheduler,
+    uint32_t task_id,
+    uint32_t *exit_code) {
+    if (!valid_scheduler(scheduler) || task_id == DODO_TASK_INVALID_ID ||
+        exit_code == NULL) {
+        return DODO_TASK_INVALID_ARGUMENT;
+    }
+
+    const struct dodo_task *task = dodo_scheduler_find(scheduler, task_id);
+    if (task == NULL) {
+        return DODO_TASK_NOT_FOUND;
+    }
+    if (task->state != DODO_TASK_ZOMBIE) {
+        return DODO_TASK_INVALID_STATE;
+    }
+
+    *exit_code = task->exit_code;
+    return DODO_TASK_OK;
+}
+
 enum dodo_task_status dodo_scheduler_reap(
     struct dodo_scheduler *scheduler, uint32_t task_id) {
     if (!valid_scheduler(scheduler) || task_id == DODO_TASK_INVALID_ID) {
