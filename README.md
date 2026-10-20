@@ -42,7 +42,7 @@ Limine is deliberately used only to bootstrap the kernel. DODO's kernel and futu
 
 ## Build and test
 
-Read [docs/BUILDING.md](docs/BUILDING.md) before building.
+Read [docs/BUILDING.md](docs/BUILDING.md) before building. Windows users can follow [the CMD + QEMU quick start](docs/WINDOWS-QUICKSTART.md) and launch the prototype with `RUN-DODO-WINDOWS.bat`.
 
 ~~~sh
 make test            # host-side physical and virtual-range allocator tests

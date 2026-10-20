@@ -22,7 +22,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Normalize exception stack frames and report breakpoint/page-fault details.
 - [x] Add a QEMU breakpoint self-test which resumes through iretq.
 - [x] Test controlled read-only and NX page faults, resuming only explicitly armed test cases.
-- [ ] Add a reusable panic/assertion policy and structured fatal diagnostics.
+- [x] Add a reusable terminal panic path with structured CPU-fault diagnostics (reason, vector, error code, RIP, CS, RFLAGS, and CR2 for page faults).\n- [ ] Add assertion helpers and dedicated QEMU tests for unexpected fatal exception paths.
 - [ ] Add a timer interrupt and deterministic timer test hooks.
 - [ ] Add tests for more fatal exception paths, including an intentional page fault outside the armed self-test.
 
