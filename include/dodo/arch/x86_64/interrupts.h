@@ -1,6 +1,7 @@
 #ifndef DODO_ARCH_X86_64_INTERRUPTS_H
 #define DODO_ARCH_X86_64_INTERRUPTS_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 /*
@@ -31,6 +32,19 @@ struct dodo_x86_64_exception_frame {
     uint64_t cs;
     uint64_t rflags;
 };
+
+/*
+ * The assembly interrupt stub pushes these registers in a fixed order.
+ * Fail the build if a future edit silently breaks the C/assembly frame ABI.
+ */
+_Static_assert(offsetof(struct dodo_x86_64_exception_frame, vector) == 120u,
+               "interrupt frame vector offset must match interrupts.S");
+_Static_assert(offsetof(struct dodo_x86_64_exception_frame, rip) == 136u,
+               "interrupt frame RIP offset must match interrupts.S");
+_Static_assert(offsetof(struct dodo_x86_64_exception_frame, rflags) == 152u,
+               "interrupt frame RFLAGS offset must match interrupts.S");
+_Static_assert(sizeof(struct dodo_x86_64_exception_frame) == 160u,
+               "interrupt frame prefix size must match interrupts.S");
 
 #define DODO_EXCEPTION_FATAL 0
 #define DODO_EXCEPTION_RESUME 1
