@@ -40,6 +40,13 @@ static void test_scheduler_invariant_validation(void) {
     scheduler.task_count = 2u;
     assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
 
+    /* Active tasks must have nonempty names. */
+    const char saved_first_name = scheduler.tasks[0].name[0];
+    scheduler.tasks[0].name[0] = '\0';
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_INVALID_ARGUMENT);
+    scheduler.tasks[0].name[0] = saved_first_name;
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
+
     /* Free slots must not retain stale resource metadata after reaping. */
     scheduler.tasks[2].saved_stack_pointer = UINT64_C(0xdead000);
     assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_INVALID_ARGUMENT);
