@@ -285,6 +285,34 @@ static int string_equal(const char *left, const char *right) {
     return *left == '\0' && *right == '\0';
 }
 
+static int parse_unsigned_decimal(const char *text, uint64_t *value) {
+    uint64_t result = 0;
+    int found_digit = 0;
+    if (text == NULL || value == NULL) {
+        return 0;
+    }
+    while (*text == ' ' || *text == '\t') {
+        ++text;
+    }
+    while (*text >= '0' && *text <= '9') {
+        const uint64_t digit = (uint64_t)(*text - '0');
+        if (result > (UINT64_MAX - digit) / 10u) {
+            return 0;
+        }
+        result = result * 10u + digit;
+        found_digit = 1;
+        ++text;
+    }
+    while (*text == ' ' || *text == '\t') {
+        ++text;
+    }
+    if (!found_digit || *text != '\0') {
+        return 0;
+    }
+    *value = result;
+    return 1;
+}
+
 static void serial_readline(char *buffer, size_t capacity) {
     size_t length = 0;
     static int skip_lf_after_cr = 0;
@@ -355,6 +383,7 @@ static void run_serial_shell(void) {
             serial_write("  version  Show the kernel prototype version\n");
             serial_write("  mem      Show physical allocator counters\n");
             serial_write("  uptime   Show ticks and approximate uptime\n");
+            serial_write("  sleep N  Sleep for 1-60 seconds using the PIT timer\n");
             serial_write("  echo TXT Print TXT back to the console\n");
             serial_write("  clear    Clear a compatible terminal\n");
             serial_write("  halt     Stop the virtual CPU\n");
@@ -381,6 +410,26 @@ static void run_serial_shell(void) {
             serial_write("\nUptime: ");
             serial_write_u64(ticks / 100u);
             serial_write(" seconds (approximate)\n");
+        } else if (command[0] == 's' && command[1] == 'l' &&
+                   command[2] == 'e' && command[3] == 'e' &&
+                   command[4] == 'p' &&
+                   (command[5] == ' ' || command[5] == '\t' ||
+                    command[5] == '\0')) {
+            uint64_t seconds = 0;
+            if (!parse_unsigned_decimal(command + 5, &seconds) ||
+                seconds < 1u || seconds > 60u) {
+                serial_write("Usage: sleep 1-60\n");
+            } else {
+                const uint64_t start_ticks = timer_ticks;
+                const uint64_t wait_ticks = seconds * 100u;
+                serial_write("Sleeping for ");
+                serial_write_u64(seconds);
+                serial_write(" seconds...\n");
+                while ((timer_ticks - start_ticks) < wait_ticks) {
+                    __asm__ volatile ("hlt" : : : "memory");
+                }
+                serial_write("Sleep complete.\n");
+            }
         } else if (command[0] == 'e' && command[1] == 'c' &&
                    command[2] == 'h' && command[3] == 'o' &&
                    (command[4] == ' ' || command[4] == '\0')) {

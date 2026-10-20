@@ -51,7 +51,7 @@ make run             # launch the ISO in QEMU
 make qemu-smoke      # verify boot, memory protections, isolation, and syscall checks
 ~~~
 
-The prototype prints diagnostic messages over COM1 serial output and opens an interactive serial shell after its self-tests. Commands include `help`, `about`, `version`, `mem`, `uptime`, `echo TXT`, `clear`, and `halt`. A blank graphical display is expected: DODO does not yet have graphics support or a desktop.
+The prototype prints diagnostic messages over COM1 serial output and opens an interactive serial shell after its self-tests. Commands include `help`, `about`, `version`, `mem`, `uptime`, `sleep N`, `echo TXT`, `clear`, and `halt`. A blank graphical display is expected: DODO does not yet have graphics support or a desktop.
 
 ## Roadmap
 
