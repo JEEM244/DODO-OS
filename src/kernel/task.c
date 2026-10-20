@@ -36,7 +36,14 @@ enum dodo_task_status dodo_scheduler_validate(
     for (uint32_t i = 0u; i < DODO_TASK_CAPACITY; ++i) {
         const struct dodo_task *task = &scheduler->tasks[i];
         if (task->state == DODO_TASK_UNUSED) {
-            if (task->id != DODO_TASK_INVALID_ID) {
+            /*
+             * A free slot must be fully cleared. Otherwise stale task metadata
+             * can survive reaping and later be mistaken for live resources.
+             */
+            if (task->id != DODO_TASK_INVALID_ID ||
+                task->saved_stack_pointer != 0u ||
+                task->address_space_root != 0u ||
+                task->exit_code != 0u || task->name[0] != '\\0') {
                 return DODO_TASK_INVALID_ARGUMENT;
             }
             continue;
@@ -45,6 +52,16 @@ enum dodo_task_status dodo_scheduler_validate(
         if (task->state < DODO_TASK_READY || task->state > DODO_TASK_ZOMBIE ||
             task->id == DODO_TASK_INVALID_ID || task->id >= scheduler->next_id ||
             task->saved_stack_pointer == 0u || task->address_space_root == 0u) {
+            return DODO_TASK_INVALID_ARGUMENT;
+        }
+
+        /* Every active task name must terminate within its fixed-size field. */
+        uint32_t name_length = 0u;
+        while (name_length <= DODO_TASK_NAME_MAX &&
+               task->name[name_length] != '\\0') {
+            ++name_length;
+        }
+        if (name_length > DODO_TASK_NAME_MAX) {
             return DODO_TASK_INVALID_ARGUMENT;
         }
         ++active_count;
