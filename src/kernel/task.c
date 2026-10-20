@@ -156,3 +156,22 @@ enum dodo_task_status dodo_scheduler_wake(
     task->state = DODO_TASK_READY;
     return DODO_TASK_OK;
 }
+
+enum dodo_task_status dodo_scheduler_reap(
+    struct dodo_scheduler *scheduler, uint32_t task_id) {
+    if (!valid_scheduler(scheduler) || task_id == DODO_TASK_INVALID_ID) {
+        return DODO_TASK_INVALID_ARGUMENT;
+    }
+
+    struct dodo_task *task = dodo_scheduler_find(scheduler, task_id);
+    if (task == NULL) {
+        return DODO_TASK_NOT_FOUND;
+    }
+    if (task->state != DODO_TASK_ZOMBIE) {
+        return DODO_TASK_INVALID_STATE;
+    }
+
+    *task = (struct dodo_task){0};
+    --scheduler->task_count;
+    return DODO_TASK_OK;
+}

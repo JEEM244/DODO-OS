@@ -66,6 +66,10 @@ enum dodo_task_status dodo_scheduler_set_current_state(
 enum dodo_task_status dodo_scheduler_wake(
     struct dodo_scheduler *scheduler, uint32_t task_id);
 
+/* Reclaim a ZOMBIE slot after the owner has handled its exit status. */
+enum dodo_task_status dodo_scheduler_reap(
+    struct dodo_scheduler *scheduler, uint32_t task_id);
+
 /* Find a task by ID; returns NULL for invalid IDs or absent tasks. */
 struct dodo_task *dodo_scheduler_find(
     struct dodo_scheduler *scheduler, uint32_t task_id);
