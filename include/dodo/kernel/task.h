@@ -44,6 +44,10 @@ struct dodo_scheduler {
 /* Initialize a fixed-capacity scheduler; no heap or hardware is required. */
 void dodo_scheduler_init(struct dodo_scheduler *scheduler);
 
+/* Check scheduler metadata invariants; returns INVALID_ARGUMENT if corrupted. */
+enum dodo_task_status dodo_scheduler_validate(
+    const struct dodo_scheduler *scheduler);
+
 /* Register a task with caller-provided initial stack and address-space root. */
 enum dodo_task_status dodo_scheduler_create(
     struct dodo_scheduler *scheduler,

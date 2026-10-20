@@ -5,6 +5,29 @@
 
 #include "dodo/kernel/task.h"
 
+static void test_scheduler_invariant_validation(void) {
+    struct dodo_scheduler scheduler;
+    uint32_t first = 0u, selected = 0u;
+    dodo_scheduler_init(&scheduler);
+    assert(dodo_scheduler_validate(NULL) == DODO_TASK_INVALID_ARGUMENT);
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
+    assert(dodo_scheduler_create(&scheduler, "first", 0x1000u, 0x2000u,
+        &first) == DODO_TASK_OK);
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
+    assert(dodo_scheduler_schedule(&scheduler, &selected) == DODO_TASK_OK);
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
+
+    scheduler.current_id = DODO_TASK_INVALID_ID;
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_INVALID_ARGUMENT);
+    scheduler.current_id = first;
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
+
+    scheduler.task_count = 0u;
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_INVALID_ARGUMENT);
+    scheduler.task_count = 1u;
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
+}
+
 static void test_round_robin_and_states(void) {
     struct dodo_scheduler scheduler;
     dodo_scheduler_init(&scheduler);
@@ -159,6 +182,7 @@ static void test_validation_and_capacity(void) {
 }
 
 int main(void) {
+    test_scheduler_invariant_validation();
     test_round_robin_and_states();
     test_no_runnable_tasks_and_invalid_scheduler();
     test_zombie_reaping_and_slot_reuse();

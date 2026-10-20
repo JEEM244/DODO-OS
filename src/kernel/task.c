@@ -24,6 +24,57 @@ void dodo_scheduler_init(struct dodo_scheduler *scheduler) {
     scheduler->task_count = 0u;
 }
 
+enum dodo_task_status dodo_scheduler_validate(
+    const struct dodo_scheduler *scheduler) {
+    if (scheduler == NULL || scheduler->next_id == 0u ||
+        scheduler->task_count > DODO_TASK_CAPACITY ||
+        scheduler->cursor >= DODO_TASK_CAPACITY) {
+        return DODO_TASK_INVALID_ARGUMENT;
+    }
+
+    uint32_t active_count = 0u;
+    uint32_t running_count = 0u;
+    uint32_t running_id = DODO_TASK_INVALID_ID;
+
+    for (uint32_t i = 0u; i < DODO_TASK_CAPACITY; ++i) {
+        const struct dodo_task *task = &scheduler->tasks[i];
+        if (task->state == DODO_TASK_UNUSED) {
+            if (task->id != DODO_TASK_INVALID_ID) {
+                return DODO_TASK_INVALID_ARGUMENT;
+            }
+            continue;
+        }
+
+        if (task->state < DODO_TASK_READY || task->state > DODO_TASK_ZOMBIE ||
+            task->id == DODO_TASK_INVALID_ID || task->id >= scheduler->next_id ||
+            task->saved_stack_pointer == 0u || task->address_space_root == 0u) {
+            return DODO_TASK_INVALID_ARGUMENT;
+        }
+        ++active_count;
+
+        for (uint32_t j = i + 1u; j < DODO_TASK_CAPACITY; ++j) {
+            if (scheduler->tasks[j].state != DODO_TASK_UNUSED &&
+                scheduler->tasks[j].id == task->id) {
+                return DODO_TASK_INVALID_ARGUMENT;
+            }
+        }
+
+        if (task->state == DODO_TASK_RUNNING) {
+            ++running_count;
+            running_id = task->id;
+        }
+    }
+
+    if (active_count != scheduler->task_count || running_count > 1u ||
+        (scheduler->current_id == DODO_TASK_INVALID_ID && running_count != 0u) ||
+        (scheduler->current_id != DODO_TASK_INVALID_ID &&
+         (running_count != 1u || running_id != scheduler->current_id))) {
+        return DODO_TASK_INVALID_ARGUMENT;
+    }
+
+    return DODO_TASK_OK;
+}
+
 struct dodo_task *dodo_scheduler_find(
     struct dodo_scheduler *scheduler, uint32_t task_id) {
     if (!valid_scheduler(scheduler) || task_id == DODO_TASK_INVALID_ID) {
