@@ -42,12 +42,19 @@ static void test_no_runnable_tasks_and_invalid_scheduler(void) {
     assert(selected == id);
     assert(dodo_scheduler_set_current_state(&scheduler, DODO_TASK_BLOCKED, 0u) ==
         DODO_TASK_OK);
+    selected = UINT32_C(0xfeed);
     assert(dodo_scheduler_schedule(&scheduler, &selected) ==
         DODO_TASK_NO_RUNNABLE_TASK);
+    assert(selected == UINT32_C(0xfeed));
     assert(scheduler.current_id == DODO_TASK_INVALID_ID);
     assert(dodo_scheduler_wake(&scheduler, id) == DODO_TASK_OK);
     assert(dodo_scheduler_schedule(&scheduler, &selected) == DODO_TASK_OK);
     assert(selected == id);
+    assert(dodo_scheduler_set_current_state(&scheduler, DODO_TASK_UNUSED, 0u) ==
+        DODO_TASK_INVALID_ARGUMENT);
+    assert(dodo_scheduler_set_current_state(&scheduler, DODO_TASK_RUNNING, 0u) ==
+        DODO_TASK_INVALID_ARGUMENT);
+    assert(dodo_scheduler_find(&scheduler, id)->state == DODO_TASK_RUNNING);
 }
 
 static void test_saved_stack_pointer_requires_current_running_task(void) {
