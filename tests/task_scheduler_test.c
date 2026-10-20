@@ -63,7 +63,7 @@ static void test_name_is_safely_truncated(void) {
     struct dodo_task *task = dodo_scheduler_find(&scheduler, id);
     assert(task != NULL);
     assert(strlen(task->name) == DODO_TASK_NAME_MAX);
-    assert(task->name[DODO_TASK_NAME_MAX] == '\\0');
+    assert(task->name[DODO_TASK_NAME_MAX] == '\0');
     assert(strncmp(task->name, long_name, DODO_TASK_NAME_MAX) == 0);
 }
 
