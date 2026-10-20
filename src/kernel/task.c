@@ -1,0 +1,151 @@
+#include <stddef.h>
+#include <stdint.h>
+
+#include "dodo/kernel/task.h"
+
+static int valid_scheduler(const struct dodo_scheduler *scheduler) {
+    return scheduler != NULL &&
+        scheduler->next_id != 0u &&
+        scheduler->task_count <= DODO_TASK_CAPACITY &&
+        scheduler->cursor < DODO_TASK_CAPACITY;
+}
+
+void dodo_scheduler_init(struct dodo_scheduler *scheduler) {
+    if (scheduler == NULL) {
+        return;
+    }
+
+    for (uint32_t i = 0; i < DODO_TASK_CAPACITY; ++i) {
+        scheduler->tasks[i] = (struct dodo_task){0};
+    }
+    scheduler->next_id = 1u;
+    scheduler->current_id = DODO_TASK_INVALID_ID;
+    scheduler->cursor = DODO_TASK_CAPACITY - 1u;
+    scheduler->task_count = 0u;
+}
+
+struct dodo_task *dodo_scheduler_find(
+    struct dodo_scheduler *scheduler, uint32_t task_id) {
+    if (!valid_scheduler(scheduler) || task_id == DODO_TASK_INVALID_ID) {
+        return NULL;
+    }
+
+    for (uint32_t i = 0; i < DODO_TASK_CAPACITY; ++i) {
+        if (scheduler->tasks[i].state != DODO_TASK_UNUSED &&
+            scheduler->tasks[i].id == task_id) {
+            return &scheduler->tasks[i];
+        }
+    }
+    return NULL;
+}
+
+enum dodo_task_status dodo_scheduler_create(
+    struct dodo_scheduler *scheduler,
+    const char *name,
+    uint64_t saved_stack_pointer,
+    uint64_t address_space_root,
+    uint32_t *task_id) {
+    if (!valid_scheduler(scheduler) || name == NULL || task_id == NULL ||
+        saved_stack_pointer == 0u || address_space_root == 0u || name[0] == '\0') {
+        return DODO_TASK_INVALID_ARGUMENT;
+    }
+    if (scheduler->next_id == UINT32_MAX) {
+        return DODO_TASK_FULL;
+    }
+
+    uint32_t slot = DODO_TASK_CAPACITY;
+    for (uint32_t i = 0; i < DODO_TASK_CAPACITY; ++i) {
+        if (scheduler->tasks[i].state == DODO_TASK_UNUSED) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot == DODO_TASK_CAPACITY) {
+        return DODO_TASK_FULL;
+    }
+
+    struct dodo_task task = {
+        .id = scheduler->next_id,
+        .state = DODO_TASK_READY,
+        .saved_stack_pointer = saved_stack_pointer,
+        .address_space_root = address_space_root,
+        .exit_code = 0u
+    };
+    uint32_t length = 0u;
+    while (length < DODO_TASK_NAME_MAX && name[length] != '\0') {
+        task.name[length] = name[length];
+        ++length;
+    }
+    task.name[length] = '\0';
+
+    scheduler->tasks[slot] = task;
+    *task_id = scheduler->next_id;
+    ++scheduler->next_id;
+    ++scheduler->task_count;
+    return DODO_TASK_OK;
+}
+
+enum dodo_task_status dodo_scheduler_schedule(
+    struct dodo_scheduler *scheduler, uint32_t *task_id) {
+    if (!valid_scheduler(scheduler) || task_id == NULL) {
+        return DODO_TASK_INVALID_ARGUMENT;
+    }
+
+    struct dodo_task *previous = dodo_scheduler_find(
+        scheduler, scheduler->current_id);
+    if (previous != NULL && previous->state == DODO_TASK_RUNNING) {
+        previous->state = DODO_TASK_READY;
+    }
+
+    for (uint32_t offset = 1u; offset <= DODO_TASK_CAPACITY; ++offset) {
+        const uint32_t slot =
+            (scheduler->cursor + offset) % DODO_TASK_CAPACITY;
+        struct dodo_task *candidate = &scheduler->tasks[slot];
+        if (candidate->state == DODO_TASK_READY) {
+            candidate->state = DODO_TASK_RUNNING;
+            scheduler->cursor = slot;
+            scheduler->current_id = candidate->id;
+            *task_id = candidate->id;
+            return DODO_TASK_OK;
+        }
+    }
+
+    scheduler->current_id = DODO_TASK_INVALID_ID;
+    return DODO_TASK_NO_RUNNABLE_TASK;
+}
+
+enum dodo_task_status dodo_scheduler_set_current_state(
+    struct dodo_scheduler *scheduler,
+    enum dodo_task_state state,
+    uint32_t exit_code) {
+    if (!valid_scheduler(scheduler) ||
+        (state != DODO_TASK_READY && state != DODO_TASK_BLOCKED &&
+         state != DODO_TASK_ZOMBIE)) {
+        return DODO_TASK_INVALID_ARGUMENT;
+    }
+    struct dodo_task *current =
+        dodo_scheduler_find(scheduler, scheduler->current_id);
+    if (current == NULL || current->state != DODO_TASK_RUNNING) {
+        return DODO_TASK_INVALID_STATE;
+    }
+
+    current->state = state;
+    if (state == DODO_TASK_ZOMBIE) {
+        current->exit_code = exit_code;
+    }
+    scheduler->current_id = DODO_TASK_INVALID_ID;
+    return DODO_TASK_OK;
+}
+
+enum dodo_task_status dodo_scheduler_wake(
+    struct dodo_scheduler *scheduler, uint32_t task_id) {
+    struct dodo_task *task = dodo_scheduler_find(scheduler, task_id);
+    if (task == NULL) {
+        return DODO_TASK_NOT_FOUND;
+    }
+    if (task->state != DODO_TASK_BLOCKED) {
+        return DODO_TASK_INVALID_STATE;
+    }
+    task->state = DODO_TASK_READY;
+    return DODO_TASK_OK;
+}

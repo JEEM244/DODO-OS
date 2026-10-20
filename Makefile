@@ -30,22 +30,31 @@ HEADERS := include/dodo/boot/limine_protocol.h \
            include/dodo/arch/x86_64/console.h \
            include/dodo/arch/x86_64/font8x8.h \
            include/dodo/arch/x86_64/paging.h \
-           include/dodo/arch/x86_64/user_mode.h
+           include/dodo/arch/x86_64/user_mode.h \\
+           include/dodo/kernel/task.h
 OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/gdt.o \
            $(BUILD_DIR)/idt.o $(BUILD_DIR)/timer.o $(BUILD_DIR)/keyboard.o $(BUILD_DIR)/console.o $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o \
            $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/paging_test.o \
            $(BUILD_DIR)/user_mode.o
 PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
 VADDR_TEST := $(BUILD_DIR)/vaddr_allocator_test
+TASK_TEST := $(BUILD_DIR)/task_scheduler_test
 
-.PHONY: all kernel iso run qemu-smoke qemu-keyboard-smoke test-phys test-vaddr test clean check-tools
+.PHONY: all kernel iso run qemu-smoke qemu-keyboard-smoke test-phys test-vaddr test-task test clean check-tools
 all: iso
 
 kernel: check-tools $(KERNEL_ELF)
 
 iso: check-tools $(ISO_IMAGE)
 
-test: test-phys test-vaddr
+test: test-phys test-vaddr test-task
+
+$(TASK_TEST): src/kernel/task.c tests/task_scheduler_test.c include/dodo/kernel/task.h | $(BUILD_DIR)
+	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Iinclude \\
+		src/kernel/task.c tests/task_scheduler_test.c -o $@
+
+test-task: $(TASK_TEST)
+	$(TASK_TEST)
 
 check-tools:
 	@command -v $(CC) >/dev/null || (echo "Missing C compiler: $(CC)" >&2; exit 1)
