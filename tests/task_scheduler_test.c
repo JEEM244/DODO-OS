@@ -106,7 +106,7 @@ static void test_zombie_reaping_and_slot_reuse(void) {
     assert(dodo_scheduler_get_exit_code(&scheduler, first, &exit_code) ==
         DODO_TASK_OK);
     assert(exit_code == 42u);
-    assert(dodo_scheduler_get_exit_code(&scheduler, second, &exit_code) ==
+    assert(dodo_scheduler_get_exit_code(&scheduler, UINT32_C(999), &exit_code) ==
         DODO_TASK_NOT_FOUND);
     assert(dodo_scheduler_reap(&scheduler, first) == DODO_TASK_OK);
     assert(scheduler.task_count == 0u);
