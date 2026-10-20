@@ -16,7 +16,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 
 ## M1 — CPU and diagnostics
 
-- [x] Remap the legacy PIC, configure PIT channel 0 at approximately 100 Hz, and count IRQ0 ticks; `uptime` reports ticks and approximate elapsed seconds, while `sleep N` waits on timer interrupts using `hlt`. Only IRQ0 is unmasked, and QEMU smoke tests check that ticks advance and the wait completes.
+- [x] Add a dedicated x86-64 timer driver that remaps the legacy PIC, configures PIT channel 0 at approximately 100 Hz, and counts IRQ0 ticks; `uptime` reports ticks and approximate elapsed seconds, while `sleep N` waits on timer interrupts using `hlt`. Only IRQ0 is unmasked, and QEMU smoke tests check that ticks advance and the wait completes.
 
 - [x] Install a project-owned GDT while preserving Limine's initial selector layout and reserve user-mode code/data descriptors.
 - [x] Install the TSS with a dedicated RSP0 stack for privilege transitions.

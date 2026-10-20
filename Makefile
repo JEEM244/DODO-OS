@@ -25,10 +25,11 @@ HEADERS := include/dodo/boot/limine_protocol.h \
            include/dodo/mm/phys.h \
            include/dodo/arch/x86_64/gdt.h \
            include/dodo/arch/x86_64/interrupts.h \
+           include/dodo/arch/x86_64/timer.h \
            include/dodo/arch/x86_64/paging.h \
            include/dodo/arch/x86_64/user_mode.h
 OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/gdt.o \
-           $(BUILD_DIR)/idt.o $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o \
+           $(BUILD_DIR)/idt.o $(BUILD_DIR)/timer.o $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o \
            $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/paging_test.o \
            $(BUILD_DIR)/user_mode.o
 PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
@@ -60,6 +61,9 @@ $(BUILD_DIR)/gdt.o: src/arch/x86_64/gdt.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/idt.o: src/arch/x86_64/idt.c $(HEADERS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/timer.o: src/arch/x86_64/timer.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/paging.o: src/arch/x86_64/paging.c $(HEADERS) | $(BUILD_DIR)
