@@ -4,10 +4,7 @@
 #include "dodo/kernel/task.h"
 
 static int valid_scheduler(const struct dodo_scheduler *scheduler) {
-    return scheduler != NULL &&
-        scheduler->next_id != 0u &&
-        scheduler->task_count <= DODO_TASK_CAPACITY &&
-        scheduler->cursor < DODO_TASK_CAPACITY;
+    return dodo_scheduler_validate(scheduler) == DODO_TASK_OK;
 }
 
 void dodo_scheduler_init(struct dodo_scheduler *scheduler) {
