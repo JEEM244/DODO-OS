@@ -43,7 +43,7 @@ enum dodo_task_status dodo_scheduler_validate(
             if (task->id != DODO_TASK_INVALID_ID ||
                 task->saved_stack_pointer != 0u ||
                 task->address_space_root != 0u ||
-                task->exit_code != 0u || task->name[0] != '\\0') {
+                task->exit_code != 0u || task->name[0] != '\0') {
                 return DODO_TASK_INVALID_ARGUMENT;
             }
             continue;
@@ -58,7 +58,7 @@ enum dodo_task_status dodo_scheduler_validate(
         /* Every active task name must terminate within its fixed-size field. */
         uint32_t name_length = 0u;
         while (name_length <= DODO_TASK_NAME_MAX &&
-               task->name[name_length] != '\\0') {
+               task->name[name_length] != '\0') {
             ++name_length;
         }
         if (name_length > DODO_TASK_NAME_MAX) {
