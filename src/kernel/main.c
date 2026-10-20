@@ -351,6 +351,7 @@ static void run_serial_shell(void) {
             serial_write("  about    Explain the current build\n");
             serial_write("  version  Show the kernel prototype version\n");
             serial_write("  mem      Show physical allocator counters\n");
+            serial_write("  memcheck Exercise physical page allocate/free/reuse\n");
             serial_write("  uptime   Show ticks and approximate uptime\n");
             serial_write("  sleep N  Sleep for 1-60 seconds using the PIT timer\n");
             serial_write("  echo TXT Print TXT back to the console\n");
@@ -372,6 +373,41 @@ static void run_serial_shell(void) {
             serial_write("\n  known regions:   ");
             serial_write_u64(physical_allocator.region_count);
             serial_write("\n  page size:       4096 bytes\n");
+        } else if (string_equal(command, "memcheck")) {
+            const uint64_t free_before = physical_allocator.free_pages;
+            const uint64_t allocated_before = physical_allocator.allocated_pages;
+            uint64_t first_frame = 0;
+            uint64_t reused_frame = 0;
+            enum dodo_phys_status status =
+                dodo_phys_alloc_page(&physical_allocator, &first_frame);
+            if (status != DODO_PHYS_OK) {
+                serial_write("memcheck failed: page allocation returned status ");
+                serial_write_u64((uint64_t)status);
+                serial_write("\n");
+            } else {
+                status = dodo_phys_free_page(&physical_allocator, first_frame);
+                if (status != DODO_PHYS_OK) {
+                    report_boot_error("memcheck could not free its test frame");
+                }
+                status = dodo_phys_alloc_page(&physical_allocator, &reused_frame);
+                if (status != DODO_PHYS_OK) {
+                    report_boot_error("memcheck could not reuse its released frame");
+                }
+                if (reused_frame != first_frame) {
+                    report_boot_error("physical allocator did not reuse the most recently freed frame");
+                }
+                status = dodo_phys_free_page(&physical_allocator, reused_frame);
+                if (status != DODO_PHYS_OK) {
+                    report_boot_error("memcheck could not return its reused frame");
+                }
+                if (physical_allocator.free_pages != free_before ||
+                    physical_allocator.allocated_pages != allocated_before) {
+                    report_boot_error("memcheck changed physical allocator accounting");
+                }
+                serial_write("Physical allocator check passed.\n  frame allocated, freed, reused, and released: ");
+                serial_write_hex64(first_frame);
+                serial_write("\n  allocator counters unchanged\n");
+            }
         } else if (string_equal(command, "uptime")) {
             const uint64_t ticks = dodo_x86_64_timer_ticks();
             serial_write("Timer frequency: 100 Hz\nTimer ticks: ");
