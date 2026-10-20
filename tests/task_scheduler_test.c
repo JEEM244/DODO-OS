@@ -7,14 +7,27 @@
 
 static void test_scheduler_invariant_validation(void) {
     struct dodo_scheduler scheduler;
-    uint32_t first = 0u, selected = 0u;
+    uint32_t first = 0u, second = 0u, selected = 0u;
     dodo_scheduler_init(&scheduler);
     assert(dodo_scheduler_validate(NULL) == DODO_TASK_INVALID_ARGUMENT);
     assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
     assert(dodo_scheduler_create(&scheduler, "first", 0x1000u, 0x2000u,
         &first) == DODO_TASK_OK);
+    assert(dodo_scheduler_create(&scheduler, "second", 0x3000u, 0x4000u,
+        &second) == DODO_TASK_OK);
     assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
     assert(dodo_scheduler_schedule(&scheduler, &selected) == DODO_TASK_OK);
+    assert(selected == first);
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
+
+    const uint32_t saved_second_id = scheduler.tasks[1].id;
+    scheduler.tasks[1].id = first;
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_INVALID_ARGUMENT);
+    scheduler.tasks[1].id = saved_second_id;
+    const enum dodo_task_state saved_second_state = scheduler.tasks[1].state;
+    scheduler.tasks[1].state = (enum dodo_task_state)99;
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_INVALID_ARGUMENT);
+    scheduler.tasks[1].state = saved_second_state;
     assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
 
     scheduler.current_id = DODO_TASK_INVALID_ID;
@@ -24,7 +37,7 @@ static void test_scheduler_invariant_validation(void) {
 
     scheduler.task_count = 0u;
     assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_INVALID_ARGUMENT);
-    scheduler.task_count = 1u;
+    scheduler.task_count = 2u;
     assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
 }
 
