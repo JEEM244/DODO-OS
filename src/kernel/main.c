@@ -5,6 +5,7 @@
 #include "dodo/arch/x86_64/interrupts.h"
 #include "dodo/arch/x86_64/timer.h"
 #include "dodo/arch/x86_64/keyboard.h"
+#include "dodo/arch/x86_64/console.h"
 #include "dodo/arch/x86_64/paging.h"
 #include "dodo/arch/x86_64/user_mode.h"
 #include "dodo/boot/limine_protocol.h"
@@ -56,6 +57,19 @@ static volatile struct dodo_limine_hhdm_request limine_hhdm_request = {
         0x0a82e883a194f07b,
         0x48dcf1cb8ad2b852,
         0x63984e959a98244b
+    },
+    .revision = 0,
+    .response = NULL
+};
+
+/* Limine RGB framebuffer request used for the visible text console. */
+__attribute__((used, section(".limine_requests"), aligned(8)))
+static volatile struct dodo_limine_framebuffer_request limine_framebuffer_request = {
+    .id = {
+        0xc7b1dd30df4c8b88,
+        0x0a82e883a194f07b,
+        0x9d5827dcd881dd75,
+        0xa3148604f6fab11b
     },
     .revision = 0,
     .response = NULL
@@ -196,6 +210,9 @@ static void serial_init(void) {
 }
 
 static void serial_putc(char ch) {
+    /* Keep the visible console and COM1 serial log in sync. */
+    dodo_x86_64_console_putc(ch);
+
     /* A bounded wait avoids hanging diagnostics if the UART is not present. */
     for (uint32_t tries = 0; tries < 1000000u; ++tries) {
         if ((inb((uint16_t)(COM1_PORT + 5u)) & 0x20u) != 0u) {
@@ -1783,6 +1800,15 @@ static void test_exception_handler(void) {
 __attribute__((noreturn))
 void kernel_main(void) {
     serial_init();
+    const int framebuffer_ready = dodo_x86_64_console_init(
+        (struct dodo_limine_framebuffer_response *)
+            limine_framebuffer_request.response);
+    limine_framebuffer_request.response = NULL;
+    if (framebuffer_ready) {
+        serial_write("DODO: framebuffer text console initialized\n");
+    } else {
+        serial_write("DODO: framebuffer console unavailable; using serial only\n");
+    }
     serial_write("\nDODO OS: kernel reached entry point\n");
 
     serial_write("DODO: begin own GDT installation\n");

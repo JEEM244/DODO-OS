@@ -27,10 +27,12 @@ HEADERS := include/dodo/boot/limine_protocol.h \
            include/dodo/arch/x86_64/interrupts.h \
            include/dodo/arch/x86_64/timer.h \
            include/dodo/arch/x86_64/keyboard.h \
+           include/dodo/arch/x86_64/console.h \
+           include/dodo/arch/x86_64/font8x8.h \
            include/dodo/arch/x86_64/paging.h \
            include/dodo/arch/x86_64/user_mode.h
 OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/gdt.o \
-           $(BUILD_DIR)/idt.o $(BUILD_DIR)/timer.o $(BUILD_DIR)/keyboard.o $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o \
+           $(BUILD_DIR)/idt.o $(BUILD_DIR)/timer.o $(BUILD_DIR)/keyboard.o $(BUILD_DIR)/console.o $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o \
            $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/paging_test.o \
            $(BUILD_DIR)/user_mode.o
 PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
@@ -68,6 +70,9 @@ $(BUILD_DIR)/timer.o: src/arch/x86_64/timer.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/keyboard.o: src/arch/x86_64/keyboard.c $(HEADERS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/console.o: src/arch/x86_64/console.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/paging.o: src/arch/x86_64/paging.c $(HEADERS) | $(BUILD_DIR)
@@ -142,13 +147,13 @@ $(ISO_IMAGE): $(KERNEL_ELF) config/limine.conf $(LIMINE_STAMP) $(LIMINE_DIR)/lim
 	@echo "Created bootable ISO: $@"
 
 run: $(ISO_IMAGE)
-	qemu-system-x86_64 -M q35 -m 512M -cdrom $(ISO_IMAGE) \
+	qemu-system-x86_64 -M q35 -m 512M -vga std -cdrom $(ISO_IMAGE) \
 		-serial stdio -no-reboot -no-shutdown
 
 # CI smoke test: QEMU is expected to keep running after the kernel halts.
 qemu-smoke: $(ISO_IMAGE)
 	@set +e; (sleep 3; printf '\r'; sleep 1; printf 'help\rversion\rmem\rmemcheck\ruptime\r'; sleep 1; printf 'sleep 1\r'; sleep 2; printf 'echo DODO_SHELL_INPUT_OK\r') | \
-		timeout 12s qemu-system-x86_64 -M q35 -m 512M \
+		timeout 12s qemu-system-x86_64 -M q35 -m 512M -vga std \
 		-cdrom $(ISO_IMAGE) -display none -serial stdio \
 		-no-reboot -no-shutdown > $(BUILD_DIR)/qemu-serial.log 2>&1; \
 	status=$$?; set -e; cat $(BUILD_DIR)/qemu-serial.log; \
@@ -211,6 +216,7 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "Physical allocator check passed." $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "allocator counters unchanged" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: legacy PIC remapped; PIT configured for 100 Hz" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: framebuffer text console initialized" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: PS/2 keyboard IRQ1 enabled" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "Timer frequency: 100 Hz" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Eq "Timer ticks: [1-9][0-9]*" $(BUILD_DIR)/qemu-serial.log; \
