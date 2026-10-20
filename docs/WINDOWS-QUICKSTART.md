@@ -1,6 +1,6 @@
 # Windows quick start (CMD + QEMU)
 
-DODO currently boots a kernel prototype, not a desktop OS. The current build has a serial command console; the graphical display is intentionally disabled in the Windows launcher.
+DODO currently boots a kernel prototype, not a desktop OS. The QEMU window now shows an initial framebuffer text console; command output is also mirrored to the serial terminal in this window.
 
 ## Requirements
 
@@ -39,7 +39,7 @@ Use `halt` to stop the virtual CPU. The launcher window remains open so errors c
 - **QEMU not found:** install QEMU for Windows and add its installation folder to `PATH`, or set `QEMU_HOME` to that folder.
 - **WSL build fails:** open Ubuntu and run the dependency installation above. Then run `cd /mnt/c/Users/<tu-usuario>/DODO-OS` (adjust the path) and `make clean all` to see the full compiler output.
 - **No ISO exists:** the build must succeed before QEMU can start. The expected file is `build/dodo-os.iso`.
-- **Blank graphical display:** expected at this stage; the prototype has no graphics driver or desktop. The launcher uses the serial console in CMD.
+- **No text appears in QEMU:** check the serial output in CMD. If it reports that the framebuffer is unavailable, graphics output for that virtual machine is not compatible with this prototype yet.
 - **No command prompt appears:** wait for the kernel self-tests. If it still does not appear, copy the full CMD output and report it.
 
 This script never writes to a physical disk. It only boots the ISO in QEMU. Do not install early DODO builds on a real computer.

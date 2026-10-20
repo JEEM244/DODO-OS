@@ -71,12 +71,13 @@ echo       %ISO%
 echo.
 echo [3/3] Iniciando DODO-OS...
 echo.
-echo La consola interactiva aparece aqui. Prueba: help, about, version, mem, echo hola
-echo Para salir, cierra QEMU con Ctrl+C o usa el comando halt dentro de DODO.
-echo La pantalla grafica esta desactivada porque esta version usa consola serie.
+echo La consola de texto de DODO aparece en la ventana de QEMU.
+echo La salida serie tambien se muestra aqui. Prueba: help, about, version, mem, echo hola
+echo Puedes escribir con el teclado en QEMU o usar esta consola serie.
+echo Para detener DODO, usa halt; para cerrar QEMU, cierra su ventana.
 echo.
 
-"%QEMU%" -M q35 -m 512M -cdrom "%ISO%" -boot d -display none -serial stdio -no-reboot -no-shutdown
+"%QEMU%" -M q35 -m 512M -vga std -cdrom "%ISO%" -boot d -serial stdio -no-reboot -no-shutdown
 set "QEMU_EXIT=%ERRORLEVEL%"
 echo.
 if not "%QEMU_EXIT%"=="0" echo [AVISO] QEMU termino con codigo %QEMU_EXIT%.

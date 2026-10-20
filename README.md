@@ -52,7 +52,7 @@ make qemu-smoke      # verify boot, memory protections, isolation, and syscall c
 make qemu-keyboard-smoke # verify the PS/2 keyboard path through QEMU
 ~~~
 
-The prototype prints diagnostic messages over COM1 serial output and opens an interactive serial shell after its self-tests. Commands include `help`, `about`, `version`, `mem`, `memcheck`, `uptime`, `sleep N`, `echo TXT`, `clear`, and `halt`. A blank graphical display is expected: DODO does not yet have graphics support or a desktop.
+The prototype now renders an initial text console on the RGB framebuffer provided by Limine and mirrors all output to COM1. The shell accepts both PS/2 keyboard input and serial input. Commands include `help`, `about`, `version`, `mem`, `memcheck`, `uptime`, `sleep N`, `echo TXT`, `clear`, and `halt`. This is a framebuffer text console, not yet a graphical desktop or window manager.
 
 ## Roadmap
 

@@ -28,6 +28,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Add a PIT timer interrupt, tick counter, and QEMU shell checks for uptime/sleep.
 - [ ] Add tests for more fatal exception paths, including an intentional page fault outside the armed self-test.
 - [x] Route PS/2 keyboard IRQ1 into the shell and verify virtual keyboard input with a QEMU monitor-driven integration test.
+- [x] Add a Limine-provided RGB framebuffer text console, mirror output to COM1, and keep the QEMU keyboard shell usable on screen; CI verifies framebuffer initialization.
 
 **Acceptance:** tested INT3, read-only write, NX instruction-fetch, and the armed ring-3 supervisor-read fault produce the expected results; only explicitly armed tests resume. Other exceptions remain fatal. This does not mean the entire exception model is complete.
 

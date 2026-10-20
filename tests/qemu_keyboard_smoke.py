@@ -91,6 +91,7 @@ def main() -> int:
         qemu,
         "-M", "q35",
         "-m", "512M",
+        "-vga", "std",
         "-cdrom", str(iso),
         "-display", "none",
         "-serial", f"file:{log_path}",
