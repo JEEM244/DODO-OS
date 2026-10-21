@@ -6,7 +6,8 @@ BUILD_DIR := build
 KERNEL_ELF := $(BUILD_DIR)/dodo-kernel.elf
 ISO_IMAGE := $(BUILD_DIR)/dodo-os.iso
 ISO_ROOT := $(BUILD_DIR)/iso_root
-OVMF_CODE ?= $(firstword $(wildcard /usr/share/OVMF/OVMF_CODE.fd /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/qemu/OVMF_CODE.fd /usr/share/edk2/ovmf/OVMF_CODE.fd))
+OVMF_CODE ?= $(firstword $(wildcard /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/OVMF/OVMF_CODE.fd /usr/share/qemu/OVMF_CODE.fd /usr/share/edk2/ovmf/OVMF_CODE.fd))
+OVMF_VARS ?= $(firstword $(wildcard /usr/share/OVMF/OVMF_VARS_4M.fd /usr/share/OVMF/OVMF_VARS.fd /usr/share/qemu/OVMF_VARS.fd /usr/share/edk2/ovmf/OVMF_VARS.fd))
 
 # Pin the bootloader release and its published binary archive checksum.
 LIMINE_VERSION := 12.9.3
@@ -252,12 +253,15 @@ qemu-smoke: $(ISO_IMAGE)
 
 # Exercise the UEFI removable-media boot path through OVMF, then type a shell command.
 qemu-uefi-smoke: $(ISO_IMAGE)
-	@if [ -z "$(OVMF_CODE)" ] || [ ! -f "$(OVMF_CODE)" ]; then \
-		echo "OVMF firmware not found; install the ovmf package or set OVMF_CODE." >&2; exit 1; \
+	@if [ -z "$(OVMF_CODE)" ] || [ ! -f "$(OVMF_CODE)" ] || [ -z "$(OVMF_VARS)" ] || [ ! -f "$(OVMF_VARS)" ]; then \
+		echo "OVMF CODE/VARS firmware files not found; install the ovmf package or set OVMF_CODE and OVMF_VARS." >&2; exit 1; \
 	fi
+	cp "$(OVMF_VARS)" "$(BUILD_DIR)/ovmf-vars.fd"
 	@set +e; (sleep 8; printf '\r'; sleep 1; printf 'version\r'; sleep 1; printf 'echo DODO_UEFI_SHELL_INPUT_OK\r') | \
 		timeout 20s qemu-system-x86_64 -M q35 -m 512M -vga std \
-		-bios "$(OVMF_CODE)" -cdrom $(ISO_IMAGE) -boot d -display none -serial stdio \
+		-drive if=pflash,format=raw,unit=0,file="$(OVMF_CODE)",readonly=on \
+		-drive if=pflash,format=raw,unit=1,file="$(BUILD_DIR)/ovmf-vars.fd" \
+		-cdrom $(ISO_IMAGE) -boot d -display none -serial stdio \
 		-no-reboot -no-shutdown > $(BUILD_DIR)/qemu-uefi-serial.log 2>&1; \
 		status=$$?; set -e; cat $(BUILD_DIR)/qemu-uefi-serial.log; \
 		if [ $$status -ne 124 ] && [ $$status -ne 0 ]; then \
