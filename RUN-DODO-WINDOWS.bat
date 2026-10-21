@@ -77,6 +77,21 @@ if not exist "%ISO%" (
     goto END
 )
 
+rem Verify a downloaded artifact when its checksum file is present.
+if "%SKIP_BUILD%"=="1" (
+    if exist "%ROOT%\build\dodo-os.iso.sha256" (
+        set "ISO_SHA=%ROOT%\build\dodo-os.iso.sha256"
+        echo [INFO] Verificando SHA-256 del artefacto descargado...
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$expected = ((Get-Content -LiteralPath $env:ISO_SHA -Raw).Trim() -split '\s+')[0].ToLowerInvariant(); $actual = (Get-FileHash -LiteralPath $env:ISO -Algorithm SHA256).Hash.ToLowerInvariant(); if ($actual -ne $expected) { Write-Error 'DODO-OS ISO SHA-256 mismatch'; exit 1 }; Write-Host ('SHA-256 OK: ' + $actual)"
+        if errorlevel 1 (
+            echo [ERROR] El checksum SHA-256 no coincide. No se ejecutara esta ISO.
+            goto END
+        )
+    ) else (
+        echo [AVISO] No se encontro el archivo SHA-256; no se pudo verificar la ISO.
+    )
+)
+
 echo.
 echo [2/3] ISO lista:
 echo       %ISO%

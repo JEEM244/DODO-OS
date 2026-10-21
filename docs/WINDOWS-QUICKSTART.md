@@ -39,7 +39,7 @@ sudo apt install --yes build-essential binutils make curl xorriso qemu-system-x8
    "SHA-256 OK: $actual"
    ```
 
-5. Run `RUN-DODO-WINDOWS.bat --skip-build` to start QEMU without invoking WSL. QEMU still needs to be installed on Windows.
+5. Run `RUN-DODO-WINDOWS.bat --skip-build` to start QEMU without invoking WSL. The launcher automatically checks the SHA-256 file when it is present and stops if the hash does not match. QEMU still needs to be installed on Windows.
 
 Try:
 
