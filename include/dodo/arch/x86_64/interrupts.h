@@ -71,7 +71,6 @@ _Static_assert(sizeof(struct dodo_x86_64_exception_frame) == 160u,
 #define DODO_EXCEPTION_FATAL 0
 #define DODO_EXCEPTION_RESUME 1
 #define DODO_EXCEPTION_RETURN_TO_KERNEL 2
-#define DODO_EXCEPTION_SWITCH_CONTEXT 3
 
 void dodo_x86_64_idt_init(void);
 

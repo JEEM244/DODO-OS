@@ -77,7 +77,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [ ] Replace the test-only interrupt ABI with a stable kernel-entry/syscall ABI and per-thread trap context.
 - [ ] Add general user-page allocation/reclamation through a reusable address-space lifecycle API.
 - [x] Add a fixed-capacity round-robin scheduler state machine with task creation, wake/block/exit, zombie reaping, exit-code retrieval, slot reuse, a checked saved-stack-pointer API, an invariant validator for duplicate IDs, invalid states, running-task ownership and counts, and host-side edge-case tests; this is metadata only and does not switch CPU execution.
-- [ ] Stabilize and stress-test the PIT-driven context-switch prototype; add safe blocking/wakeup, task exit/reaping, per-task fault handling and owned address spaces before calling it a process scheduler.
+- [ ] Connect tasks to owned kernel stacks and saved interrupt frames; implement and QEMU-test real CPU context switching.
 - [ ] IPC with validated message boundaries.
 - [ ] Capability table and deny-by-default resource access.
 

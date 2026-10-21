@@ -35,7 +35,7 @@ HEADERS := include/dodo/boot/limine_protocol.h \
            include/dodo/arch/x86_64/paging.h \
            include/dodo/arch/x86_64/user_mode.h \
            include/dodo/kernel/task.h
-OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/task.o $(BUILD_DIR)/gdt.o \
+OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/gdt.o \
            $(BUILD_DIR)/idt.o $(BUILD_DIR)/timer.o $(BUILD_DIR)/keyboard.o $(BUILD_DIR)/console.o $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o \
            $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/paging_test.o \
            $(BUILD_DIR)/user_mode.o
@@ -70,9 +70,6 @@ $(BUILD_DIR)/main.o: src/kernel/main.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/phys.o: src/mm/phys.c $(HEADERS) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/task.o: src/kernel/task.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/gdt.o: src/arch/x86_64/gdt.c $(HEADERS) | $(BUILD_DIR)
@@ -167,7 +164,7 @@ run: $(ISO_IMAGE)
 
 # CI smoke test: QEMU is expected to keep running after the kernel halts.
 qemu-smoke: $(ISO_IMAGE)
-	@set +e; (sleep 3; printf '\r'; sleep 1; printf 'help\rversion\rmem\rmemcheck\ruptime\rsched\r'; sleep 1; printf 'sleep 1\r'; sleep 2; printf 'echo DODO_SHELL_INPUT_OK\r') | \
+	@set +e; (sleep 3; printf '\r'; sleep 1; printf 'help\rversion\rmem\rmemcheck\ruptime\r'; sleep 1; printf 'sleep 1\r'; sleep 2; printf 'echo DODO_SHELL_INPUT_OK\r') | \
 		timeout 12s qemu-system-x86_64 -M q35 -m 512M -vga std \
 		-cdrom $(ISO_IMAGE) -display none -serial stdio \
 		-no-reboot -no-shutdown > $(BUILD_DIR)/qemu-serial.log 2>&1; \
@@ -233,16 +230,6 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "DODO: legacy PIC remapped; PIT configured for 100 Hz" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: framebuffer text console initialized" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: PS/2 keyboard IRQ1 enabled" $(BUILD_DIR)/qemu-serial.log; \
-	grep -Fq "DODO: preemptive round-robin scheduler prepared; tasks = 3" $(BUILD_DIR)/qemu-serial.log; \
-	grep -Fq "DODO: preemptive round-robin scheduler active" $(BUILD_DIR)/qemu-serial.log; \
-	grep -Fq "A" $(BUILD_DIR)/qemu-serial.log; \
-	grep -Fq "DODO: worker-a entered" $(BUILD_DIR)/qemu-serial.log; \
-	grep -Fq "B" $(BUILD_DIR)/qemu-serial.log; \
-	grep -Fq "DODO: worker-b entered" $(BUILD_DIR)/qemu-serial.log; \
-	grep -Fq "Kernel scheduler: preemptive round-robin (PIT 100 Hz)" $(BUILD_DIR)/qemu-serial.log; \
-	grep -Eq "Context switches: [1-9][0-9]*" $(BUILD_DIR)/qemu-serial.log; \
-	grep -Eq "worker-a heartbeat: [1-9][0-9]*" $(BUILD_DIR)/qemu-serial.log; \
-	grep -Eq "worker-b heartbeat: [1-9][0-9]*" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "Timer frequency: 100 Hz" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Eq "Timer ticks: [1-9][0-9]*" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "Sleeping for 1 seconds..." $(BUILD_DIR)/qemu-serial.log; \

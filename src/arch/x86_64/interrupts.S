@@ -3,7 +3,6 @@
 
 .extern dodo_x86_64_exception_handler
 .extern dodo_x86_64_user_return_trampoline
-.extern dodo_x86_64_scheduler_next_frame
 
 .macro DODO_ISR_NOERR vector
     .global dodo_isr_\vector
@@ -60,45 +59,6 @@ DODO_ISR_NOERR 31
 DODO_ISR_NOERR 32
 DODO_ISR_NOERR 33
 
-/*
- * Minimal first-entry trampolines for ring-0 worker tasks.
- * Each emits a marker to COM1 before entering its C body.
- */
-.extern dodo_kernel_worker_a
-.extern dodo_kernel_worker_b
-
-.global dodo_kernel_worker_a_entry
-.type dodo_kernel_worker_a_entry, @function
-dodo_kernel_worker_a_entry:
-    cli
-1:
-    movw $0x3fd, %dx
-    inb %dx, %al
-    testb $0x20, %al
-    jz 1b
-    movw $0x3f8, %dx
-    movb $65, %al
-    outb %al, %dx
-    /* Keep interrupts masked until the C worker has printed its first status. */
-    jmp dodo_kernel_worker_a
-.size dodo_kernel_worker_a_entry, . - dodo_kernel_worker_a_entry
-
-.global dodo_kernel_worker_b_entry
-.type dodo_kernel_worker_b_entry, @function
-dodo_kernel_worker_b_entry:
-    cli
-2:
-    movw $0x3fd, %dx
-    inb %dx, %al
-    testb $0x20, %al
-    jz 2b
-    movw $0x3f8, %dx
-    movb $66, %al
-    outb %al, %dx
-    /* Keep interrupts masked until the C worker has printed its first status. */
-    jmp dodo_kernel_worker_b
-.size dodo_kernel_worker_b_entry, . - dodo_kernel_worker_b_entry
-
 /* DPL3 software interrupt used only by the controlled ring-3 self-test. */
 .global dodo_isr_128
 .type dodo_isr_128, @function
@@ -142,13 +102,10 @@ dodo_isr_common:
 
     cmpl $2, %eax
     je dodo_isr_return_to_kernel
-    cmpl $3, %eax
-    je dodo_isr_switch_context
     testl %eax, %eax
     jz dodo_isr_fatal
 
     /* Handler explicitly allowed the armed exception test to resume. */
-dodo_isr_resume:
     popq %r15
     popq %r14
     popq %r13
@@ -166,18 +123,6 @@ dodo_isr_resume:
     popq %rax
     addq $16, %rsp
     iretq
-
-/*
- * Switch stacks only when the dispatcher explicitly requests it. The normal
- * epilogue restores the selected task's register frame and returns with IRETQ.
- */
-dodo_isr_switch_context:
-    andq $-16, %rsp
-    call dodo_x86_64_scheduler_next_frame
-    testq %rax, %rax
-    jz dodo_isr_fatal
-    movq %rax, %rsp
-    jmp dodo_isr_resume
 
 /*
  * Controlled CPL3 test path: never try an IRETQ back to CPL0 using a frame
