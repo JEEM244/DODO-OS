@@ -82,7 +82,7 @@ if "%SKIP_BUILD%"=="1" (
     if exist "%ROOT%\build\dodo-os.iso.sha256" (
         set "ISO_SHA=%ROOT%\build\dodo-os.iso.sha256"
         echo [INFO] Verificando SHA-256 del artefacto descargado...
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "$expected = ((Get-Content -LiteralPath $env:ISO_SHA -Raw).Trim() -split '\s+')[0].ToLowerInvariant(); $actual = (Get-FileHash -LiteralPath $env:ISO -Algorithm SHA256).Hash.ToLowerInvariant(); if ($actual -ne $expected) { Write-Error 'DODO-OS ISO SHA-256 mismatch'; exit 1 }; Write-Host ('SHA-256 OK: ' + $actual)"
+        powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\scripts\verify_iso_hash.ps1" -IsoPath "%ISO%" -ChecksumPath "%ROOT%\build\dodo-os.iso.sha256"
         if errorlevel 1 (
             echo [ERROR] El checksum SHA-256 no coincide. No se ejecutara esta ISO.
             goto END

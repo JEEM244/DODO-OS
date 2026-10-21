@@ -67,3 +67,26 @@ jobs:
             build/dodo-os.iso.sha256
           if-no-files-found: error
           retention-days: 14
+
+  windows-checksum-helper:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Verify checksum helper accepts valid digest and rejects invalid digest
+        shell: pwsh
+        run: |
+          $testRoot = Join-Path $env:RUNNER_TEMP 'dodo-checksum-test'
+          New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
+          $isoPath = Join-Path $testRoot 'dodo-os.iso'
+          $checksumPath = Join-Path $testRoot 'dodo-os.iso.sha256'
+          [System.IO.File]::WriteAllBytes($isoPath, [byte[]](0, 1, 2, 3, 254, 255))
+          $hash = (Get-FileHash -LiteralPath $isoPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -LiteralPath $checksumPath -NoNewline -Value "$hash  build/dodo-os.iso"
+          $script = Join-Path $env:GITHUB_WORKSPACE 'scripts\verify_iso_hash.ps1'
+          $good = Start-Process -FilePath 'pwsh' -ArgumentList @('-NoProfile', '-File', $script, '-IsoPath', $isoPath, '-ChecksumPath', $checksumPath) -Wait -PassThru -NoNewWindow
+          if ($good.ExitCode -ne 0) { throw "Checksum helper rejected a valid image (exit $($good.ExitCode))." }
+          Set-Content -LiteralPath $checksumPath -NoNewline -Value "$(('0' * 64))  build/dodo-os.iso"
+          $bad = Start-Process -FilePath 'pwsh' -ArgumentList @('-NoProfile', '-File', $script, '-IsoPath', $isoPath, '-ChecksumPath', $checksumPath) -Wait -PassThru -NoNewWindow
+          if ($bad.ExitCode -eq 0) { throw 'Checksum helper accepted an invalid digest.' }
