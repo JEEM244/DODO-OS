@@ -96,5 +96,5 @@ These segment flags are defense in depth. Later memory-management work must pres
 - Hardware interrupt delivery is limited to legacy PIT IRQ0 and PS/2 keyboard IRQ1 through the 8259 PIC. There is no generalized interrupt-routing layer, IOAPIC/APIC support, interrupt nesting, or SMP-safe interrupt handling.
 - DODO owns its GDT/TSS/IDT and has a controlled ring-3 entry/return probe plus a test-only `int 0x80` write/exit path. These are not general process execution or a stable syscall ABI.
 - DODO owns the cloned page-table structure but preserves Limine's leaf physical mappings and HHDM layout; it does not yet maintain its own physical-frame reclamation or reusable per-process mapping policy.
-- There is no CPU-integrated task scheduler/context switching, IPC, capability enforcement, filesystem, network stack, or GUI.
+- The kernel task-switching prototype is experimental and awaits repeatable QEMU validation. General process isolation, safe task exit/reaping, integrated blocking/wakeup, IPC, capability enforcement, filesystem, network stack, and GUI are absent.
 - The QEMU smoke tests cover specific tested paths only; they do not establish that DODO is secure or suitable for daily use.

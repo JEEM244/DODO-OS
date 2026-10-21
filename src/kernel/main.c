@@ -84,6 +84,7 @@ static volatile uint64_t limine_requests_end_marker[2] = {
 
 static struct dodo_phys_allocator physical_allocator;
 static struct dodo_scheduler kernel_scheduler;
+static volatile uint64_t kernel_scheduler_prepared;
 static volatile uint64_t kernel_scheduler_active;
 static volatile uint64_t kernel_scheduler_switches;
 static volatile uint64_t kernel_worker_heartbeats[2];
@@ -371,6 +372,9 @@ static void kernel_worker_a(void) __attribute__((noreturn));
 static void kernel_worker_b(void) __attribute__((noreturn));
 
 static void kernel_worker_a(void) {
+    __asm__ volatile ("cli" : : : "memory");
+    serial_write("DODO: worker-a entered\n");
+    __asm__ volatile ("sti" : : : "memory");
     for (;;) {
         ++kernel_worker_heartbeats[0];
         __asm__ volatile ("hlt" : : : "memory");
@@ -378,6 +382,9 @@ static void kernel_worker_a(void) {
 }
 
 static void kernel_worker_b(void) {
+    __asm__ volatile ("cli" : : : "memory");
+    serial_write("DODO: worker-b entered\n");
+    __asm__ volatile ("sti" : : : "memory");
     for (;;) {
         ++kernel_worker_heartbeats[1];
         __asm__ volatile ("hlt" : : : "memory");
@@ -470,8 +477,8 @@ static void initialize_kernel_scheduler(void) {
     kernel_scheduler_switches = 0u;
     kernel_worker_heartbeats[0] = 0u;
     kernel_worker_heartbeats[1] = 0u;
-    kernel_scheduler_active = 1u;
-    serial_write("DODO: preemptive round-robin scheduler online; tasks = 3\n");
+    kernel_scheduler_prepared = 1u;
+    serial_write("DODO: preemptive round-robin scheduler prepared; tasks = 3\n");
 }
 
 /* Assembly calls this only after the dispatcher explicitly requests a switch. */
@@ -539,6 +546,11 @@ static void run_serial_shell(void) {
     serial_write("Type 'help' to see available commands.\n\n");
     for (;;) {
         serial_write("dodo> ");
+        /* Keep startup non-preemptive until the shell prompt is visible. */
+        if (kernel_scheduler_prepared != 0u && kernel_scheduler_active == 0u) {
+            kernel_scheduler_active = 1u;
+            serial_write("DODO: preemptive round-robin scheduler active\n");
+        }
         serial_readline(line, sizeof(line));
         char *command = line;
         while (*command == ' ' || *command == '\t') {
