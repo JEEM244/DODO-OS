@@ -318,6 +318,13 @@ qemu-panic-smoke:
 		grep -Eq "RFLAGS: 0x[0-9A-F]{16}" $(BUILD_DIR)/qemu-pagefault-panic-serial.log; \
 		grep -Fq "System halted. Reboot the VM after collecting this report." $(BUILD_DIR)/qemu-pagefault-panic-serial.log
 	$(MAKE) clean all
+	@if strings $(KERNEL_ELF) | grep -Fq "DODO: triggering unarmed invalid opcode for panic test"; then \
+		echo "ERROR: panic-test command leaked into the normal kernel." >&2; exit 1; \
+	fi
+	@if strings $(KERNEL_ELF) | grep -Fq "DODO: triggering unarmed page fault for panic test"; then \
+		echo "ERROR: pagefault-test command leaked into the normal kernel." >&2; exit 1; \
+	fi
+	@echo "PASS: normal kernel excludes test-only panic commands."
 
 clean:
 	rm -rf $(BUILD_DIR)
