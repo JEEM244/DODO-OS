@@ -368,10 +368,13 @@ static void serial_readline(char *buffer, size_t capacity) {
  * the shell plus two heartbeat workers share the same address space and ring.
  * It validates real interrupt-frame switching, not general process isolation.
  */
-static void kernel_worker_a(void) __attribute__((noreturn));
-static void kernel_worker_b(void) __attribute__((noreturn));
+extern void dodo_kernel_worker_a_entry(void);
+extern void dodo_kernel_worker_b_entry(void);
 
-static void kernel_worker_a(void) {
+void dodo_kernel_worker_a(void) __attribute__((noreturn));
+void dodo_kernel_worker_b(void) __attribute__((noreturn));
+
+void dodo_kernel_worker_a(void) {
     __asm__ volatile ("cli" : : : "memory");
     serial_write("DODO: worker-a entered\n");
     __asm__ volatile ("sti" : : : "memory");
@@ -381,7 +384,7 @@ static void kernel_worker_a(void) {
     }
 }
 
-static void kernel_worker_b(void) {
+void dodo_kernel_worker_b(void) {
     __asm__ volatile ("cli" : : : "memory");
     serial_write("DODO: worker-b entered\n");
     __asm__ volatile ("sti" : : : "memory");
@@ -452,7 +455,9 @@ static void initialize_kernel_scheduler(void) {
     }
 
     const char *const names[2] = {"worker-a", "worker-b"};
-    void (*const entries[2])(void) = {kernel_worker_a, kernel_worker_b};
+    void (*const entries[2])(void) = {
+        dodo_kernel_worker_a_entry, dodo_kernel_worker_b_entry
+    };
     for (uint32_t i = 0u; i < 2u; ++i) {
         if (dodo_phys_alloc_page(
                 &physical_allocator, &kernel_worker_stack_frames[i]) !=

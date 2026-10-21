@@ -235,7 +235,9 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "DODO: PS/2 keyboard IRQ1 enabled" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: preemptive round-robin scheduler prepared; tasks = 3" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: preemptive round-robin scheduler active" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "A" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: worker-a entered" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "B" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: worker-b entered" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "Kernel scheduler: preemptive round-robin (PIT 100 Hz)" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Eq "Context switches: [1-9][0-9]*" $(BUILD_DIR)/qemu-serial.log; \
