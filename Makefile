@@ -36,8 +36,9 @@ HEADERS := include/dodo/boot/limine_protocol.h \
            include/dodo/arch/x86_64/font8x8.h \
            include/dodo/arch/x86_64/paging.h \
            include/dodo/arch/x86_64/user_mode.h \
-           include/dodo/kernel/task.h
-OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/gdt.o \
+           include/dodo/kernel/task.h \
+           include/dodo/kernel/capability.h
+OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/capability.o $(BUILD_DIR)/gdt.o \
            $(BUILD_DIR)/idt.o $(BUILD_DIR)/timer.o $(BUILD_DIR)/keyboard.o $(BUILD_DIR)/console.o $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o \
            $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/paging_test.o \
            $(BUILD_DIR)/user_mode.o
@@ -93,6 +94,9 @@ $(BUILD_DIR)/main.o: src/kernel/main.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/phys.o: src/mm/phys.c $(HEADERS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/capability.o: src/kernel/capability.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/gdt.o: src/arch/x86_64/gdt.c $(HEADERS) | $(BUILD_DIR)
@@ -243,6 +247,7 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "DODO: exception IDT loaded" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: IDT breakpoint self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: exception handler resumed after INT3" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: capability deny-by-default self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: all kernel bootstrap self-checks passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO OS interactive serial console" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "Commands:" $(BUILD_DIR)/qemu-serial.log; \

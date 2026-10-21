@@ -10,6 +10,7 @@
 #include "dodo/arch/x86_64/user_mode.h"
 #include "dodo/boot/limine_protocol.h"
 #include "dodo/mm/phys.h"
+#include "dodo/kernel/capability.h"
 
 #define COM1_PORT 0x3F8u
 #define DODO_BOOT_TEST_FRAME_COUNT 5u
@@ -1883,6 +1884,53 @@ static void test_user_mode_transitions(void) {
     serial_write("DODO: user-root teardown/reclaim self-check passed\n");
 }
 
+
+static void test_capability_policy(void) {
+    struct dodo_capability_table table;
+    dodo_capability_table_init(&table);
+    const uint64_t object_id = UINT64_C(0x444f444f);
+
+    if (dodo_capability_table_validate(&table) != DODO_CAPABILITY_OK ||
+        dodo_capability_check(&table, 1u, DODO_CAPABILITY_OBJECT_FILE,
+            object_id, DODO_CAPABILITY_READ) != DODO_CAPABILITY_DENIED) {
+        report_boot_error("empty capability table did not deny by default");
+    }
+    if (dodo_capability_grant(&table, 1u, DODO_CAPABILITY_OBJECT_FILE,
+            object_id, DODO_CAPABILITY_READ) != DODO_CAPABILITY_OK ||
+        dodo_capability_check(&table, 1u, DODO_CAPABILITY_OBJECT_FILE,
+            object_id, DODO_CAPABILITY_READ) != DODO_CAPABILITY_OK) {
+        report_boot_error("capability grant did not authorize the requested right");
+    }
+    if (dodo_capability_check(&table, 1u, DODO_CAPABILITY_OBJECT_FILE,
+            object_id, DODO_CAPABILITY_WRITE) != DODO_CAPABILITY_DENIED ||
+        dodo_capability_check(&table, 2u, DODO_CAPABILITY_OBJECT_FILE,
+            object_id, DODO_CAPABILITY_READ) != DODO_CAPABILITY_DENIED) {
+        report_boot_error("capability policy widened task or right scope");
+    }
+    if (dodo_capability_grant(&table, 1u, DODO_CAPABILITY_OBJECT_FILE,
+            object_id, DODO_CAPABILITY_WRITE) != DODO_CAPABILITY_OK ||
+        dodo_capability_check(&table, 1u, DODO_CAPABILITY_OBJECT_FILE,
+            object_id, DODO_CAPABILITY_READ | DODO_CAPABILITY_WRITE) !=
+            DODO_CAPABILITY_OK) {
+        report_boot_error("capability rights union failed");
+    }
+    if (dodo_capability_revoke(&table, 1u, DODO_CAPABILITY_OBJECT_FILE,
+            object_id, DODO_CAPABILITY_READ) != DODO_CAPABILITY_OK ||
+        dodo_capability_check(&table, 1u, DODO_CAPABILITY_OBJECT_FILE,
+            object_id, DODO_CAPABILITY_READ) != DODO_CAPABILITY_DENIED ||
+        dodo_capability_check(&table, 1u, DODO_CAPABILITY_OBJECT_FILE,
+            object_id, DODO_CAPABILITY_WRITE) != DODO_CAPABILITY_OK) {
+        report_boot_error("capability partial revocation failed");
+    }
+    if (dodo_capability_revoke_task(&table, 1u) != DODO_CAPABILITY_OK ||
+        dodo_capability_check(&table, 1u, DODO_CAPABILITY_OBJECT_FILE,
+            object_id, DODO_CAPABILITY_WRITE) != DODO_CAPABILITY_DENIED ||
+        dodo_capability_table_validate(&table) != DODO_CAPABILITY_OK) {
+        report_boot_error("capability task cleanup failed");
+    }
+    serial_write("DODO: capability deny-by-default self-check passed\n");
+}
+
 static void test_exception_handler(void) {
     breakpoint_selftest_armed = 1;
     __asm__ volatile ("int3" : : : "memory");
@@ -1933,6 +1981,7 @@ void kernel_main(void) {
     inspect_memory_map();
     test_virtual_mapping();
     test_user_mode_transitions();
+    test_capability_policy();
     test_exception_handler();
     reclaim_bootloader_memory();
     serial_write("DODO: all kernel bootstrap self-checks passed\n");

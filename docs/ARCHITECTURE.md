@@ -85,6 +85,12 @@ DODO now has a deliberately narrow CPL3 probe, not a general process model:
 
 This test is single-threaded and uses global one-shot state and fixed test roots. In addition to mapping isolation, the prototype `write` handler validates that a buffer stays in the user half, enforces a small maximum length, verifies each page is present/user-accessible, and copies in page-sized chunks. QEMU checks an actual copy that crosses from the user code page into the user stack page; rejects a kernel pointer, a user-half pointer without a present leaf, a zero-length write, a length above the cap, and a buffer whose length crosses the lower-half address limit; and rejects an unknown syscall number without panicking. The test manually releases its finite set of frames and validates allocator accounting, but DODO still lacks a reusable address-space lifecycle API, per-thread trap context, a hardened kernel-entry ABI, CPU-integrated scheduling/context switching, signals, and general table-tree ownership/reclamation. A fixed-capacity round-robin task-state module is host-tested, but it does not switch CPU execution. This proves only the checked properties in the QEMU configuration; it does not establish that arbitrary user programs are safely isolated yet.
 
+## Capability table prototype
+
+The kernel has a fixed-capacity (64-entry) capability table keyed by task ID, object type and object ID. Each entry carries explicit READ, WRITE, EXECUTE, CONNECT, ACCEPT and CONTROL rights. Missing grants deny access; grants may be extended, selected rights revoked, and all entries for a task cleared during cleanup. The validator rejects duplicate keys, unknown rights, malformed counts and stale entries beyond the live count. The table is tested in host tests and in the QEMU bootstrap self-check.
+
+This is currently a metadata/policy primitive only. The syscall dispatcher and file, network and device paths do not yet consult it, object IDs are not yet hardened handles, and the table has no SMP locking or grant-inheritance model. Do not treat it as enforcement until those callers are integrated and tested.
+
 ## Security model principles
 
 - Deny by default for privileged resources.

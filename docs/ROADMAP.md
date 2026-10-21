@@ -81,9 +81,10 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Stress scheduler metadata with 20,000 deterministic pseudo-random create/schedule/block/wake/exit/reap/save transitions and validate invariants after every operation; this does not test actual CPU context switching.
 - [ ] Connect tasks to owned kernel stacks and saved interrupt frames; implement and QEMU-test real CPU context switching.
 - [ ] IPC with validated message boundaries.
-- [ ] Capability table and deny-by-default resource access.
+- [x] Add a fixed-capacity capability-table primitive with deny-by-default checks, task-scoped rights, partial revocation and per-task cleanup; host tests and a QEMU self-check validate metadata behavior, but this is not yet resource-access enforcement.
+- [ ] Wire capability checks into a stable syscall ABI and file/network/device services; tie grant lifetime to reusable process lifecycle.
 
-**Acceptance:** independent test processes cannot read each other's mappings or use a resource without an explicit capability. QEMU now verifies a controlled cross-root read denial and test-specific frame cleanup with allocator accounting restored to baseline, but there is no reusable per-process lifecycle, per-process kernel stack ownership, scheduler, or capability model yet.
+**Acceptance:** independent test processes cannot read each other's mappings or use a resource without an explicit capability. QEMU now verifies a controlled cross-root read denial and test-specific frame cleanup with allocator accounting restored to baseline, but there is no reusable per-process lifecycle, per-process kernel stack ownership, or CPU-integrated scheduler; the capability table prototype is not yet consulted by resource access paths.
 
 ## M4 — DODO SOMBRA prototype
 
