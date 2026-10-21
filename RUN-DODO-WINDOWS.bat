@@ -7,7 +7,8 @@ cd /d "%~dp0"
 set "ROOT=%CD%"
 set "ISO=%ROOT%\build\dodo-os.iso"
 set "QEMU="
-set "BUILD_OK=0"
+set "SKIP_BUILD=0"
+if /I "%~1"=="--skip-build" set "SKIP_BUILD=1"
 
 echo.
 echo  ==========================================
@@ -36,21 +37,34 @@ if not defined QEMU (
 echo [OK] QEMU: %QEMU%
 echo.
 
-rem Always try to rebuild from the current source when WSL is available.
-where wsl.exe >nul 2>&1
-if not errorlevel 1 (
-    echo [1/3] Intentando compilar la ISO desde el codigo actual con WSL...
-    echo       Esto requiere una distro Linux con las dependencias del proyecto.
-    wsl.exe --cd "%ROOT%" --exec bash -lc "make clean all"
-    if errorlevel 1 (
-        echo.
-        echo [AVISO] No se pudo compilar con WSL.
-        echo         Si ya existe una ISO, se intentara usarla.
-    ) else (
-        set "BUILD_OK=1"
-    )
+rem A temporary build directory preserves the last ISO if a rebuild fails.
+if "%SKIP_BUILD%"=="1" (
+    echo [INFO] Omitiendo compilacion; se usara la ISO existente.
 ) else (
-    echo [AVISO] WSL no esta disponible. Se usara la ISO existente si la hay.
+    where wsl.exe >nul 2>&1
+    if not errorlevel 1 (
+        echo [1/3] Compilando una ISO temporal desde el codigo actual con WSL...
+        echo       Esto requiere una distro Linux con las dependencias del proyecto.
+        if not exist "%ROOT%\build" mkdir "%ROOT%\build"
+        wsl.exe --cd "%ROOT%" --exec bash -lc "make BUILD_DIR=build/.wsl-build clean all"
+        if errorlevel 1 (
+            echo.
+            echo [AVISO] No se pudo compilar con WSL.
+            echo         Se conservara cualquier ISO anterior que ya exista.
+        ) else (
+            copy /Y "%ROOT%\build\.wsl-build\dodo-os.iso" "%ISO%" >nul
+            if errorlevel 1 (
+                echo [ERROR] La compilacion termino pero no se pudo copiar la ISO final.
+                goto END
+            )
+            rem Do not leave a checksum from a previous image beside the new image.
+            del /Q "%ROOT%\build\dodo-os.iso.sha256" >nul 2>&1
+            echo [OK] ISO nueva copiada desde la compilacion temporal.
+        )
+    ) else (
+        echo [AVISO] WSL no esta disponible. Se usara la ISO existente si la hay.
+        echo         Para compilar, instala WSL2 Ubuntu y las dependencias del proyecto.
+    )
 )
 
 if not exist "%ISO%" (
@@ -58,9 +72,7 @@ if not exist "%ISO%" (
     echo [ERROR] No se encontro la ISO:
     echo %ISO%
     echo.
-    echo Para crearla, usa WSL2 Ubuntu e instala las dependencias descritas en:
-    echo docs\BUILDING.md
-    echo.
+    echo Para compilarla, sigue docs\BUILDING.md o descarga el artefacto de GitHub Actions.
     echo QEMU ejecuta la ISO; no compila el kernel.
     goto END
 )
