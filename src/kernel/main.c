@@ -484,12 +484,24 @@ static void initialize_kernel_scheduler(void) {
 /* Assembly calls this only after the dispatcher explicitly requests a switch. */
 uint64_t dodo_x86_64_scheduler_next_frame(void) {
     if (kernel_scheduler_active == 0u) {
+        if (kernel_scheduler_switches == 1u) {
+            serial_write("DODO: ERROR scheduler inactive in switch path\n");
+        }
         return 0u;
     }
     struct dodo_task *current =
         dodo_scheduler_find(&kernel_scheduler, kernel_scheduler.current_id);
-    if (current == NULL || current->state != DODO_TASK_RUNNING) {
+    if (current == NULL || current->state != DODO_TASK_RUNNING ||
+        current->saved_stack_pointer == 0u) {
+        serial_write("DODO: ERROR invalid scheduler target; task ID = ");
+        serial_write_u64(kernel_scheduler.current_id);
+        serial_write("\n");
         return 0u;
+    }
+    if (kernel_scheduler_switches == 1u) {
+        serial_write("DODO: first scheduler target frame = ");
+        serial_write_hex64(current->saved_stack_pointer);
+        serial_write("\n");
     }
     return current->saved_stack_pointer;
 }
@@ -856,6 +868,9 @@ int dodo_x86_64_exception_handler(
                 kernel_panic("scheduler found no runnable kernel task", frame);
             }
             if (selected_id != previous_id) ++kernel_scheduler_switches;
+            if (kernel_scheduler_switches == 1u) {
+                serial_write("DODO: first context switch requested\n");
+            }
             return DODO_EXCEPTION_SWITCH_CONTEXT;
         }
         return DODO_EXCEPTION_RESUME;
