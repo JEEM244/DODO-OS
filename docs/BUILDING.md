@@ -93,11 +93,12 @@ The `make qemu-panic-smoke` target builds a temporary kernel with compile-time-o
 ```sh
 file build/dodo-kernel.elf
 readelf -h build/dodo-kernel.elf
-readelf -l build/dodo-kernel.elf
+readelf -lW build/dodo-kernel.elf
 nm build/dodo-kernel.elf
+python3 tests/verify_elf_layout.py build/dodo-kernel.elf
 ```
 
-The kernel uses a higher-half x86-64 layout and separate load segments for request data, executable code, read-only data, and writable data. The bootstrap pager clones the active page-table structures into DODO-owned frames but keeps the same leaf physical mappings; it does not yet implement per-process address spaces, frame reclamation, or a complete virtual-memory manager.
+The kernel uses a higher-half x86-64 layout and separate load segments for request data, executable code, read-only data, and writable data. `tests/verify_elf_layout.py` checks the ELF program headers for read-only, RX and RW load segments and rejects any segment with simultaneous write and execute permissions (W^X). This is a link-layout assertion, not a claim that every runtime mapping remains correctly protected. The bootstrap pager clones the active page-table structures into DODO-owned frames but keeps the same leaf physical mappings; it does not yet implement per-process address spaces, frame reclamation, or a complete virtual-memory manager.
 
 ## Safety
 

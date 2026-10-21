@@ -43,7 +43,7 @@ PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
 VADDR_TEST := $(BUILD_DIR)/vaddr_allocator_test
 TASK_TEST := $(BUILD_DIR)/task_scheduler_test
 
-.PHONY: all kernel iso run verify qemu-smoke qemu-keyboard-smoke qemu-panic-smoke test-phys test-vaddr test-task test clean check-tools
+.PHONY: all kernel iso run verify verify-elf-layout qemu-smoke qemu-keyboard-smoke qemu-panic-smoke test-phys test-vaddr test-task test clean check-tools
 all: iso
 
 kernel: check-tools $(KERNEL_ELF)
@@ -56,6 +56,7 @@ test: test-phys test-vaddr test-task
 verify:
 	$(MAKE) test
 	$(MAKE) clean all
+	$(MAKE) verify-elf-layout
 	$(MAKE) qemu-smoke
 	$(MAKE) qemu-keyboard-smoke
 	$(MAKE) qemu-panic-smoke
@@ -66,6 +67,9 @@ $(TASK_TEST): src/kernel/task.c tests/task_scheduler_test.c include/dodo/kernel/
 
 test-task: $(TASK_TEST)
 	$(TASK_TEST)
+
+verify-elf-layout: $(KERNEL_ELF)
+	python3 tests/verify_elf_layout.py $(KERNEL_ELF)
 
 check-tools:
 	@command -v $(CC) >/dev/null || (echo "Missing C compiler: $(CC)" >&2; exit 1)
