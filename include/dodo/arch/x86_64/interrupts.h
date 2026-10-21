@@ -37,12 +37,34 @@ struct dodo_x86_64_exception_frame {
  * The assembly interrupt stub pushes these registers in a fixed order.
  * Fail the build if a future edit silently breaks the C/assembly frame ABI.
  */
-_Static_assert(offsetof(struct dodo_x86_64_exception_frame, vector) == 120u,
-               "interrupt frame vector offset must match interrupts.S");
-_Static_assert(offsetof(struct dodo_x86_64_exception_frame, rip) == 136u,
-               "interrupt frame RIP offset must match interrupts.S");
-_Static_assert(offsetof(struct dodo_x86_64_exception_frame, rflags) == 152u,
-               "interrupt frame RFLAGS offset must match interrupts.S");
+/* Lock every saved-register offset before the context-switch path uses it. */
+#define DODO_ASSERT_FRAME_OFFSET(member, expected) \
+    _Static_assert(offsetof(struct dodo_x86_64_exception_frame, member) == (expected), \
+                   "interrupt frame offset mismatch: " #member)
+
+DODO_ASSERT_FRAME_OFFSET(r15, 0u);
+DODO_ASSERT_FRAME_OFFSET(r14, 8u);
+DODO_ASSERT_FRAME_OFFSET(r13, 16u);
+DODO_ASSERT_FRAME_OFFSET(r12, 24u);
+DODO_ASSERT_FRAME_OFFSET(r11, 32u);
+DODO_ASSERT_FRAME_OFFSET(r10, 40u);
+DODO_ASSERT_FRAME_OFFSET(r9, 48u);
+DODO_ASSERT_FRAME_OFFSET(r8, 56u);
+DODO_ASSERT_FRAME_OFFSET(rsi, 64u);
+DODO_ASSERT_FRAME_OFFSET(rdi, 72u);
+DODO_ASSERT_FRAME_OFFSET(rbp, 80u);
+DODO_ASSERT_FRAME_OFFSET(rdx, 88u);
+DODO_ASSERT_FRAME_OFFSET(rcx, 96u);
+DODO_ASSERT_FRAME_OFFSET(rbx, 104u);
+DODO_ASSERT_FRAME_OFFSET(rax, 112u);
+DODO_ASSERT_FRAME_OFFSET(vector, 120u);
+DODO_ASSERT_FRAME_OFFSET(error_code, 128u);
+DODO_ASSERT_FRAME_OFFSET(rip, 136u);
+DODO_ASSERT_FRAME_OFFSET(cs, 144u);
+DODO_ASSERT_FRAME_OFFSET(rflags, 152u);
+
+#undef DODO_ASSERT_FRAME_OFFSET
+
 _Static_assert(sizeof(struct dodo_x86_64_exception_frame) == 160u,
                "interrupt frame prefix size must match interrupts.S");
 
