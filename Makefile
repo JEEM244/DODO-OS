@@ -6,6 +6,7 @@ BUILD_DIR := build
 KERNEL_ELF := $(BUILD_DIR)/dodo-kernel.elf
 ISO_IMAGE := $(BUILD_DIR)/dodo-os.iso
 ISO_ROOT := $(BUILD_DIR)/iso_root
+OVMF_CODE ?= $(firstword $(wildcard /usr/share/OVMF/OVMF_CODE.fd /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/qemu/OVMF_CODE.fd /usr/share/edk2/ovmf/OVMF_CODE.fd))
 
 # Pin the bootloader release and its published binary archive checksum.
 LIMINE_VERSION := 12.9.3
@@ -43,7 +44,7 @@ PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
 VADDR_TEST := $(BUILD_DIR)/vaddr_allocator_test
 TASK_TEST := $(BUILD_DIR)/task_scheduler_test
 
-.PHONY: all kernel iso run verify verify-elf-layout qemu-smoke qemu-keyboard-smoke qemu-panic-smoke test-phys test-vaddr test-task test clean check-tools
+.PHONY: all kernel iso run verify verify-elf-layout qemu-smoke qemu-uefi-smoke qemu-keyboard-smoke qemu-panic-smoke test-phys test-vaddr test-task test clean check-tools
 all: iso
 
 kernel: check-tools $(KERNEL_ELF)
@@ -58,6 +59,7 @@ verify:
 	$(MAKE) clean all
 	$(MAKE) verify-elf-layout
 	$(MAKE) qemu-smoke
+	$(MAKE) qemu-uefi-smoke
 	$(MAKE) qemu-keyboard-smoke
 	$(MAKE) qemu-panic-smoke
 
@@ -247,6 +249,25 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "Sleeping for 1 seconds..." $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "Sleep complete." $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO_SHELL_INPUT_OK" $(BUILD_DIR)/qemu-serial.log
+
+# Exercise the UEFI removable-media boot path through OVMF, then type a shell command.
+qemu-uefi-smoke: $(ISO_IMAGE)
+	@if [ -z "$(OVMF_CODE)" ] || [ ! -f "$(OVMF_CODE)" ]; then \
+		echo "OVMF firmware not found; install the ovmf package or set OVMF_CODE." >&2; exit 1; \
+	fi
+	@set +e; (sleep 8; printf '\r'; sleep 1; printf 'version\r'; sleep 1; printf 'echo DODO_UEFI_SHELL_INPUT_OK\r') | \
+		timeout 20s qemu-system-x86_64 -M q35 -m 512M -vga std \
+		-bios "$(OVMF_CODE)" -cdrom $(ISO_IMAGE) -boot d -display none -serial stdio \
+		-no-reboot -no-shutdown > $(BUILD_DIR)/qemu-uefi-serial.log 2>&1; \
+		status=$$?; set -e; cat $(BUILD_DIR)/qemu-uefi-serial.log; \
+		if [ $$status -ne 124 ] && [ $$status -ne 0 ]; then \
+			echo "QEMU UEFI boot exited unexpectedly with status $$status" >&2; exit $$status; \
+		fi; \
+		grep -Fq "DODO OS: kernel reached entry point" $(BUILD_DIR)/qemu-uefi-serial.log; \
+		grep -Fq "DODO: all kernel bootstrap self-checks passed" $(BUILD_DIR)/qemu-uefi-serial.log; \
+		grep -Fq "DODO OS interactive serial console" $(BUILD_DIR)/qemu-uefi-serial.log; \
+		grep -Fq "DODO OS kernel prototype 0.1.0" $(BUILD_DIR)/qemu-uefi-serial.log; \
+		grep -Fq "DODO_UEFI_SHELL_INPUT_OK" $(BUILD_DIR)/qemu-uefi-serial.log
 
 # Exercise the real PS/2 IRQ1 path by injecting keys through QEMU's monitor.
 qemu-keyboard-smoke: $(ISO_IMAGE)

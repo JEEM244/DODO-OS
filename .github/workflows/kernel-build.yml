@@ -23,7 +23,7 @@ jobs:
       - name: Install build and test tools
         run: |
           sudo apt-get update
-          sudo apt-get install --yes build-essential binutils curl xorriso qemu-system-x86 python3
+          sudo apt-get install --yes build-essential binutils curl xorriso qemu-system-x86 ovmf python3
 
       - name: Run host memory allocator tests
         run: make test
@@ -40,8 +40,11 @@ jobs:
           nm build/dodo-kernel.elf | grep -q ' T _start$'
           python3 tests/verify_elf_layout.py build/dodo-kernel.elf
 
-      - name: Boot ISO and verify kernel serial output
+      - name: Boot ISO through BIOS and verify kernel serial output
         run: make qemu-smoke
+
+      - name: Boot ISO through UEFI firmware and verify shell input
+        run: make qemu-uefi-smoke
 
       - name: Verify PS/2 keyboard input through QEMU
         run: make qemu-keyboard-smoke

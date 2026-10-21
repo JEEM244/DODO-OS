@@ -10,7 +10,7 @@ On Ubuntu / WSL2 Ubuntu, install:
 
 ```sh
 sudo apt update
-sudo apt install --yes build-essential binutils make curl xorriso qemu-system-x86 coreutils
+sudo apt install --yes build-essential binutils make curl xorriso qemu-system-x86 ovmf coreutils
 ```
 
 The build downloads the pinned Limine binary release. A SHA-256 checksum is checked before extraction. Limine is used as a bootloader; the kernel source in `src/` is DODO's own code.
@@ -72,6 +72,7 @@ For an automated boot check on Linux, run the individual targets when debugging 
 
 ```sh
 make qemu-smoke
+make qemu-uefi-smoke
 make qemu-keyboard-smoke
 make qemu-panic-smoke
 ```
@@ -84,9 +85,9 @@ make verify
 
 It executes host allocator/scheduler tests, rebuilds the ISO, checks the normal boot and shell, verifies PS/2 typing plus Backspace, tests invalid-opcode and fatal-page-fault diagnostics, and rebuilds the regular ISO when finished. Requires the Linux build tools and QEMU described above.
 
-The smoke test boots the ISO for up to 12 seconds, sends test commands to the serial console after boot, captures the serial log in `build/qemu-serial.log`, and checks the boot handoff, memory-map parsing, physical allocator, page-table clone rollback, virtual mapping, read-only/NX protection, separate user-root mapping, CPL3 interrupt/return, supervisor-memory denial, cross-root non-present fault, controlled exception recovery, interactive console responses, and a nonzero PIT tick count from `uptime`. The prototype CPL3 `write`/`exit` probes also check a valid cross-page buffer copy, rejection of a kernel pointer, an unmapped user pointer, a zero-length or oversized write, a buffer that crosses the user-half address limit, and an unknown syscall number. It uses QEMU and does not write to the host's disks.
+The BIOS smoke test boots the ISO for up to 12 seconds, sends test commands to the serial console after boot, captures the serial log in `build/qemu-serial.log`, and checks the boot handoff, memory-map parsing, physical allocator, page-table clone rollback, virtual mapping, read-only/NX protection, separate user-root mapping, CPL3 interrupt/return, supervisor-memory denial, cross-root non-present fault, controlled exception recovery, interactive console responses, and a nonzero PIT tick count from `uptime`. The prototype CPL3 `write`/`exit` probes also check a valid cross-page buffer copy, rejection of a kernel pointer, an unmapped user pointer, a zero-length or oversized write, a buffer that crosses the user-half address limit, and an unknown syscall number. It uses QEMU and does not write to the host's disks.
 
-The `make qemu-panic-smoke` target builds a temporary kernel with compile-time-only `panic-test` and `pagefault-test` commands. It first triggers an unarmed invalid-opcode exception, then reads a deliberately unmapped canonical virtual address. QEMU checks the panic reason, vector, error code, RIP, CS, RFLAGS and terminal halt; the page-fault test additionally checks that CR2 reports `0x0000400000000000`. The target rebuilds the ordinary ISO on success. The normal ISO does not include either deliberately crashing test command.
+`make qemu-uefi-smoke` uses OVMF firmware with QEMU, boots the ISO through its UEFI removable-media path, and checks kernel startup, bootstrap self-check completion, shell startup, and command input. `make qemu-panic-smoke` builds a temporary kernel with compile-time-only `panic-test` and `pagefault-test` commands. It first triggers an unarmed invalid-opcode exception, then reads a deliberately unmapped canonical virtual address. QEMU checks the panic reason, vector, error code, RIP, CS, RFLAGS and terminal halt; the page-fault test additionally checks that CR2 reports `0x0000400000000000`. The target rebuilds the ordinary ISO on success. The normal ISO does not include either deliberately crashing test command.
 
 ## Inspect the kernel
 
@@ -109,4 +110,4 @@ The kernel uses a higher-half x86-64 layout and separate load segments for reque
 
 ## Continuous integration
 
-The GitHub Actions workflow runs the allocator unit tests, compiles the kernel, verifies ELF metadata, boots the generated ISO under QEMU, checks serial output, and uploads `dodo-os.iso` plus `dodo-os.iso.sha256` as an artifact for 14 days. CI verifies the checksum file against the final ISO before upload. The repository's Actions tab is the source of truth for the latest run result.
+The GitHub Actions workflow runs host allocator/scheduler tests, checks ELF architecture and W^X load-segment permissions, boots the ISO through BIOS and UEFI in QEMU, tests PS/2 typing and Backspace, checks fatal exception diagnostics, verifies SHA-256, and uploads `dodo-os.iso` plus `dodo-os.iso.sha256` as an artifact for 14 days. CI verifies the checksum file against the final ISO before upload. The repository's Actions tab is the source of truth for the latest run result.
