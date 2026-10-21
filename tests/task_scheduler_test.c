@@ -400,6 +400,29 @@ static void test_randomized_scheduler_transitions(void) {
     }
 }
 
+static void test_task_id_exhaustion_does_not_wrap(void) {
+    struct dodo_scheduler scheduler;
+    dodo_scheduler_init(&scheduler);
+
+    /*
+     * A task ID must never wrap to zero or reuse an older identifier. Exhaustion
+     * returns FULL without consuming a free slot or changing caller output.
+     */
+    scheduler.next_id = UINT32_MAX;
+    uint32_t id = UINT32_C(0xfeed);
+    assert(dodo_scheduler_create(
+        &scheduler, "after-id-limit", UINT64_C(0x1000), UINT64_C(0x2000),
+        &id) == DODO_TASK_FULL);
+    assert(id == UINT32_C(0xfeed));
+    assert(scheduler.next_id == UINT32_MAX);
+    assert(scheduler.task_count == 0u);
+    assert(scheduler.current_id == DODO_TASK_INVALID_ID);
+    assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
+    for (uint32_t i = 0u; i < DODO_TASK_CAPACITY; ++i) {
+        assert(scheduler.tasks[i].state == DODO_TASK_UNUSED);
+    }
+}
+
 int main(void) {
     test_scheduler_invariant_validation();
     test_round_robin_and_states();
@@ -408,6 +431,7 @@ int main(void) {
     test_saved_stack_pointer_requires_current_running_task();
     test_name_is_safely_truncated();
     test_validation_and_capacity();
+    test_task_id_exhaustion_does_not_wrap();
     test_randomized_scheduler_transitions();
     puts("Task scheduler tests passed.");
     return 0;
