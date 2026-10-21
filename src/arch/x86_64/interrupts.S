@@ -79,7 +79,7 @@ dodo_kernel_worker_a_entry:
     movw $0x3f8, %dx
     movb $65, %al
     outb %al, %dx
-    sti
+    /* Keep interrupts masked until the C worker has printed its first status. */
     jmp dodo_kernel_worker_a
 .size dodo_kernel_worker_a_entry, . - dodo_kernel_worker_a_entry
 
@@ -95,7 +95,7 @@ dodo_kernel_worker_b_entry:
     movw $0x3f8, %dx
     movb $66, %al
     outb %al, %dx
-    sti
+    /* Keep interrupts masked until the C worker has printed its first status. */
     jmp dodo_kernel_worker_b
 .size dodo_kernel_worker_b_entry, . - dodo_kernel_worker_b_entry
 
