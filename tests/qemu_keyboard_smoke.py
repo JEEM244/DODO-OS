@@ -148,7 +148,30 @@ def main() -> int:
             log = read_serial_log(log_path)
             # One occurrence is shell local echo, the second is command output.
             if log.count(expected) >= 2:
-                print("PASS: QEMU PS/2 key events reached the DODO shell.")
+                break
+            if process.poll() is not None:
+                raise RuntimeError(f"QEMU exited early with status {process.returncode}.")
+            time.sleep(0.05)
+        else:
+            raise TimeoutError("The shell did not execute the command typed through PS/2.")
+
+        # Type a line with one extra character, remove it with the real PS/2
+        # Backspace make/break events, then verify the corrected command runs.
+        correction_keys = [*"echo", "spc", *"dodobackspaceokx", "backspace", "ret"]
+        for key in correction_keys:
+            result = monitor_command(monitor, f"sendkey {key} 70")
+            if b"unknown key" in result.lower():
+                raise RuntimeError(f"QEMU rejected keyboard key name: {key}")
+            time.sleep(0.08)
+
+        corrected = b"dodobackspaceok"
+        deadline = time.monotonic() + 8.0
+        while time.monotonic() < deadline:
+            log = read_serial_log(log_path)
+            # Local echo contains the corrected prefix plus the erased X;
+            # command output contributes the second complete occurrence.
+            if log.count(corrected) >= 2:
+                print("PASS: QEMU PS/2 input and Backspace editing work.")
                 print(f"Serial log: {log_path}")
                 try:
                     monitor.sendall(b"quit\n")
@@ -159,7 +182,7 @@ def main() -> int:
                 raise RuntimeError(f"QEMU exited early with status {process.returncode}.")
             time.sleep(0.05)
 
-        raise TimeoutError("The shell did not execute the command typed through PS/2.")
+        raise TimeoutError("Backspace did not correct the PS/2-typed shell command.")
     except (OSError, ConnectionError, RuntimeError, TimeoutError) as error:
         log = read_serial_log(log_path).decode("utf-8", errors="replace")
         print(f"FAIL: {error}", file=sys.stderr)
