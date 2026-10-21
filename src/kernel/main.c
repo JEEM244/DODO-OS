@@ -499,8 +499,17 @@ uint64_t dodo_x86_64_scheduler_next_frame(void) {
         return 0u;
     }
     if (kernel_scheduler_switches == 1u) {
+        const struct dodo_x86_64_exception_frame *target =
+            (const struct dodo_x86_64_exception_frame *)(uintptr_t)
+            current->saved_stack_pointer;
         serial_write("DODO: first scheduler target frame = ");
         serial_write_hex64(current->saved_stack_pointer);
+        serial_write(" rip=");
+        serial_write_hex64(target->rip);
+        serial_write(" cs=");
+        serial_write_hex64(target->cs);
+        serial_write(" flags=");
+        serial_write_hex64(target->rflags);
         serial_write("\n");
     }
     return current->saved_stack_pointer;
