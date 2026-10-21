@@ -482,6 +482,13 @@ static void run_serial_shell(void) {
             for (;;) {
                 __asm__ volatile ("cli; hlt");
             }
+        } else if (string_equal(command, "pagefault-test")) {
+            serial_write("DODO: triggering unarmed page fault for panic test\n");
+            volatile uint64_t fault_value = *(volatile uint64_t *)(uintptr_t)
+                UINT64_C(0x0000400000000000);
+            (void)fault_value;
+            serial_write("DODO: pagefault test unexpectedly read mapped memory\n");
+            kernel_halt();
 #endif
         } else {
             serial_write("Unknown command: ");

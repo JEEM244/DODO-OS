@@ -249,9 +249,9 @@ qemu-panic-smoke:
 		timeout 8s qemu-system-x86_64 -M q35 -m 512M -vga std \
 		-cdrom $(ISO_IMAGE) -display none -serial stdio \
 		-no-reboot -no-shutdown > $(BUILD_DIR)/qemu-panic-serial.log 2>&1; \
-		status=$?; set -e; cat $(BUILD_DIR)/qemu-panic-serial.log; \
-		if [ $status -ne 124 ] && [ $status -ne 0 ]; then \
-			echo "QEMU exited unexpectedly with status $status" >&2; exit $status; \
+		status=$$?; set -e; cat $(BUILD_DIR)/qemu-panic-serial.log; \
+		if [ $$status -ne 124 ] && [ $$status -ne 0 ]; then \
+			echo "QEMU exited unexpectedly with status $$status" >&2; exit $$status; \
 		fi; \
 		grep -Fq "DODO: triggering unarmed invalid opcode for panic test" $(BUILD_DIR)/qemu-panic-serial.log; \
 		grep -Fq "=== DODO KERNEL PANIC ===" $(BUILD_DIR)/qemu-panic-serial.log; \
@@ -262,6 +262,24 @@ qemu-panic-smoke:
 		grep -Eq "CS:     0x[0-9A-F]{16}" $(BUILD_DIR)/qemu-panic-serial.log; \
 		grep -Eq "RFLAGS: 0x[0-9A-F]{16}" $(BUILD_DIR)/qemu-panic-serial.log; \
 		grep -Fq "System halted. Reboot the VM after collecting this report." $(BUILD_DIR)/qemu-panic-serial.log
+
+	@set +e; (sleep 3; printf '\r'; sleep 1; printf 'pagefault-test\r'; sleep 1) | \
+		timeout 8s qemu-system-x86_64 -M q35 -m 512M -vga std \
+		-cdrom $(ISO_IMAGE) -display none -serial stdio \
+		-no-reboot -no-shutdown > $(BUILD_DIR)/qemu-pagefault-panic-serial.log 2>&1; \
+		status=$$?; set -e; cat $(BUILD_DIR)/qemu-pagefault-panic-serial.log; \
+		if [ $$status -ne 124 ] && [ $$status -ne 0 ]; then \
+			echo "QEMU page-fault test exited unexpectedly with status $$status" >&2; exit $$status; \
+		fi; \
+		grep -Fq "DODO: triggering unarmed page fault for panic test" $(BUILD_DIR)/qemu-pagefault-panic-serial.log; \
+		grep -Fq "=== DODO KERNEL PANIC ===" $(BUILD_DIR)/qemu-pagefault-panic-serial.log; \
+		grep -Fq "Reason: Page Fault" $(BUILD_DIR)/qemu-pagefault-panic-serial.log; \
+		grep -Fq "Vector: 14" $(BUILD_DIR)/qemu-pagefault-panic-serial.log; \
+		grep -Fq "CR2:    0x0000400000000000" $(BUILD_DIR)/qemu-pagefault-panic-serial.log; \
+		grep -Eq "RIP:    0x[0-9A-F]{16}" $(BUILD_DIR)/qemu-pagefault-panic-serial.log; \
+		grep -Eq "CS:     0x[0-9A-F]{16}" $(BUILD_DIR)/qemu-pagefault-panic-serial.log; \
+		grep -Eq "RFLAGS: 0x[0-9A-F]{16}" $(BUILD_DIR)/qemu-pagefault-panic-serial.log; \
+		grep -Fq "System halted. Reboot the VM after collecting this report." $(BUILD_DIR)/qemu-pagefault-panic-serial.log
 	$(MAKE) clean all
 
 clean:
