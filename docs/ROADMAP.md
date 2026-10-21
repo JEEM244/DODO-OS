@@ -26,7 +26,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Test controlled read-only and NX page faults, resuming only explicitly armed test cases.
 - [x] Add a reusable terminal panic path with structured CPU-fault diagnostics (reason, vector, error code, RIP, CS, RFLAGS, and CR2 for page faults).\n- [x] Add a dedicated QEMU test build that triggers an unarmed invalid-opcode exception and verifies the panic reason, vector, and terminal halt.
 - [x] Add a PIT timer interrupt, tick counter, and QEMU shell checks for uptime/sleep.
-- [ ] Add tests for more fatal exception paths, including an intentional page fault outside the armed self-test.
+- [x] Add QEMU tests for unarmed invalid-opcode and page-fault exceptions; verify panic reason/vector/registers and the exact CR2 address. Other fatal exception classes still need dedicated tests.
 - [x] Route PS/2 keyboard IRQ1 into the shell and verify virtual keyboard input with a QEMU monitor-driven integration test.
 - [x] Add a Limine-provided RGB framebuffer text console, mirror output to COM1, and keep the QEMU keyboard shell usable on screen; CI verifies framebuffer initialization.
 
@@ -52,7 +52,8 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Prevent a user root from mapping or unmapping the shared higher-half kernel page-table branches, with QEMU regression checks.
 - [x] Verify read-only and NX page protection behavior in QEMU.
 - [x] Verify the mapper rejects remapping a present page and rejects non-canonical virtual addresses.
-- [ ] Add broader allocator stress tests, locking/SMP safety, and complete frame ownership transfer rules.
+- [x] Add deterministic allocate/free/reuse stress for the physical allocator and verify live-frame uniqueness plus accounting throughout repeated transitions.
+- [ ] Add locking/SMP safety and complete frame ownership transfer rules.
 - [x] Recursively clone the active four-level page-table tree into DODO-owned frames while retaining leaf mappings and permissions.
 - [x] Preserve shared table references and recursive root mappings during cloning.
 - [x] Add allocation-failure injection during page-table cloning and verify rollback restores allocator counts.
@@ -77,6 +78,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [ ] Replace the test-only interrupt ABI with a stable kernel-entry/syscall ABI and per-thread trap context.
 - [ ] Add general user-page allocation/reclamation through a reusable address-space lifecycle API.
 - [x] Add a fixed-capacity round-robin scheduler state machine with task creation, wake/block/exit, zombie reaping, exit-code retrieval, slot reuse, a checked saved-stack-pointer API, an invariant validator for duplicate IDs, invalid states, running-task ownership and counts, and host-side edge-case tests; this is metadata only and does not switch CPU execution.
+- [x] Stress scheduler metadata with 20,000 deterministic pseudo-random create/schedule/block/wake/exit/reap/save transitions and validate invariants after every operation; this does not test actual CPU context switching.
 - [ ] Connect tasks to owned kernel stacks and saved interrupt frames; implement and QEMU-test real CPU context switching.
 - [ ] IPC with validated message boundaries.
 - [ ] Capability table and deny-by-default resource access.

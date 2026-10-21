@@ -83,7 +83,7 @@ To run the complete local acceptance pass in the same order as CI, use:
 make verify
 ```
 
-It executes host allocator/scheduler tests, rebuilds the ISO, checks the normal boot and shell, verifies PS/2 typing plus Backspace, tests invalid-opcode and fatal-page-fault diagnostics, and rebuilds the regular ISO when finished. Requires the Linux build tools and QEMU described above.
+It executes host allocator tests (including deterministic allocate/free stress) and scheduler state-machine tests (including 20,000 reproducible randomized transitions), rebuilds the ISO, checks the normal boot and shell, verifies BIOS and UEFI startup, verifies PS/2 typing plus Backspace, tests invalid-opcode and fatal-page-fault diagnostics, and rebuilds the regular ISO when finished. Requires the Linux build tools and QEMU described above.
 
 The BIOS smoke test boots the ISO for up to 12 seconds, sends test commands to the serial console after boot, captures the serial log in `build/qemu-serial.log`, and checks the boot handoff, memory-map parsing, physical allocator, page-table clone rollback, virtual mapping, read-only/NX protection, separate user-root mapping, CPL3 interrupt/return, supervisor-memory denial, cross-root non-present fault, controlled exception recovery, interactive console responses, and a nonzero PIT tick count from `uptime`. The prototype CPL3 `write`/`exit` probes also check a valid cross-page buffer copy, rejection of a kernel pointer, an unmapped user pointer, a zero-length or oversized write, a buffer that crosses the user-half address limit, and an unknown syscall number. It uses QEMU and does not write to the host's disks.
 

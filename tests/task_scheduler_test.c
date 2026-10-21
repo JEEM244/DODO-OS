@@ -217,6 +217,189 @@ static void test_validation_and_capacity(void) {
     assert(dodo_scheduler_wake(&scheduler, id) == DODO_TASK_INVALID_STATE);
 }
 
+
+static uint32_t scheduler_stress_next_random(uint32_t *state) {
+    *state = *state * UINT32_C(1664525) + UINT32_C(1013904223);
+    return *state;
+}
+
+static uint32_t scheduler_count_state(
+    const struct dodo_scheduler *scheduler,
+    enum dodo_task_state state) {
+    uint32_t count = 0u;
+    for (uint32_t i = 0u; i < DODO_TASK_CAPACITY; ++i) {
+        if (scheduler->tasks[i].state == state) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+static uint32_t scheduler_nth_task_in_state(
+    const struct dodo_scheduler *scheduler,
+    enum dodo_task_state state,
+    uint32_t ordinal) {
+    for (uint32_t i = 0u; i < DODO_TASK_CAPACITY; ++i) {
+        if (scheduler->tasks[i].state != state) {
+            continue;
+        }
+        if (ordinal == 0u) {
+            return scheduler->tasks[i].id;
+        }
+        --ordinal;
+    }
+    return DODO_TASK_INVALID_ID;
+}
+
+static void assert_scheduler_stress_invariants(
+    const struct dodo_scheduler *scheduler) {
+    assert(dodo_scheduler_validate(scheduler) == DODO_TASK_OK);
+    assert(scheduler_count_state(scheduler, DODO_TASK_UNUSED) +
+           scheduler->task_count == DODO_TASK_CAPACITY);
+
+    uint32_t active = 0u;
+    uint32_t running = 0u;
+    uint32_t running_id = DODO_TASK_INVALID_ID;
+    for (uint32_t i = 0u; i < DODO_TASK_CAPACITY; ++i) {
+        const struct dodo_task *task = &scheduler->tasks[i];
+        if (task->state == DODO_TASK_UNUSED) {
+            continue;
+        }
+        ++active;
+        if (task->state == DODO_TASK_RUNNING) {
+            ++running;
+            running_id = task->id;
+        }
+        for (uint32_t j = i + 1u; j < DODO_TASK_CAPACITY; ++j) {
+            if (scheduler->tasks[j].state != DODO_TASK_UNUSED) {
+                assert(scheduler->tasks[j].id != task->id);
+            }
+        }
+    }
+
+    assert(active == scheduler->task_count);
+    if (scheduler->current_id == DODO_TASK_INVALID_ID) {
+        assert(running == 0u);
+    } else {
+        assert(running == 1u);
+        assert(running_id == scheduler->current_id);
+    }
+}
+
+/*
+ * Deterministic state-machine stress, not CPU context-switch testing. A fixed
+ * seed makes failures reproducible while mixing create/schedule/block/wake/
+ * exit/reap/save operations and no-runnable periods across recycled task slots.
+ */
+static void test_randomized_scheduler_transitions(void) {
+    enum { ITERATIONS = 20000 };
+    struct dodo_scheduler scheduler;
+    uint32_t random_state = UINT32_C(0xD0D05EED);
+    dodo_scheduler_init(&scheduler);
+
+    for (uint32_t step = 0u; step < ITERATIONS; ++step) {
+        const uint32_t random = scheduler_stress_next_random(&random_state);
+        const uint32_t active = scheduler.task_count;
+        const uint32_t blocked =
+            scheduler_count_state(&scheduler, DODO_TASK_BLOCKED);
+        const uint32_t zombies =
+            scheduler_count_state(&scheduler, DODO_TASK_ZOMBIE);
+        const uint32_t op = (random >> 24) % 6u;
+
+        if (op == 0u) {
+            uint32_t id = UINT32_C(0xfeed);
+            if (active == DODO_TASK_CAPACITY) {
+                assert(dodo_scheduler_create(
+                    &scheduler, "stress", UINT64_C(0x1000), UINT64_C(0x2000),
+                    &id) == DODO_TASK_FULL);
+                assert(id == UINT32_C(0xfeed));
+            } else {
+                const uint64_t sequence = scheduler.next_id;
+                const uint64_t stack =
+                    UINT64_C(0x100000) + sequence * UINT64_C(4096);
+                const uint64_t root =
+                    UINT64_C(0x10000000) + sequence * UINT64_C(4096);
+                assert(dodo_scheduler_create(
+                    &scheduler, "stress", stack, root, &id) == DODO_TASK_OK);
+                assert(id == sequence);
+            }
+        } else if (op == 1u) {
+            uint32_t selected = UINT32_C(0xfeed);
+            const enum dodo_task_status status =
+                dodo_scheduler_schedule(&scheduler, &selected);
+            if (status == DODO_TASK_OK) {
+                assert(selected == scheduler.current_id);
+                const struct dodo_task *current =
+                    dodo_scheduler_find(&scheduler, selected);
+                assert(current != NULL && current->state == DODO_TASK_RUNNING);
+            } else {
+                assert(status == DODO_TASK_NO_RUNNABLE_TASK);
+                assert(selected == UINT32_C(0xfeed));
+                assert(scheduler.current_id == DODO_TASK_INVALID_ID);
+            }
+        } else if (op == 2u) {
+            if (scheduler.current_id != DODO_TASK_INVALID_ID) {
+                const enum dodo_task_state next_state =
+                    ((random >> 8) & 1u) != 0u ?
+                        DODO_TASK_BLOCKED : DODO_TASK_ZOMBIE;
+                assert(dodo_scheduler_set_current_state(
+                    &scheduler, next_state, random) == DODO_TASK_OK);
+                assert(scheduler.current_id == DODO_TASK_INVALID_ID);
+            } else {
+                assert(dodo_scheduler_set_current_state(
+                    &scheduler, DODO_TASK_BLOCKED, 0u) ==
+                    DODO_TASK_INVALID_STATE);
+            }
+        } else if (op == 3u) {
+            if (blocked != 0u) {
+                const uint32_t ordinal = random % blocked;
+                const uint32_t id = scheduler_nth_task_in_state(
+                    &scheduler, DODO_TASK_BLOCKED, ordinal);
+                assert(id != DODO_TASK_INVALID_ID);
+                assert(dodo_scheduler_wake(&scheduler, id) == DODO_TASK_OK);
+            } else {
+                assert(dodo_scheduler_wake(
+                    &scheduler, DODO_TASK_INVALID_ID) == DODO_TASK_NOT_FOUND);
+            }
+        } else if (op == 4u) {
+            if (zombies != 0u) {
+                const uint32_t ordinal = random % zombies;
+                const uint32_t id = scheduler_nth_task_in_state(
+                    &scheduler, DODO_TASK_ZOMBIE, ordinal);
+                assert(id != DODO_TASK_INVALID_ID);
+                const struct dodo_task *zombie =
+                    dodo_scheduler_find(&scheduler, id);
+                assert(zombie != NULL);
+                const uint32_t expected_exit_code = zombie->exit_code;
+                uint32_t exit_code = 0u;
+                assert(dodo_scheduler_get_exit_code(
+                    &scheduler, id, &exit_code) == DODO_TASK_OK);
+                assert(exit_code == expected_exit_code);
+                assert(dodo_scheduler_reap(&scheduler, id) == DODO_TASK_OK);
+                assert(dodo_scheduler_find(&scheduler, id) == NULL);
+            } else {
+                assert(dodo_scheduler_reap(
+                    &scheduler, DODO_TASK_INVALID_ID) ==
+                    DODO_TASK_INVALID_ARGUMENT);
+            }
+        } else {
+            if (scheduler.current_id != DODO_TASK_INVALID_ID) {
+                const uint64_t saved_stack = UINT64_C(0x40000000) +
+                    ((uint64_t)step + 1u) * UINT64_C(4096);
+                assert(dodo_scheduler_save_stack_pointer(
+                    &scheduler, scheduler.current_id, saved_stack) ==
+                    DODO_TASK_OK);
+            } else {
+                assert(dodo_scheduler_save_stack_pointer(
+                    &scheduler, DODO_TASK_INVALID_ID, UINT64_C(0x5000)) ==
+                    DODO_TASK_INVALID_ARGUMENT);
+            }
+        }
+
+        assert_scheduler_stress_invariants(&scheduler);
+    }
+}
+
 int main(void) {
     test_scheduler_invariant_validation();
     test_round_robin_and_states();
@@ -225,6 +408,7 @@ int main(void) {
     test_saved_stack_pointer_requires_current_running_task();
     test_name_is_safely_truncated();
     test_validation_and_capacity();
+    test_randomized_scheduler_transitions();
     puts("Task scheduler tests passed.");
     return 0;
 }
