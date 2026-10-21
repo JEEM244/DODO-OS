@@ -354,6 +354,59 @@ static void serial_readline(char *buffer, size_t capacity) {
     }
 }
 
+
+static void show_physical_region_map(void) {
+    if (physical_allocator.initialized == 0u) {
+        serial_write("Physical allocator is not initialized.\n");
+        return;
+    }
+
+    /* Bound printed rows so a firmware map with thousands of regions remains usable. */
+    const uint64_t display_limit = 32u;
+    const uint64_t displayed_regions =
+        physical_allocator.region_count < display_limit ?
+            physical_allocator.region_count : display_limit;
+    uint64_t unissued_pages = 0u;
+
+    serial_write("Physical region map (end-exclusive; page size 4096 bytes):\n");
+    for (uint64_t i = 0u; i < physical_allocator.region_count; ++i) {
+        const struct dodo_phys_region *region = &physical_allocator.regions[i];
+        uint64_t remaining = 0u;
+        if (region->cursor <= region->end) {
+            remaining = (region->end - region->cursor) / DODO_PHYS_PAGE_SIZE;
+        }
+        unissued_pages += remaining;
+
+        if (i >= displayed_regions) {
+            continue;
+        }
+
+        serial_write("  region ");
+        serial_write_u64(i);
+        serial_write(": start=");
+        serial_write_hex64(region->start);
+        serial_write(" cursor=");
+        serial_write_hex64(region->cursor);
+        serial_write(" end=");
+        serial_write_hex64(region->end);
+        serial_write(" unissued_pages=");
+        serial_write_u64(remaining);
+        serial_write("\n");
+    }
+
+    serial_write("Regions shown: ");
+    serial_write_u64(displayed_regions);
+    serial_write(" / ");
+    serial_write_u64(physical_allocator.region_count);
+    serial_write("\nUnissued cursor pages: ");
+    serial_write_u64(unissued_pages);
+    serial_write("\nRecycled free-stack pages: ");
+    serial_write_u64(physical_allocator.free_stack_count);
+    serial_write("\nAllocator total free pages: ");
+    serial_write_u64(physical_allocator.free_pages);
+    serial_write("\n");
+}
+
 static void run_serial_shell(void) __attribute__((noreturn));
 
 static void run_serial_shell(void) {
@@ -376,6 +429,7 @@ static void run_serial_shell(void) {
             serial_write("  about    Explain the current build\n");
             serial_write("  version  Show the kernel prototype version\n");
             serial_write("  mem      Show physical allocator counters\n");
+            serial_write("  memmap   Show tracked physical memory regions\n");
             serial_write("  memcheck Exercise physical page allocate/free/reuse\n");
             serial_write("  uptime   Show ticks and approximate uptime\n");
             serial_write("  sleep N  Sleep for 1-60 seconds using the PIT timer\n");
@@ -398,6 +452,8 @@ static void run_serial_shell(void) {
             serial_write("\n  known regions:   ");
             serial_write_u64(physical_allocator.region_count);
             serial_write("\n  page size:       4096 bytes\n");
+        } else if (string_equal(command, "memmap")) {
+            show_physical_region_map();
         } else if (string_equal(command, "memcheck")) {
             const uint64_t free_before = physical_allocator.free_pages;
             const uint64_t allocated_before = physical_allocator.allocated_pages;

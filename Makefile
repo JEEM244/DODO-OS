@@ -179,7 +179,7 @@ run: $(ISO_IMAGE)
 
 # CI smoke test: QEMU is expected to keep running after the kernel halts.
 qemu-smoke: $(ISO_IMAGE)
-	@set +e; (sleep 3; printf '\r'; sleep 1; printf 'help\rversion\rmem\rmemcheck\ruptime\r'; sleep 1; printf 'sleep 1\r'; sleep 2; printf 'echo DODO_SHELL_INPUT_OK\r') | \
+	@set +e; (sleep 3; printf '\r'; sleep 1; printf 'help\rversion\rmem\rmemmap\rmemcheck\ruptime\r'; sleep 1; printf 'sleep 1\r'; sleep 2; printf 'echo DODO_SHELL_INPUT_OK\r') | \
 		timeout 12s qemu-system-x86_64 -M q35 -m 512M -vga std \
 		-cdrom $(ISO_IMAGE) -display none -serial stdio \
 		-no-reboot -no-shutdown > $(BUILD_DIR)/qemu-serial.log 2>&1; \
@@ -240,6 +240,10 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "Commands:" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO OS kernel prototype 0.1.0" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "Physical memory allocator:" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "Physical region map (end-exclusive; page size 4096 bytes):" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "Unissued cursor pages:" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "Recycled free-stack pages:" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "Allocator total free pages:" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "Physical allocator check passed." $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "allocator counters unchanged" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: legacy PIC remapped; PIT configured for 100 Hz" $(BUILD_DIR)/qemu-serial.log; \
