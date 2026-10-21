@@ -3,6 +3,7 @@
 
 .extern dodo_x86_64_exception_handler
 .extern dodo_x86_64_user_return_trampoline
+.extern dodo_x86_64_scheduler_next_frame
 
 .macro DODO_ISR_NOERR vector
     .global dodo_isr_\vector
@@ -102,10 +103,13 @@ dodo_isr_common:
 
     cmpl $2, %eax
     je dodo_isr_return_to_kernel
+    cmpl $3, %eax
+    je dodo_isr_switch_context
     testl %eax, %eax
     jz dodo_isr_fatal
 
     /* Handler explicitly allowed the armed exception test to resume. */
+dodo_isr_resume:
     popq %r15
     popq %r14
     popq %r13
@@ -123,6 +127,18 @@ dodo_isr_common:
     popq %rax
     addq $16, %rsp
     iretq
+
+/*
+ * Switch stacks only when the dispatcher explicitly requests it. The normal
+ * epilogue restores the selected task's register frame and returns with IRETQ.
+ */
+dodo_isr_switch_context:
+    andq $-16, %rsp
+    call dodo_x86_64_scheduler_next_frame
+    testq %rax, %rax
+    jz dodo_isr_fatal
+    movq %rax, %rsp
+    jmp dodo_isr_resume
 
 /*
  * Controlled CPL3 test path: never try an IRETQ back to CPL0 using a frame

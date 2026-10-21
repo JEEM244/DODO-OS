@@ -9,6 +9,7 @@
 #include "dodo/arch/x86_64/paging.h"
 #include "dodo/arch/x86_64/user_mode.h"
 #include "dodo/boot/limine_protocol.h"
+#include "dodo/kernel/task.h"
 #include "dodo/mm/phys.h"
 
 #define COM1_PORT 0x3F8u
@@ -82,6 +83,12 @@ static volatile uint64_t limine_requests_end_marker[2] = {
 };
 
 static struct dodo_phys_allocator physical_allocator;
+static struct dodo_scheduler kernel_scheduler;
+static volatile uint64_t kernel_scheduler_active;
+static volatile uint64_t kernel_scheduler_switches;
+static volatile uint64_t kernel_worker_heartbeats[2];
+static uint32_t kernel_shell_task_id;
+static uint64_t kernel_worker_stack_frames[2];
 /*
  * The first four frames are retained by the paging self-test: three for
  * intermediate tables and one for the data page. The fifth is a read-only/NX
@@ -354,6 +361,176 @@ static void serial_readline(char *buffer, size_t capacity) {
     }
 }
 
+
+/*
+ * The first CPU-scheduling milestone is deliberately small and kernel-only:
+ * the shell plus two heartbeat workers share the same address space and ring.
+ * It validates real interrupt-frame switching, not general process isolation.
+ */
+static void kernel_worker_a(void) __attribute__((noreturn));
+static void kernel_worker_b(void) __attribute__((noreturn));
+
+static void kernel_worker_a(void) {
+    for (;;) {
+        ++kernel_worker_heartbeats[0];
+        __asm__ volatile ("hlt" : : : "memory");
+    }
+}
+
+static void kernel_worker_b(void) {
+    for (;;) {
+        ++kernel_worker_heartbeats[1];
+        __asm__ volatile ("hlt" : : : "memory");
+    }
+}
+
+static struct dodo_x86_64_exception_frame *make_kernel_task_frame(
+    uint64_t physical_stack_frame,
+    void (*entry)(void)) {
+    volatile void *alias =
+        dodo_x86_64_hhdm_pointer(physical_stack_frame);
+    if (alias == NULL) {
+        return NULL;
+    }
+
+    const uint64_t stack_base = (uint64_t)(uintptr_t)alias;
+    if (stack_base > UINT64_MAX - DODO_PAGE_SIZE) {
+        return NULL;
+    }
+
+    /*
+     * IRETQ enters a C function without CALL. Make the initial RSP congruent
+     * to 8 mod 16, as required at a SysV AMD64 function entry.
+     */
+    uint64_t stack_top =
+        (stack_base + DODO_PAGE_SIZE) & ~UINT64_C(0x0f);
+    if (stack_top < sizeof(struct dodo_x86_64_exception_frame) + 8u) {
+        return NULL;
+    }
+    stack_top -= 8u;
+
+    struct dodo_x86_64_exception_frame *frame =
+        (struct dodo_x86_64_exception_frame *)(uintptr_t)
+        (stack_top - sizeof(struct dodo_x86_64_exception_frame));
+    uint64_t *words = (uint64_t *)(uintptr_t)frame;
+    for (size_t i = 0u; i < sizeof(*frame) / sizeof(uint64_t); ++i) {
+        words[i] = 0u;
+    }
+
+    frame->vector = 32u;
+    frame->error_code = 0u;
+    frame->rip = (uint64_t)(uintptr_t)entry;
+    frame->cs = DODO_X86_64_KERNEL_CODE_SELECTOR;
+    frame->rflags = UINT64_C(0x202);
+    return frame;
+}
+
+static void initialize_kernel_scheduler(void) {
+    const uint64_t kernel_root = dodo_x86_64_kernel_root_physical();
+    if (kernel_root == 0u) {
+        report_boot_error("scheduler could not identify the kernel root");
+    }
+
+    dodo_scheduler_init(&kernel_scheduler);
+    if (dodo_scheduler_create(
+            &kernel_scheduler, "shell", 1u, kernel_root,
+            &kernel_shell_task_id) != DODO_TASK_OK) {
+        report_boot_error("scheduler could not register the shell task");
+    }
+
+    uint32_t selected = DODO_TASK_INVALID_ID;
+    if (dodo_scheduler_schedule(&kernel_scheduler, &selected) != DODO_TASK_OK ||
+        selected != kernel_shell_task_id) {
+        report_boot_error("scheduler could not select the initial shell task");
+    }
+
+    const char *const names[2] = {"worker-a", "worker-b"};
+    void (*const entries[2])(void) = {kernel_worker_a, kernel_worker_b};
+    for (uint32_t i = 0u; i < 2u; ++i) {
+        if (dodo_phys_alloc_page(
+                &physical_allocator, &kernel_worker_stack_frames[i]) !=
+            DODO_PHYS_OK) {
+            report_boot_error("scheduler could not allocate a worker stack");
+        }
+        struct dodo_x86_64_exception_frame *frame =
+            make_kernel_task_frame(kernel_worker_stack_frames[i], entries[i]);
+        if (frame == NULL) {
+            report_boot_error("scheduler could not initialize a worker frame");
+        }
+
+        uint32_t task_id = DODO_TASK_INVALID_ID;
+        if (dodo_scheduler_create(
+                &kernel_scheduler, names[i],
+                (uint64_t)(uintptr_t)frame, kernel_root, &task_id) !=
+            DODO_TASK_OK) {
+            report_boot_error("scheduler could not register a worker task");
+        }
+    }
+
+    kernel_scheduler_switches = 0u;
+    kernel_worker_heartbeats[0] = 0u;
+    kernel_worker_heartbeats[1] = 0u;
+    kernel_scheduler_active = 1u;
+    serial_write("DODO: preemptive round-robin scheduler online; tasks = 3\n");
+}
+
+/* Assembly calls this only after the dispatcher explicitly requests a switch. */
+uint64_t dodo_x86_64_scheduler_next_frame(void) {
+    if (kernel_scheduler_active == 0u) {
+        return 0u;
+    }
+    struct dodo_task *current =
+        dodo_scheduler_find(&kernel_scheduler, kernel_scheduler.current_id);
+    if (current == NULL || current->state != DODO_TASK_RUNNING) {
+        return 0u;
+    }
+    return current->saved_stack_pointer;
+}
+
+static const char *kernel_task_state_name(enum dodo_task_state state) {
+    switch (state) {
+        case DODO_TASK_READY: return "READY";
+        case DODO_TASK_RUNNING: return "RUNNING";
+        case DODO_TASK_BLOCKED: return "BLOCKED";
+        case DODO_TASK_ZOMBIE: return "ZOMBIE";
+        case DODO_TASK_UNUSED: return "UNUSED";
+        default: return "INVALID";
+    }
+}
+
+static void show_kernel_scheduler(void) {
+    if (kernel_scheduler_active == 0u) {
+        serial_write("Scheduler is not initialized.\n");
+        return;
+    }
+
+    /* Keep the table coherent on this single-CPU prototype. */
+    __asm__ volatile ("cli" : : : "memory");
+    serial_write("Kernel scheduler: preemptive round-robin (PIT 100 Hz)\n");
+    serial_write("Context switches: ");
+    serial_write_u64(kernel_scheduler_switches);
+    serial_write("\nCurrent task ID: ");
+    serial_write_u64(kernel_scheduler.current_id);
+    serial_write("\nTask table:\n");
+    for (uint32_t i = 0u; i < DODO_TASK_CAPACITY; ++i) {
+        const struct dodo_task *task = &kernel_scheduler.tasks[i];
+        if (task->state == DODO_TASK_UNUSED) continue;
+        serial_write("  ");
+        serial_write(task->name);
+        serial_write(" | id=");
+        serial_write_u64(task->id);
+        serial_write(" | state=");
+        serial_write(kernel_task_state_name(task->state));
+        serial_write("\n");
+    }
+    serial_write("worker-a heartbeat: ");
+    serial_write_u64(kernel_worker_heartbeats[0]);
+    serial_write("\nworker-b heartbeat: ");
+    serial_write_u64(kernel_worker_heartbeats[1]);
+    serial_write("\n");
+    __asm__ volatile ("sti" : : : "memory");
+}
+
 static void run_serial_shell(void) __attribute__((noreturn));
 
 static void run_serial_shell(void) {
@@ -378,6 +555,7 @@ static void run_serial_shell(void) {
             serial_write("  mem      Show physical allocator counters\n");
             serial_write("  memcheck Exercise physical page allocate/free/reuse\n");
             serial_write("  uptime   Show ticks and approximate uptime\n");
+            serial_write("  sched    Show kernel task switching and worker counters\n");
             serial_write("  sleep N  Sleep for 1-60 seconds using the PIT timer\n");
             serial_write("  echo TXT Print TXT back to the console\n");
             serial_write("  clear    Clear a compatible terminal\n");
@@ -440,6 +618,8 @@ static void run_serial_shell(void) {
             serial_write("\nUptime: ");
             serial_write_u64(ticks / DODO_X86_64_TIMER_HZ);
             serial_write(" seconds (approximate)\n");
+        } else if (string_equal(command, "sched")) {
+            show_kernel_scheduler();
         } else if (command[0] == 's' && command[1] == 'l' &&
                    command[2] == 'e' && command[3] == 'e' &&
                    command[4] == 'p' &&
@@ -646,8 +826,26 @@ int dodo_x86_64_exception_handler(
     }
 
     if (frame->vector == 32u) {
-        /* PIT IRQ0: keep the handler short and acknowledge the master PIC. */
         dodo_x86_64_timer_handle_irq();
+        if (kernel_scheduler_active != 0u) {
+            const uint32_t previous_id = kernel_scheduler.current_id;
+            const enum dodo_task_status save_status =
+                dodo_scheduler_save_stack_pointer(
+                    &kernel_scheduler, previous_id,
+                    (uint64_t)(uintptr_t)frame);
+            if (save_status != DODO_TASK_OK) {
+                kernel_panic("scheduler could not save interrupted task frame", frame);
+            }
+
+            uint32_t selected_id = DODO_TASK_INVALID_ID;
+            const enum dodo_task_status schedule_status =
+                dodo_scheduler_schedule(&kernel_scheduler, &selected_id);
+            if (schedule_status != DODO_TASK_OK) {
+                kernel_panic("scheduler found no runnable kernel task", frame);
+            }
+            if (selected_id != previous_id) ++kernel_scheduler_switches;
+            return DODO_EXCEPTION_SWITCH_CONTEXT;
+        }
         return DODO_EXCEPTION_RESUME;
     }
 
@@ -1847,5 +2045,6 @@ void kernel_main(void) {
     dodo_x86_64_keyboard_init();
     serial_write("DODO: legacy PIC remapped; PIT configured for 100 Hz\n");
     serial_write("DODO: PS/2 keyboard IRQ1 enabled\n");
+    initialize_kernel_scheduler();
     run_serial_shell();
 }
