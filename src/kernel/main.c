@@ -474,6 +474,15 @@ static void run_serial_shell(void) {
         } else if (string_equal(command, "halt")) {
             serial_write("DODO: CPU halted by console command.\n");
             kernel_halt();
+#ifdef DODO_ENABLE_PANIC_TEST
+        } else if (string_equal(command, "panic-test")) {
+            serial_write("DODO: triggering unarmed invalid opcode for panic test\n");
+            __asm__ volatile ("ud2" : : : "memory");
+            /* If the exception path ever returns, do not resume the shell. */
+            for (;;) {
+                __asm__ volatile ("cli; hlt");
+            }
+#endif
         } else {
             serial_write("Unknown command: ");
             serial_write(command);

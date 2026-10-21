@@ -18,6 +18,9 @@ LIMINE_URL := https://github.com/Limine-Bootloader/Limine/releases/download/v$(L
 CFLAGS := -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -Iinclude \
           -fno-stack-protector -fno-pic -fno-pie -fno-asynchronous-unwind-tables \
           -m64 -mcmodel=kernel -mno-red-zone -mgeneral-regs-only
+ifeq ($(PANIC_TEST),1)
+CFLAGS += -DDODO_ENABLE_PANIC_TEST
+endif
 ASFLAGS := -m64 -ffreestanding -fno-pic -fno-pie
 LDFLAGS := -nostdlib -z max-page-size=0x1000 -T linker/x86_64.ld
 
@@ -40,7 +43,7 @@ PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
 VADDR_TEST := $(BUILD_DIR)/vaddr_allocator_test
 TASK_TEST := $(BUILD_DIR)/task_scheduler_test
 
-.PHONY: all kernel iso run qemu-smoke qemu-keyboard-smoke test-phys test-vaddr test-task test clean check-tools
+.PHONY: all kernel iso run qemu-smoke qemu-keyboard-smoke qemu-panic-smoke test-phys test-vaddr test-task test clean check-tools
 all: iso
 
 kernel: check-tools $(KERNEL_ELF)
@@ -236,6 +239,26 @@ qemu-smoke: $(ISO_IMAGE)
 # Exercise the real PS/2 IRQ1 path by injecting keys through QEMU's monitor.
 qemu-keyboard-smoke: $(ISO_IMAGE)
 	python3 tests/qemu_keyboard_smoke.py --iso $(ISO_IMAGE) --log $(BUILD_DIR)/qemu-keyboard-serial.log
+
+# Build a test-only kernel that proves an unarmed CPU exception reaches panic.
+# Restore the ordinary, non-test ISO before returning successfully.
+qemu-panic-smoke:
+	$(MAKE) clean
+	$(MAKE) PANIC_TEST=1 iso
+	@set +e; (sleep 3; printf 'panic-test\r'; sleep 1) | \
+		timeout 8s qemu-system-x86_64 -M q35 -m 512M -vga std \
+		-cdrom $(ISO_IMAGE) -display none -serial stdio \
+		-no-reboot -no-shutdown > $(BUILD_DIR)/qemu-panic-serial.log 2>&1; \
+		status=$?; set -e; cat $(BUILD_DIR)/qemu-panic-serial.log; \
+		if [ $status -ne 124 ] && [ $status -ne 0 ]; then \
+			echo "QEMU exited unexpectedly with status $status" >&2; exit $status; \
+		fi; \
+		grep -Fq "DODO: triggering unarmed invalid opcode for panic test" $(BUILD_DIR)/qemu-panic-serial.log; \
+		grep -Fq "=== DODO KERNEL PANIC ===" $(BUILD_DIR)/qemu-panic-serial.log; \
+		grep -Fq "Reason: Invalid Opcode" $(BUILD_DIR)/qemu-panic-serial.log; \
+		grep -Fq "Vector: 6" $(BUILD_DIR)/qemu-panic-serial.log; \
+		grep -Fq "System halted. Reboot the VM after collecting this report." $(BUILD_DIR)/qemu-panic-serial.log
+	$(MAKE) clean all
 
 clean:
 	rm -rf $(BUILD_DIR)

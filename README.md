@@ -50,6 +50,7 @@ make clean all       # build kernel and bootable test ISO
 make run             # launch the ISO in QEMU
 make qemu-smoke      # verify boot, memory protections, isolation, and syscall checks
 make qemu-keyboard-smoke # verify the PS/2 keyboard path through QEMU
+make qemu-panic-smoke # verify unexpected-exception panic diagnostics
 ~~~
 
 The prototype now renders an initial text console on the RGB framebuffer provided by Limine and mirrors all output to COM1. The shell accepts both PS/2 keyboard input and serial input. Commands include `help`, `about`, `version`, `mem`, `memcheck`, `uptime`, `sleep N`, `echo TXT`, `clear`, and `halt`. This is a framebuffer text console, not yet a graphical desktop or window manager.

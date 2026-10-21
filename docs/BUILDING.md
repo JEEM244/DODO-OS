@@ -73,9 +73,12 @@ For an automated boot check on Linux:
 ```sh
 make qemu-smoke
 make qemu-keyboard-smoke
+make qemu-panic-smoke
 ```
 
 The smoke test boots the ISO for up to 12 seconds, sends test commands to the serial console after boot, captures the serial log in `build/qemu-serial.log`, and checks the boot handoff, memory-map parsing, physical allocator, page-table clone rollback, virtual mapping, read-only/NX protection, separate user-root mapping, CPL3 interrupt/return, supervisor-memory denial, cross-root non-present fault, controlled exception recovery, interactive console responses, and a nonzero PIT tick count from `uptime`. The prototype CPL3 `write`/`exit` probes also check a valid cross-page buffer copy, rejection of a kernel pointer, an unmapped user pointer, a zero-length or oversized write, a buffer that crosses the user-half address limit, and an unknown syscall number. It uses QEMU and does not write to the host's disks.
+
+The `make qemu-panic-smoke` target builds a temporary kernel with a compile-time-only `panic-test` command, triggers an unarmed invalid-opcode exception inside QEMU, and verifies that the panic report includes the exception reason and vector and then halts. On success it rebuilds the ordinary ISO without the test command. The normal ISO does not include this deliberately crashing test command.
 
 ## Inspect the kernel
 

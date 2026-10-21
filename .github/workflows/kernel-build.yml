@@ -45,6 +45,9 @@ jobs:
       - name: Verify PS/2 keyboard input through QEMU
         run: make qemu-keyboard-smoke
 
+      - name: Verify unexpected exception panic diagnostics through QEMU
+        run: make qemu-panic-smoke
+
       - name: Upload bootable ISO
         uses: actions/upload-artifact@v4
         with:

@@ -92,9 +92,9 @@ These segment flags are defense in depth. Later memory-management work must pres
 
 ## Current limitations
 
-- COM1 is used for diagnostics; there is no terminal service.
-- There is no timer or external interrupt delivery.
-- The GDT is owned by DODO, but ring-3 entry/return instructions and actual user-mode processes are not implemented yet.
-- DODO owns the cloned page-table structure but preserves Limine's leaf mappings and HHDM layout; it does not yet maintain its own physical-frame reclamation or per-process mapping policy.
-- There is no user mode, scheduler, IPC, capability enforcement, filesystem, network stack, or GUI.
-- The QEMU smoke test covers the tested paths only; it does not establish that DODO is secure or suitable for daily use.
+- COM1 is used for diagnostics; there is no terminal service beyond the kernel's basic shell.
+- Hardware interrupt delivery is limited to legacy PIT IRQ0 and PS/2 keyboard IRQ1 through the 8259 PIC. There is no generalized interrupt-routing layer, IOAPIC/APIC support, interrupt nesting, or SMP-safe interrupt handling.
+- DODO owns its GDT/TSS/IDT and has a controlled ring-3 entry/return probe plus a test-only `int 0x80` write/exit path. These are not general process execution or a stable syscall ABI.
+- DODO owns the cloned page-table structure but preserves Limine's leaf physical mappings and HHDM layout; it does not yet maintain its own physical-frame reclamation or reusable per-process mapping policy.
+- There is no CPU-integrated task scheduler/context switching, IPC, capability enforcement, filesystem, network stack, or GUI.
+- The QEMU smoke tests cover specific tested paths only; they do not establish that DODO is secure or suitable for daily use.
