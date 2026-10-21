@@ -48,10 +48,18 @@ jobs:
       - name: Verify unexpected exception panic diagnostics through QEMU
         run: make qemu-panic-smoke
 
+      - name: Generate and verify ISO SHA-256 checksum
+        run: |
+          test -s build/dodo-os.iso
+          sha256sum build/dodo-os.iso | tee build/dodo-os.iso.sha256
+          sha256sum --check build/dodo-os.iso.sha256
+
       - name: Upload bootable ISO
         uses: actions/upload-artifact@v4
         with:
           name: dodo-os-bootable-iso
-          path: build/dodo-os.iso
+          path: |
+            build/dodo-os.iso
+            build/dodo-os.iso.sha256
           if-no-files-found: error
           retention-days: 14

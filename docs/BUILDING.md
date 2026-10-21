@@ -78,7 +78,7 @@ make qemu-panic-smoke
 
 The smoke test boots the ISO for up to 12 seconds, sends test commands to the serial console after boot, captures the serial log in `build/qemu-serial.log`, and checks the boot handoff, memory-map parsing, physical allocator, page-table clone rollback, virtual mapping, read-only/NX protection, separate user-root mapping, CPL3 interrupt/return, supervisor-memory denial, cross-root non-present fault, controlled exception recovery, interactive console responses, and a nonzero PIT tick count from `uptime`. The prototype CPL3 `write`/`exit` probes also check a valid cross-page buffer copy, rejection of a kernel pointer, an unmapped user pointer, a zero-length or oversized write, a buffer that crosses the user-half address limit, and an unknown syscall number. It uses QEMU and does not write to the host's disks.
 
-The `make qemu-panic-smoke` target builds a temporary kernel with a compile-time-only `panic-test` command, triggers an unarmed invalid-opcode exception inside QEMU, and verifies that the panic report includes the exception reason and vector and then halts. On success it rebuilds the ordinary ISO without the test command. The normal ISO does not include this deliberately crashing test command.
+The `make qemu-panic-smoke` target builds a temporary kernel with a compile-time-only `panic-test` command, triggers an unarmed invalid-opcode exception inside QEMU, and verifies the panic reason, vector, error code, RIP, CS, RFLAGS and terminal halt. On success it rebuilds the ordinary ISO without the test command. The normal ISO does not include this deliberately crashing test command.
 
 ## Inspect the kernel
 
@@ -100,4 +100,4 @@ The kernel uses a higher-half x86-64 layout and separate load segments for reque
 
 ## Continuous integration
 
-The GitHub Actions workflow runs the allocator unit tests, compiles the kernel, verifies ELF metadata, boots the generated ISO under QEMU, checks serial output, and uploads `dodo-os.iso` as an artifact for 14 days. The repository's Actions tab is the source of truth for the latest run result.
+The GitHub Actions workflow runs the allocator unit tests, compiles the kernel, verifies ELF metadata, boots the generated ISO under QEMU, checks serial output, and uploads `dodo-os.iso` plus `dodo-os.iso.sha256` as an artifact for 14 days. CI verifies the checksum file against the final ISO before upload. The repository's Actions tab is the source of truth for the latest run result.

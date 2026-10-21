@@ -257,6 +257,10 @@ qemu-panic-smoke:
 		grep -Fq "=== DODO KERNEL PANIC ===" $(BUILD_DIR)/qemu-panic-serial.log; \
 		grep -Fq "Reason: Invalid Opcode" $(BUILD_DIR)/qemu-panic-serial.log; \
 		grep -Fq "Vector: 6" $(BUILD_DIR)/qemu-panic-serial.log; \
+		grep -Eq "Error:  0x[0-9A-F]{16}" $(BUILD_DIR)/qemu-panic-serial.log; \
+		grep -Eq "RIP:    0x[0-9A-F]{16}" $(BUILD_DIR)/qemu-panic-serial.log; \
+		grep -Eq "CS:     0x[0-9A-F]{16}" $(BUILD_DIR)/qemu-panic-serial.log; \
+		grep -Eq "RFLAGS: 0x[0-9A-F]{16}" $(BUILD_DIR)/qemu-panic-serial.log; \
 		grep -Fq "System halted. Reboot the VM after collecting this report." $(BUILD_DIR)/qemu-panic-serial.log
 	$(MAKE) clean all
 
