@@ -245,7 +245,7 @@ qemu-keyboard-smoke: $(ISO_IMAGE)
 qemu-panic-smoke:
 	$(MAKE) clean
 	$(MAKE) PANIC_TEST=1 iso
-	@set +e; (sleep 3; printf 'panic-test\r'; sleep 1) | \
+	@set +e; (sleep 3; printf '\r'; sleep 1; printf 'panic-test\r'; sleep 1) | \
 		timeout 8s qemu-system-x86_64 -M q35 -m 512M -vga std \
 		-cdrom $(ISO_IMAGE) -display none -serial stdio \
 		-no-reboot -no-shutdown > $(BUILD_DIR)/qemu-panic-serial.log 2>&1; \
