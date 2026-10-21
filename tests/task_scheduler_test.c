@@ -53,10 +53,14 @@ static void test_scheduler_invariant_validation(void) {
     scheduler.tasks[2].saved_stack_pointer = 0u;
     assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
 
-    /* Active task names must remain NUL-terminated inside the fixed field. */
-    scheduler.tasks[0].name[DODO_TASK_NAME_MAX] = 'X';
+    /* A name with no NUL in its entire fixed field must be rejected. */
+    char saved_first_name_field[DODO_TASK_NAME_MAX + 1u];
+    memcpy(saved_first_name_field, scheduler.tasks[0].name,
+        sizeof(saved_first_name_field));
+    memset(scheduler.tasks[0].name, 'X', sizeof(scheduler.tasks[0].name));
     assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_INVALID_ARGUMENT);
-    scheduler.tasks[0].name[DODO_TASK_NAME_MAX] = '\0';
+    memcpy(scheduler.tasks[0].name, saved_first_name_field,
+        sizeof(saved_first_name_field));
     assert(dodo_scheduler_validate(&scheduler) == DODO_TASK_OK);
 }
 
