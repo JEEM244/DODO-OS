@@ -431,7 +431,8 @@ static struct dodo_x86_64_exception_frame *make_kernel_task_frame(
     frame->error_code = 0u;
     frame->rip = (uint64_t)(uintptr_t)entry;
     frame->cs = DODO_X86_64_KERNEL_CODE_SELECTOR;
-    frame->rflags = UINT64_C(0x202);
+    /* Start the trampoline with maskable IRQs off; it enables them explicitly. */
+    frame->rflags = UINT64_C(0x002);
     return frame;
 }
 
@@ -502,20 +503,6 @@ uint64_t dodo_x86_64_scheduler_next_frame(void) {
         serial_write_u64(kernel_scheduler.current_id);
         serial_write("\n");
         return 0u;
-    }
-    if (kernel_scheduler_switches == 1u) {
-        const struct dodo_x86_64_exception_frame *target =
-            (const struct dodo_x86_64_exception_frame *)(uintptr_t)
-            current->saved_stack_pointer;
-        serial_write("DODO: first scheduler target frame = ");
-        serial_write_hex64(current->saved_stack_pointer);
-        serial_write(" rip=");
-        serial_write_hex64(target->rip);
-        serial_write(" cs=");
-        serial_write_hex64(target->cs);
-        serial_write(" flags=");
-        serial_write_hex64(target->rflags);
-        serial_write("\n");
     }
     return current->saved_stack_pointer;
 }
@@ -882,9 +869,6 @@ int dodo_x86_64_exception_handler(
                 kernel_panic("scheduler found no runnable kernel task", frame);
             }
             if (selected_id != previous_id) ++kernel_scheduler_switches;
-            if (kernel_scheduler_switches == 1u) {
-                serial_write("DODO: first context switch requested\n");
-            }
             return DODO_EXCEPTION_SWITCH_CONTEXT;
         }
         return DODO_EXCEPTION_RESUME;
