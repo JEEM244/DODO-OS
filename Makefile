@@ -244,6 +244,7 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "Unissued cursor pages:" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "Recycled free-stack pages:" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "Allocator total free pages:" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "Free-page accounting: consistent" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "Physical allocator check passed." $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "allocator counters unchanged" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: legacy PIC remapped; PIT configured for 100 Hz" $(BUILD_DIR)/qemu-serial.log; \

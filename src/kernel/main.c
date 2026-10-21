@@ -404,7 +404,14 @@ static void show_physical_region_map(void) {
     serial_write_u64(physical_allocator.free_stack_count);
     serial_write("\nAllocator total free pages: ");
     serial_write_u64(physical_allocator.free_pages);
-    serial_write("\n");
+    serial_write("\nFree-page accounting: ");
+    if (unissued_pages <= UINT64_MAX - physical_allocator.free_stack_count &&
+        unissued_pages + physical_allocator.free_stack_count ==
+            physical_allocator.free_pages) {
+        serial_write("consistent\n");
+    } else {
+        serial_write("MISMATCH\n");
+    }
 }
 
 static void run_serial_shell(void) __attribute__((noreturn));
