@@ -43,7 +43,7 @@ PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
 VADDR_TEST := $(BUILD_DIR)/vaddr_allocator_test
 TASK_TEST := $(BUILD_DIR)/task_scheduler_test
 
-.PHONY: all kernel iso run qemu-smoke qemu-keyboard-smoke qemu-panic-smoke test-phys test-vaddr test-task test clean check-tools
+.PHONY: all kernel iso run verify qemu-smoke qemu-keyboard-smoke qemu-panic-smoke test-phys test-vaddr test-task test clean check-tools
 all: iso
 
 kernel: check-tools $(KERNEL_ELF)
@@ -51,6 +51,14 @@ kernel: check-tools $(KERNEL_ELF)
 iso: check-tools $(ISO_IMAGE)
 
 test: test-phys test-vaddr test-task
+
+# Full local acceptance pass. Requires the same Linux/QEMU tools as CI.
+verify:
+	$(MAKE) test
+	$(MAKE) clean all
+	$(MAKE) qemu-smoke
+	$(MAKE) qemu-keyboard-smoke
+	$(MAKE) qemu-panic-smoke
 
 $(TASK_TEST): src/kernel/task.c tests/task_scheduler_test.c include/dodo/kernel/task.h | $(BUILD_DIR)
 	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Iinclude \
