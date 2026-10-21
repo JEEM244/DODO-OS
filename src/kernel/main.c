@@ -414,6 +414,26 @@ static void show_physical_region_map(void) {
     }
 }
 
+
+static void show_security_status(void) {
+    serial_write("DODO kernel security status:\n");
+    serial_write("  CPU mode: x86-64 long mode; four-level paging\n");
+    serial_write("  Supervisor write protection (CR0.WP): enabled\n");
+    serial_write("  NX instruction protection: ");
+    if (dodo_x86_64_nx_enabled()) {
+        serial_write("enabled\n");
+    } else {
+        serial_write("unavailable\n");
+    }
+    serial_write("  Kernel PML4 root: ");
+    serial_write_hex64(dodo_x86_64_kernel_root_physical());
+    serial_write("\n");
+    serial_write("  CPL3 isolation: boot self-tests passed; general processes not implemented\n");
+    serial_write("  Syscall ABI: test-only int 0x80; not a stable process ABI\n");
+    serial_write("  Scheduler: state-machine only; no CPU context switching\n");
+    serial_write("  Filesystem / network / graphical desktop: not implemented\n");
+}
+
 static void run_serial_shell(void) __attribute__((noreturn));
 
 static void run_serial_shell(void) {
@@ -435,6 +455,7 @@ static void run_serial_shell(void) {
             serial_write("  help     Show this command list\n");
             serial_write("  about    Explain the current build\n");
             serial_write("  version  Show the kernel prototype version\n");
+            serial_write("  security Show active protection status and current limitations\n");
             serial_write("  mem      Show physical allocator counters\n");
             serial_write("  memmap   Show tracked physical memory regions\n");
             serial_write("  memcheck Exercise physical page allocate/free/reuse\n");
@@ -451,6 +472,8 @@ static void run_serial_shell(void) {
         } else if (string_equal(command, "version")) {
             serial_write("DODO OS kernel prototype 0.1.0\n");
             serial_write("Architecture: x86_64 | Boot: Limine BIOS/UEFI ISO\n");
+        } else if (string_equal(command, "security")) {
+            show_security_status();
         } else if (string_equal(command, "mem")) {
             serial_write("Physical memory allocator:\n  free pages:      ");
             serial_write_u64(physical_allocator.free_pages);

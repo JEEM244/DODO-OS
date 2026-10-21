@@ -10,7 +10,7 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 - [x] Halt safely after the kernel bootstrap checks.
 - [x] Reproduce the build in GitHub Actions and inspect ELF metadata.
 - [x] Integrate a pinned Limine boot path and create a BIOS/UEFI test ISO.
-- [x] Open a basic COM1 command console after boot self-checks (`help`, `about`, `version`, `mem`, `memmap`, `memcheck`, `uptime`, `sleep`, `echo`, `clear`, `halt`); interactive command behavior must pass the latest QEMU smoke test.
+- [x] Open a basic COM1 command console after boot self-checks (`help`, `about`, `version`, `security`, `mem`, `memmap`, `memcheck`, `uptime`, `sleep`, `echo`, `clear`, `halt`); interactive command behavior must pass the latest QEMU smoke test.
 
 **Acceptance:** the kernel ELF builds, QEMU reaches the kernel, the protocol base revision is accepted, serial output is checked by CI, and automated serial input receives command responses. The kernel is still only a bootstrap prototype.
 

@@ -55,7 +55,7 @@ make qemu-panic-smoke # verify invalid-opcode/page-fault panic diagnostics
 make verify          # run all host and QEMU acceptance tests in sequence (ELF W^X, BIOS, UEFI, keyboard, panic)
 ~~~
 
-The prototype now renders an initial text console on the RGB framebuffer provided by Limine and mirrors all output to COM1. The shell accepts both PS/2 keyboard input and serial input. Commands include `help`, `about`, `version`, `mem`, `memmap`, `memcheck`, `uptime`, `sleep N`, `echo TXT`, `clear`, and `halt`. `memmap` displays physical region bounds and per-region unissued pages, plus the recycled-frame count and whether those totals reconcile with the allocator's free-page count. This is a framebuffer text console, not yet a graphical desktop or window manager.
+The prototype now renders an initial text console on the RGB framebuffer provided by Limine and mirrors all output to COM1. The shell accepts both PS/2 keyboard input and serial input. Commands include `help`, `about`, `version`, `security`, `mem`, `memmap`, `memcheck`, `uptime`, `sleep N`, `echo TXT`, `clear`, and `halt`. `security` reports the kernel's current protection configuration and clearly lists major facilities that are still missing. `memmap` displays physical region bounds and per-region unissued pages, plus the recycled-frame count and whether those totals reconcile with the allocator's free-page count. This is a framebuffer text console, not yet a graphical desktop or window manager.
 
 ## Roadmap
 
