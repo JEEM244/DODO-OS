@@ -153,3 +153,7 @@ For every map step that can fail, inject the failure and assert that no leaf map
 ### Unmap failure preservation
 
 Test invalid address, absent leaf, malformed metadata, wrong owner, and unsupported huge-page cases. Failures must preserve output parameters and must not release physical frames.
+
+### Repeated lifecycle stress
+
+Run deterministic create-map-unmap-destroy cycles across multiple owners and reuse the same virtual addresses. Validate the ownership ledger and physical allocator after every transition.
