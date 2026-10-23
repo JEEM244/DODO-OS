@@ -287,6 +287,25 @@ static void test_invalid_runtime_range_allocates_nothing(void) {
     assert(f.allocator.allocated_pages == 0u);
 }
 
+static void test_distinct_owners_can_have_independent_roots(void) {
+    struct fixture f;
+    fixture_init(&f, 126u);
+    struct dodo_address_space_runtime second;
+    assert(dodo_address_space_runtime_create(&second, &f.frames, 127u,
+        UINT64_C(0x900000), UINT64_C(0xA00000)) ==
+        DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(second.root_physical != f.runtime.root_physical);
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_address_space_runtime_validate(&second) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_address_space_runtime_destroy(&second) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(f.allocator.allocated_pages == 0u);
+}
+
 static void test_owner_id_cannot_be_reused_for_live_runtime(void) {
     struct fixture f;
     fixture_init(&f, 113u);
@@ -702,6 +721,7 @@ int main(void) {
     test_create_map_unmap_destroy_reclaims_all_owned_frames();
     test_invalid_owner_id_allocates_nothing();
     test_invalid_runtime_range_allocates_nothing();
+    test_distinct_owners_can_have_independent_roots();
     test_owner_id_cannot_be_reused_for_live_runtime();
     test_user_root_creation_failure_releases_root_frame();
     test_failed_root_switch_rolls_back_mapping_allocation();
