@@ -90,6 +90,15 @@ enum dodo_address_space_status dodo_address_space_validate(
             }
         }
     }
+    for (uint32_t i = space->mapping_count;
+         i < DODO_ADDRESS_SPACE_MAX_MAPPINGS; ++i) {
+        const struct dodo_address_space_mapping *unused = &space->mappings[i];
+        if (unused->virtual_address != 0u || unused->physical_address != 0u ||
+            unused->flags != 0u ||
+            unused->frame_policy != DODO_ADDRESS_SPACE_BORROWED_FRAME) {
+            return DODO_ADDRESS_SPACE_INVALID_STATE;
+        }
+    }
     return DODO_ADDRESS_SPACE_OK;
 }
 
