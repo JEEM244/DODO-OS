@@ -145,3 +145,7 @@ Release the root frame only after the address space is inactive, all private lea
 ### Creation failure injection
 
 Host tests should inject allocation failure at every allocation index in address-space creation. Each run must prove that live physical-frame counts, ledger counts, and virtual reservations return to their pre-call values.
+
+### Map failure injection
+
+For every map step that can fail, inject the failure and assert that no leaf mapping remains, no virtual reservation was committed, and every table frame acquired by the failed operation is either released or still explicitly owned.
