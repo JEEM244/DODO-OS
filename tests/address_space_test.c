@@ -386,6 +386,16 @@ static void test_invalid_physical_frame_and_policy_are_rejected(void) {
         DODO_ADDRESS_SPACE_INVALID_ARGUMENT);
     assert(f.space.mapping_count == 0u && f.space.virtual_space.count == 0u);
 }
+static void test_last_page_before_exclusive_end_is_accepted(void) {
+    struct fixture f;
+    fixture_init(&f);
+    assert(dodo_address_space_record_mapped_page(&f.space, UINT64_C(0x7ff000),
+        UINT64_C(0x2000), DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE,
+        DODO_ADDRESS_SPACE_BORROWED_FRAME) == DODO_ADDRESS_SPACE_OK);
+    assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OK);
+    assert(dodo_address_space_forget_unmapped_page(&f.space, UINT64_C(0x7ff000)) ==
+           DODO_ADDRESS_SPACE_OK);
+}
 static void test_null_page_mapping_is_rejected(void) {
     struct fixture f;
     fixture_init(&f);
@@ -596,6 +606,7 @@ int main(void) {
     test_unaligned_addresses_are_rejected();
     test_unsupported_cache_flags_are_rejected();
     test_invalid_physical_frame_and_policy_are_rejected();
+    test_last_page_before_exclusive_end_is_accepted();
     test_null_page_mapping_is_rejected();
     test_mapping_outside_reserved_interval_is_rejected();
     test_owned_mapping_requires_user_data_frame_kind();
