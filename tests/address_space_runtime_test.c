@@ -359,6 +359,21 @@ static void test_unmap_restore_failure_keeps_metadata_consistent(void) {
            DODO_ADDRESS_SPACE_RUNTIME_OK);
 }
 
+static void test_read_only_executable_mapping_is_accepted(void) {
+    struct fixture f;
+    fixture_init(&f, 121u);
+    assert(dodo_address_space_runtime_map(&f.runtime, UINT64_C(0x401000),
+        DODO_PAGE_USER_ACCESSIBLE) == DODO_ADDRESS_SPACE_RUNTIME_OK);
+    struct dodo_address_space_mapping mapping;
+    assert(dodo_address_space_lookup(&f.runtime.metadata, UINT64_C(0x401000),
+        &mapping) == DODO_ADDRESS_SPACE_OK);
+    assert(mapping.flags == DODO_PAGE_USER_ACCESSIBLE);
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+}
+
 static void test_duplicate_and_invalid_mapping_do_not_leak(void) {
     struct fixture f;
     fixture_init(&f, 103u);
@@ -629,6 +644,7 @@ int main(void) {
     test_failed_root_switch_rolls_back_mapping_allocation();
     test_restore_switch_failure_keeps_mapping_owned();
     test_unmap_restore_failure_keeps_metadata_consistent();
+    test_read_only_executable_mapping_is_accepted();
     test_duplicate_and_invalid_mapping_do_not_leak();
     test_low_level_mapping_failure_rolls_back_owned_frames();
     test_hardware_metadata_mismatch_fails_closed();
