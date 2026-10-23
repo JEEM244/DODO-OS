@@ -27,6 +27,10 @@ The metadata registry allows multiple borrowed aliases only when the external ow
 
 The user null page is excluded from address-space intervals. The generic virtual allocator remains capable of representing address zero for non-process uses, but process address spaces must start at or above one page.
 
+### Read-only hardware mapping inspection
+
+`dodo_x86_64_query_page()` walks the active four-level page tables and reports the leaf physical frame and allowed flags without mutating entries. It rejects non-canonical or unaligned virtual addresses, absent leaves, and huge-page walks; output parameters remain unchanged on failure. Kernel boot self-checks compare the query result with known kernel and user mappings and verify that a successful unmap becomes visible to the query. This is a diagnostic primitive, not yet an automatic cross-check performed by the metadata registry.
+
 ## Metadata registry prototype
 
 `include/dodo/mm/address_space.h` and `src/mm/address_space.c` now provide a host-testable metadata layer. It validates lower-half user mapping flags, a bounded reservation table, owner-scoped `USER_DATA` frames for owned mappings, borrowed-versus-owned policy, sorted mapping records, lookup, and removal bookkeeping. Writable mappings must also be NX; unsupported cache/global flags are rejected.
