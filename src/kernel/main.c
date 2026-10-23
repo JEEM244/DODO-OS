@@ -2129,6 +2129,13 @@ static void test_integrated_address_space_runtime(void) {
             DODO_ADDRESS_SPACE_RUNTIME_OK) {
         report_boot_error("integrated address-space creation failed");
     }
+    if (dodo_address_space_runtime_activate(&runtime) !=
+            DODO_ADDRESS_SPACE_RUNTIME_OK ||
+        dodo_address_space_runtime_deactivate(&runtime,
+            dodo_x86_64_kernel_root_physical()) !=
+            DODO_ADDRESS_SPACE_RUNTIME_OK) {
+        report_boot_error("integrated address-space root activation failed");
+    }
     const uint64_t flags = DODO_PAGE_USER_ACCESSIBLE;
     if (dodo_address_space_runtime_map(&runtime, UINT64_C(0x40001000), flags) !=
             DODO_ADDRESS_SPACE_RUNTIME_OK ||
