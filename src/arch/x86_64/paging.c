@@ -558,9 +558,15 @@ enum dodo_paging_status dodo_x86_64_copy_from_active_user(
 }
 
 static enum dodo_paging_status get_root_table(volatile uint64_t **root_table) {
-    if (!paging_initialized) {
+    if (!paging_initialized || root_table == 0) {
         return DODO_PAGING_INVALID_ARGUMENT;
     }
+    /* CR3 is authoritative if low-level code changed roots outside this API. */
+    const uint64_t hardware_root = read_cr3() & DODO_PTE_ADDRESS_MASK;
+    if (hardware_root == 0u) {
+        return DODO_PAGING_INVALID_ADDRESS;
+    }
+    root_table_physical = hardware_root;
     if (!physical_to_hhdm(root_table_physical, root_table)) {
         return DODO_PAGING_INVALID_HHDM;
     }
