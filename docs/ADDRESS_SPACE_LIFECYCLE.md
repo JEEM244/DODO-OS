@@ -105,3 +105,7 @@ Destroy must reject both the hardware-active CR3 root and any object marked ACTI
 ### Permission validation
 
 Reject user mappings that request global pages, unsupported cache attributes, noncanonical addresses, ranges crossing the user limit, or writable-executable permissions when the policy forbids them. Never silently mask invalid caller flags into a weaker request.
+
+### Ancestor permission audit
+
+Before accepting a user leaf, verify every traversed PML4, PDPT, and PD entry permits user access. If an ancestor is supervisor-only, reject the mapping rather than widening a shared or existing table.
