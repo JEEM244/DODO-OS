@@ -1340,6 +1340,32 @@ static void test_user_mode_transitions(void) {
         report_boot_error("could not create a user stack mapping");
     }
 
+    uint64_t queried_user_frame = UINT64_MAX;
+    uint64_t queried_user_flags = UINT64_MAX;
+    paging_status = dodo_x86_64_query_page(user_code_virtual,
+        &queried_user_frame, &queried_user_flags);
+    if (paging_status != DODO_PAGING_OK ||
+        queried_user_frame != user_code_frame ||
+        queried_user_flags != DODO_PAGE_USER_ACCESSIBLE) {
+        report_boot_error("user-code mapping query disagreed with page tables");
+    }
+    paging_status = dodo_x86_64_query_page(user_stack_virtual,
+        &queried_user_frame, &queried_user_flags);
+    if (paging_status != DODO_PAGING_OK ||
+        queried_user_frame != user_stack_frame ||
+        queried_user_flags != user_stack_flags) {
+        report_boot_error("user-stack mapping query disagreed with page tables");
+    }
+    uint64_t queried_kernel_frame = UINT64_MAX;
+    uint64_t queried_kernel_flags = UINT64_MAX;
+    paging_status = dodo_x86_64_query_page(UINT64_C(0xffffffff80000000),
+        &queried_kernel_frame, &queried_kernel_flags);
+    if (paging_status != DODO_PAGING_OK ||
+        (queried_kernel_flags & DODO_PAGE_USER_ACCESSIBLE) != 0u) {
+        report_boot_error("user root exposed a kernel mapping to the page query");
+    }
+    serial_write("DODO: user and supervisor mapping query checks passed\n");
+
     /*
      * Prove the low-half mapping was added only to the user root. The kernel
      * root must still have no entry for this PML4 slot, while the user root's
