@@ -41,7 +41,7 @@ HEADERS := include/dodo/boot/limine_protocol.h \
            include/dodo/mm/frame_ledger.h \
            include/dodo/mm/owned_frames.h \
            include/dodo/mm/vaddr.h \
-           include/dodo/mm/address_space.h \\
+           include/dodo/mm/address_space.h \
            include/dodo/mm/address_space_runtime.h
 OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/capability.o $(BUILD_DIR)/gdt.o \
            $(BUILD_DIR)/idt.o $(BUILD_DIR)/timer.o $(BUILD_DIR)/keyboard.o $(BUILD_DIR)/console.o $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o \
@@ -120,7 +120,7 @@ test-address-space: $(ADDRESS_SPACE_TEST)
 	$(ADDRESS_SPACE_TEST)
 
 $(ADDRESS_SPACE_RUNTIME_TEST): src/mm/phys.c src/mm/frame_ledger.c src/mm/owned_frames.c src/mm/vaddr.c src/mm/address_space.c src/mm/address_space_runtime.c tests/address_space_runtime_test.c $(HEADERS) | $(BUILD_DIR)
-	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Iinclude \\
+	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Iinclude \
 		src/mm/phys.c src/mm/frame_ledger.c src/mm/owned_frames.c src/mm/vaddr.c src/mm/address_space.c src/mm/address_space_runtime.c tests/address_space_runtime_test.c -o $@
 
 test-address-space-runtime: $(ADDRESS_SPACE_RUNTIME_TEST)
