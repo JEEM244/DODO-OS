@@ -140,7 +140,7 @@ enum dodo_paging_status dodo_x86_64_query_page(
  * lower-half addresses because their higher-half page-table branches are shared
  * with the kernel. Returns the physical frame and leaf flags on success, but
  * never frees either the data frame or now-empty intermediate tables. Output
- * parameters remain unchanged on failure.
+ * parameters remain unchanged on failure and must be distinct pointers.
  */
 enum dodo_paging_status dodo_x86_64_unmap_page(
     uint64_t virtual_address,
