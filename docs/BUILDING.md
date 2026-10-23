@@ -42,6 +42,7 @@ The virtual-range tests are compiled with UndefinedBehaviorSanitizer and exercis
 
 The virtual-range allocator does not map pages or own physical frames. Passing these host tests does not establish that real process address spaces are isolated or safely reclaimed.
 
+The host suite also includes a metadata-only address-space registry test. It checks user-range reservations, mapping flags (including W^X), owned versus borrowed frame bookkeeping, ownership-kind checks, sorted records, lookup, corruption rejection, and capacity exhaustion. This registry does not touch hardware page tables; the full create/switch/unmap/destroy lifecycle remains unfinished.
 ## Build
 
 From the repository root:
