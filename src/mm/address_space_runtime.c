@@ -171,7 +171,7 @@ enum dodo_address_space_runtime_status dodo_address_space_runtime_deactivate(
     if (status != DODO_ADDRESS_SPACE_RUNTIME_OK) {
         return status;
     }
-    if (fallback_root_physical == 0u ||
+    if (fallback_root_physical != dodo_x86_64_kernel_root_physical() ||
         fallback_root_physical == runtime->root_physical ||
         dodo_x86_64_active_root_physical() != runtime->root_physical) {
         return DODO_ADDRESS_SPACE_RUNTIME_INVALID_STATE;
