@@ -173,3 +173,7 @@ Create and destroy multiple user roots while checking representative kernel code
 ### Capacity exhaustion test
 
 Fill the virtual reservation table and ownership ledger to their documented limits. The next operation must return a capacity status without modifying existing records or leaking frames.
+
+### Corrupted-ledger negative test
+
+Corrupt one ownership record in a host-only test fixture and verify validate, map, unmap, and destroy refuse to proceed destructively. Preserve caller outputs on rejection.
