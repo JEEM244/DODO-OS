@@ -341,6 +341,39 @@ static void test_mapping_capacity_is_bounded_without_leaks(void) {
     assert(f.allocator.allocated_pages == 0u);
 }
 
+static void test_runtime_rejects_borrowed_mapping_metadata(void) {
+    struct fixture f;
+    fixture_init(&f, 108u);
+    assert(dodo_address_space_record_mapped_page(&f.runtime.metadata,
+        UINT64_C(0x401000), UINT64_C(0x2000),
+        DODO_PAGE_USER_ACCESSIBLE,
+        DODO_ADDRESS_SPACE_BORROWED_FRAME) == DODO_ADDRESS_SPACE_OK);
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_INVALID_STATE);
+    assert(dodo_address_space_forget_unmapped_page(&f.runtime.metadata,
+        UINT64_C(0x401000)) == DODO_ADDRESS_SPACE_OK);
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+}
+
+static void test_invalid_virtual_range_does_not_leak(void) {
+    struct fixture f;
+    fixture_init(&f, 109u);
+    uint32_t before = 0u;
+    uint32_t after = UINT32_MAX;
+    assert(dodo_owned_frames_count_owner(&f.frames, 109u, &before) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(dodo_address_space_runtime_map(&f.runtime, UINT64_C(0x1000),
+        DODO_PAGE_USER_ACCESSIBLE) == DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT);
+    assert(dodo_owned_frames_count_owner(&f.frames, 109u, &after) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(after == before);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+}
+
 static void test_destroy_refuses_active_root(void) {
     struct fixture f;
     fixture_init(&f, 104u);
@@ -359,6 +392,8 @@ int main(void) {
     test_low_level_mapping_failure_rolls_back_owned_frames();
     test_hardware_metadata_mismatch_fails_closed();
     test_mapping_capacity_is_bounded_without_leaks();
+    test_runtime_rejects_borrowed_mapping_metadata();
+    test_invalid_virtual_range_does_not_leak();
     test_destroy_refuses_active_root();
     puts("address-space runtime tests: ok");
     return 0;
