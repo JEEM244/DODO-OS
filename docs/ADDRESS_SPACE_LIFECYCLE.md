@@ -197,3 +197,7 @@ The first lifecycle implementation must work without malloc, recursion-sized var
 ### Transactional reservation updates
 
 Virtual reservation updates should be staged or performed only at the final commit point. If mapping fails, callers must not need to infer whether the range was reserved.
+
+### Frame-kind requirements
+
+Use distinct frame kinds for roots, page-table pages, user data, and kernel stacks. Teardown must reject a record whose kind does not match the operation being performed.
