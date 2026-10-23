@@ -34,6 +34,11 @@ enum dodo_address_space_runtime_status dodo_address_space_runtime_create(
     if (runtime == NULL || frames == NULL || owner_id == DODO_FRAME_OWNER_INVALID) {
         return DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT;
     }
+    struct dodo_vaddr_space range_probe;
+    if (virtual_start < DODO_VADDR_PAGE_SIZE ||
+        dodo_vaddr_init(&range_probe, virtual_start, virtual_end) != DODO_VADDR_OK) {
+        return DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT;
+    }
     if (dodo_owned_frames_validate(frames) != DODO_OWNED_FRAMES_OK) {
         return DODO_ADDRESS_SPACE_RUNTIME_OWNERSHIP_ERROR;
     }
