@@ -149,3 +149,7 @@ Host tests should inject allocation failure at every allocation index in address
 ### Map failure injection
 
 For every map step that can fail, inject the failure and assert that no leaf mapping remains, no virtual reservation was committed, and every table frame acquired by the failed operation is either released or still explicitly owned.
+
+### Unmap failure preservation
+
+Test invalid address, absent leaf, malformed metadata, wrong owner, and unsupported huge-page cases. Failures must preserve output parameters and must not release physical frames.
