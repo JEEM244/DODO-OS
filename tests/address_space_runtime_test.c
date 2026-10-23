@@ -405,6 +405,11 @@ static void test_hardware_metadata_mismatch_fails_closed(void) {
            DODO_ADDRESS_SPACE_RUNTIME_PAGING_ERROR);
     assert(f.runtime.metadata.mapping_count == 1u);
     mapping->physical_address = expected_physical;
+    const uint64_t expected_flags = mapping->flags;
+    mapping->flags ^= DODO_PAGE_NO_EXECUTE;
+    assert(dodo_address_space_runtime_unmap(&f.runtime, address) ==
+           DODO_ADDRESS_SPACE_RUNTIME_PAGING_ERROR);
+    mapping->flags = expected_flags;
     assert(dodo_address_space_runtime_validate(&f.runtime) ==
            DODO_ADDRESS_SPACE_RUNTIME_OK);
     assert(dodo_address_space_runtime_destroy(&f.runtime) ==
