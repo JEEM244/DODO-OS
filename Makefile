@@ -100,7 +100,7 @@ $(BUILD_DIR)/frame_ledger.o: src/mm/frame_ledger.c include/dodo/mm/frame_ledger.
 $(BUILD_DIR)/owned_frames.o: src/mm/owned_frames.c include/dodo/mm/owned_frames.h include/dodo/mm/frame_ledger.h include/dodo/mm/phys.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/address_space.o: src/mm/address_space.c include/dodo/mm/address_space.h include/dodo/mm/owned_frames.h include/dodo/mm/vaddr.h | $(BUILD_DIR)
+$(BUILD_DIR)/address_space.o: src/mm/address_space.c include/dodo/mm/address_space.h include/dodo/mm/owned_frames.h include/dodo/mm/vaddr.h include/dodo/arch/x86_64/paging.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(ADDRESS_SPACE_TEST): src/mm/phys.c src/mm/frame_ledger.c src/mm/owned_frames.c src/mm/vaddr.c src/mm/address_space.c tests/address_space_test.c $(HEADERS) | $(BUILD_DIR)
