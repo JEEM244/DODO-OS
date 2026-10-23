@@ -133,3 +133,7 @@ Run a full metadata and allocator-consistency validation before teardown starts.
 ### Destroy postorder
 
 Walk private page-table branches bottom-up. Remove user leaf mappings and invalidate translations before freeing leaf frames; release a table only after no present entry refers to its child table.
+
+### Shared kernel mapping contract
+
+A user root may share supervisor-only kernel-half top-level entries, but the address-space owner must not record those shared descendants as private. The kernel remains responsible for their lifetime.
