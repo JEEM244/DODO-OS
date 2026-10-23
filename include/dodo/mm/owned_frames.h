@@ -25,6 +25,10 @@ struct dodo_owned_frames {
 void dodo_owned_frames_init(struct dodo_owned_frames *pool,
                             struct dodo_phys_allocator *allocator);
 
+/* Verify ledger integrity and that every recorded frame is still allocated. */
+enum dodo_owned_frames_status dodo_owned_frames_validate(
+    const struct dodo_owned_frames *pool);
+
 enum dodo_owned_frames_status dodo_owned_frames_alloc(
     struct dodo_owned_frames *pool, uint32_t owner_id,
     enum dodo_frame_kind kind, uint64_t *physical_address);
