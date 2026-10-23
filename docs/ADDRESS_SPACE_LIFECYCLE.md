@@ -213,3 +213,7 @@ Zero each newly allocated page-table frame before linking it into a reachable hi
 ### No root mutation before validation
 
 Validate the target root frame and its expected ownership kind before writing any root entries or loading it into CR3. Reject roots that alias the active root or a shared kernel object.
+
+### Switch transition protocol
+
+Switching roots should validate READY state, root alignment, physical-address bounds, and shared kernel mapping assumptions before writing CR3. Update software active-state metadata only after CR3 readback succeeds.
