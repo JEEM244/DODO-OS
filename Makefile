@@ -45,7 +45,7 @@ OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/capability.o $(B
            $(BUILD_DIR)/idt.o $(BUILD_DIR)/timer.o $(BUILD_DIR)/keyboard.o $(BUILD_DIR)/console.o $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o \
            $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/paging_test.o \
            $(BUILD_DIR)/user_mode.o $(BUILD_DIR)/frame_ledger.o $(BUILD_DIR)/owned_frames.o \
-           $(BUILD_DIR)/address_space.o
+           $(BUILD_DIR)/vaddr.o $(BUILD_DIR)/address_space.o
 PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
 VADDR_TEST := $(BUILD_DIR)/vaddr_allocator_test
 TASK_TEST := $(BUILD_DIR)/task_scheduler_test
@@ -98,6 +98,9 @@ $(BUILD_DIR)/frame_ledger.o: src/mm/frame_ledger.c include/dodo/mm/frame_ledger.
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/owned_frames.o: src/mm/owned_frames.c include/dodo/mm/owned_frames.h include/dodo/mm/frame_ledger.h include/dodo/mm/phys.h | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/vaddr.o: src/mm/vaddr.c include/dodo/mm/vaddr.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/address_space.o: src/mm/address_space.c include/dodo/mm/address_space.h include/dodo/mm/owned_frames.h include/dodo/mm/vaddr.h include/dodo/arch/x86_64/paging.h | $(BUILD_DIR)
