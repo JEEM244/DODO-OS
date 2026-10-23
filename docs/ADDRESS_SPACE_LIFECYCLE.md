@@ -236,3 +236,20 @@ Switching roots should validate READY state, root alignment, physical-address bo
 ### Interrupt critical sections
 
 For the single-CPU implementation, protect multi-step updates to active-root state and ownership records from local interrupt re-entry where required. This is not a substitute for SMP locks or remote TLB shootdown.
+
+
+## Implemented runtime wrapper (prototype)
+
+`include/dodo/mm/address_space_runtime.h` and `src/mm/address_space_runtime.c` now provide a single-CPU runtime wrapper around the existing metadata registry, owned-frame adapter, and x86-64 paging API.
+
+The wrapper supports:
+- Create a user root with an empty lower half and shared supervisor-only kernel mappings.
+- Allocate an owned user-data frame and up to three candidate intermediate table frames per mapping.
+- Record metadata before installing the hardware leaf, then roll metadata and allocated frames back if mapping fails.
+- Query the active leaf before unmapping and require its physical frame and leaf flags to match the metadata record.
+- Retain intermediate page-table frames after unmap because the current low-level unmapper does not prune empty tables.
+- Destroy an inactive address space by unmapping every recorded leaf, releasing owned data frames, then releasing retained table frames and the root.
+
+The ownership ledger capacity is now 512 records so the bootstrap registry can represent a root, user pages, and a bounded set of retained page-table frames. The runtime refuses new mappings before its table-frame tracking array can overflow.
+
+This remains a prototype, not a process manager: it is single-CPU, has no reference-counted shared user frames, does not reclaim empty intermediate tables on each unmap, and does not provide scheduler/context-switch integration. The boot self-check and host mock tests cover ordinary lifecycle, rollback, metadata/hardware mismatch, capacity, and teardown. A passing CI/QEMU run is still required before treating it as verified.
