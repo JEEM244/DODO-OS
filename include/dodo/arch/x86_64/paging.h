@@ -61,6 +61,9 @@ int dodo_x86_64_nx_enabled(void);
 /* Physical address of the kernel root established during bootstrap. */
 uint64_t dodo_x86_64_kernel_root_physical(void);
 
+/* Physical address of the root currently tracked as active by the mapper. */
+uint64_t dodo_x86_64_active_root_physical(void);
+
 /*
  * Create a separate user root with all lower-half PML4 entries empty and only
  * the kernel-half entries copied from DODO's active kernel root. This provides
