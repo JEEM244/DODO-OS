@@ -55,15 +55,16 @@ CAPABILITY_TEST := $(BUILD_DIR)/capability_test
 FRAME_LEDGER_TEST := $(BUILD_DIR)/frame_ledger_test
 OWNED_FRAMES_TEST := $(BUILD_DIR)/owned_frames_test
 ADDRESS_SPACE_TEST := $(BUILD_DIR)/address_space_test
+ADDRESS_SPACE_RUNTIME_TEST := $(BUILD_DIR)/address_space_runtime_test
 
-.PHONY: all kernel iso run verify verify-elf-layout qemu-smoke qemu-uefi-smoke qemu-keyboard-smoke qemu-panic-smoke test-phys test-vaddr test-task test-capability test-frame-ledger test-owned-frames test-address-space test clean check-tools
+.PHONY: all kernel iso run verify verify-elf-layout qemu-smoke qemu-uefi-smoke qemu-keyboard-smoke qemu-panic-smoke test-phys test-vaddr test-task test-capability test-frame-ledger test-owned-frames test-address-space test-address-space-runtime test clean check-tools
 all: iso
 
 kernel: check-tools $(KERNEL_ELF)
 
 iso: check-tools $(ISO_IMAGE)
 
-test: test-phys test-vaddr test-task test-capability test-frame-ledger test-owned-frames test-address-space
+test: test-phys test-vaddr test-task test-capability test-frame-ledger test-owned-frames test-address-space test-address-space-runtime
 
 # Full local acceptance pass. Requires the same Linux/QEMU tools as CI.
 verify:
@@ -117,6 +118,13 @@ $(ADDRESS_SPACE_TEST): src/mm/phys.c src/mm/frame_ledger.c src/mm/owned_frames.c
 
 test-address-space: $(ADDRESS_SPACE_TEST)
 	$(ADDRESS_SPACE_TEST)
+
+$(ADDRESS_SPACE_RUNTIME_TEST): src/mm/phys.c src/mm/frame_ledger.c src/mm/owned_frames.c src/mm/vaddr.c src/mm/address_space.c src/mm/address_space_runtime.c tests/address_space_runtime_test.c $(HEADERS) | $(BUILD_DIR)
+	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Iinclude \\
+		src/mm/phys.c src/mm/frame_ledger.c src/mm/owned_frames.c src/mm/vaddr.c src/mm/address_space.c src/mm/address_space_runtime.c tests/address_space_runtime_test.c -o $@
+
+test-address-space-runtime: $(ADDRESS_SPACE_RUNTIME_TEST)
+	$(ADDRESS_SPACE_RUNTIME_TEST)
 
 $(OWNED_FRAMES_TEST): src/mm/phys.c src/mm/frame_ledger.c src/mm/owned_frames.c tests/owned_frames_test.c $(HEADERS) | $(BUILD_DIR)
 	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Iinclude \
