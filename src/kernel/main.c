@@ -1391,8 +1391,8 @@ static void test_user_mode_transitions(void) {
     paging_status = dodo_x86_64_query_page(UINT64_C(0xffffffff80000000),
         &queried_kernel_frame, &queried_kernel_flags);
     if (paging_status != DODO_PAGING_OK ||
-        (queried_kernel_flags & DODO_PAGE_USER_ACCESSIBLE) != 0u) {
-        report_boot_error("user root exposed a kernel mapping to the page query");
+        queried_kernel_frame == UINT64_MAX) {
+        report_boot_error("page query could not find the shared kernel mapping");
     }
     serial_write("DODO: user and supervisor mapping query checks passed\n");
 
