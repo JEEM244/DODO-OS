@@ -50,6 +50,14 @@ enum dodo_address_space_status dodo_address_space_init(
     if (dodo_owned_frames_validate(frames) != DODO_OWNED_FRAMES_OK) {
         return DODO_ADDRESS_SPACE_OWNERSHIP_ERROR;
     }
+    /*
+     * Keep the null page unmappable in every user address space. The generic
+     * virtual-range allocator may represent address zero, but process mappings
+     * must not make a null dereference silently access user data.
+     */
+    if (virtual_start < DODO_VADDR_PAGE_SIZE) {
+        return DODO_ADDRESS_SPACE_RANGE_ERROR;
+    }
     const enum dodo_vaddr_status range_status =
         dodo_vaddr_init(&space->virtual_space, virtual_start, virtual_end);
     if (range_status != DODO_VADDR_OK) {
