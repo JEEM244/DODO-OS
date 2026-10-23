@@ -1844,6 +1844,13 @@ static void test_user_mode_transitions(void) {
     if (paging_status != DODO_PAGING_OK || frames_used != 0u) {
         report_boot_error("could not restore mapping after active-root rejection test");
     }
+    paging_status = dodo_x86_64_query_page(second_user_code_virtual,
+        &removed_frame_query, &removed_flags_query);
+    if (paging_status != DODO_PAGING_OK ||
+        removed_frame_query != second_user_code_frame ||
+        removed_flags_query != DODO_PAGE_USER_ACCESSIBLE) {
+        report_boot_error("page query did not observe restored user mapping");
+    }
     serial_write("DODO: active-root recreation rejection self-check passed\n");
 
     /*
