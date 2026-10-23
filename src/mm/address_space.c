@@ -10,6 +10,18 @@ static int valid_frame_policy(enum dodo_address_space_frame_policy policy) {
            policy == DODO_ADDRESS_SPACE_OWNED_FRAME;
 }
 
+static int owns_user_data_frame(const struct dodo_address_space *space,
+                                  uint64_t physical_address) {
+    for (uint32_t i = 0u; i < DODO_FRAME_LEDGER_CAPACITY; ++i) {
+        const struct dodo_frame_record *record = &space->frames->ledger.records[i];
+        if (record->physical_address == physical_address) {
+            return record->owner_id == space->owner_id &&
+                   record->kind == DODO_FRAME_KIND_USER_DATA;
+        }
+    }
+    return 0;
+}
+
 static int valid_mapping_values(uint64_t virtual_address, uint64_t physical_address,
                                 uint64_t flags,
                                 enum dodo_address_space_frame_policy policy) {
@@ -76,10 +88,7 @@ enum dodo_address_space_status dodo_address_space_validate(
             return DODO_ADDRESS_SPACE_INVALID_STATE;
         }
         if (mapping->frame_policy == DODO_ADDRESS_SPACE_OWNED_FRAME) {
-            enum dodo_frame_kind kind = DODO_FRAME_KIND_UNUSED;
-            if (dodo_owned_frames_get_kind(space->frames, space->owner_id,
-                                           mapping->physical_address, &kind) !=
-                    DODO_OWNED_FRAMES_OK || kind != DODO_FRAME_KIND_USER_DATA) {
+            if (!owns_user_data_frame(space, mapping->physical_address)) {
                 return DODO_ADDRESS_SPACE_OWNERSHIP_ERROR;
             }
             for (uint32_t j = i + 1u; j < space->mapping_count; ++j) {
@@ -119,10 +128,7 @@ enum dodo_address_space_status dodo_address_space_record_mapped_page(
         return DODO_ADDRESS_SPACE_CAPACITY;
     }
     if (frame_policy == DODO_ADDRESS_SPACE_OWNED_FRAME) {
-        enum dodo_frame_kind kind = DODO_FRAME_KIND_UNUSED;
-        if (dodo_owned_frames_get_kind(space->frames, space->owner_id,
-                                       physical_address, &kind) !=
-                DODO_OWNED_FRAMES_OK || kind != DODO_FRAME_KIND_USER_DATA) {
+        if (!owns_user_data_frame(space, physical_address)) {
             return DODO_ADDRESS_SPACE_OWNERSHIP_ERROR;
         }
         /*
