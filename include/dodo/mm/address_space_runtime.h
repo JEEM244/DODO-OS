@@ -21,6 +21,8 @@ enum dodo_address_space_runtime_status {
  * Single-CPU runtime wrapper joining address-space metadata, frame ownership,
  * and the active x86-64 mapper. Intermediate page-table frames are retained
  * until destroy because the low-level unmapper does not prune empty tables.
+ * The caller supplies fresh storage; owner_id must be unique and own no frames
+ * before create. Calls are not reentrant or SMP-safe.
  */
 struct dodo_address_space_runtime {
     struct dodo_address_space metadata;
