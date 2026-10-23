@@ -121,3 +121,7 @@ The virtual-range reservation table and hardware page tables must agree at every
 ### Bounded ownership capacity
 
 Before allocating any frame, reserve enough ownership-record capacity for the whole operation or guarantee rollback for each allocation. Never allocate a frame and then lose its identity because the ledger is full.
+
+### Duplicate frame rejection
+
+An address-space ownership record must reject a physical frame already recorded for the same or another owner. Aliasing may be supported later through a separate reference-counted mapping object, not duplicate ownership.
