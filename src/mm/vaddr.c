@@ -40,6 +40,11 @@ static int valid_space(const struct dodo_vaddr_space *space) {
     return 1;
 }
 
+enum dodo_vaddr_status dodo_vaddr_validate(
+    const struct dodo_vaddr_space *space) {
+    return valid_space(space) ? DODO_VADDR_OK : DODO_VADDR_INVALID_ARGUMENT;
+}
+
 enum dodo_vaddr_status dodo_vaddr_init(
     struct dodo_vaddr_space *space, uint64_t start, uint64_t end) {
     if (space == NULL) {
