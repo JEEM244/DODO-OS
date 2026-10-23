@@ -402,6 +402,17 @@ static void test_owned_mapping_requires_matching_frame_owner(void) {
     assert(f.space.mapping_count == 0u && f.space.virtual_space.count == 0u);
     assert(dodo_owned_frames_release(&f.frames, 99, frame) == DODO_OWNED_FRAMES_OK);
 }
+static void test_read_only_executable_mapping_is_allowed(void) {
+    struct fixture f;
+    fixture_init(&f);
+    const uint64_t flags = DODO_PAGE_USER_ACCESSIBLE;
+    assert(dodo_address_space_record_mapped_page(&f.space, UINT64_C(0x41c000),
+        UINT64_C(0x1000), flags, DODO_ADDRESS_SPACE_BORROWED_FRAME) ==
+        DODO_ADDRESS_SPACE_OK);
+    assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OK);
+    assert(dodo_address_space_forget_unmapped_page(&f.space, UINT64_C(0x41c000)) ==
+           DODO_ADDRESS_SPACE_OK);
+}
 static void test_writable_executable_mapping_is_rejected(void) {
     struct fixture f;
     fixture_init(&f);
@@ -544,6 +555,7 @@ int main(void) {
     test_mapping_outside_reserved_interval_is_rejected();
     test_owned_mapping_requires_user_data_frame_kind();
     test_owned_mapping_requires_matching_frame_owner();
+    test_read_only_executable_mapping_is_allowed();
     test_writable_executable_mapping_is_rejected();
     test_owned_frame_cannot_have_two_owning_mappings();
     test_forget_rejects_missing_or_misaligned_page();
