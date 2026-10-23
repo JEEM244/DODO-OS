@@ -21,6 +21,12 @@ DODO can create and test separate user page-table roots, but cleanup currently r
 
 `dodo_vaddr_validate(const struct dodo_vaddr_space *)` is now a public validation entry point for the metadata-only low-half range allocator. It returns `DODO_VADDR_OK` only when the interval, reservation count, alignment, ordering, bounds, and non-overlap invariants are valid; malformed metadata returns `DODO_VADDR_INVALID_ARGUMENT`. This is a consistency check, not proof that hardware page tables match reservations, and it does not allocate or free physical memory. Host tests call it during the deterministic range-allocation stress loop and inject malformed overlapping records.
 
+### Alias and lifetime restrictions
+
+The metadata registry allows multiple borrowed aliases only when the external owner guarantees the frame's lifetime. A frame owned by this address space cannot also appear as a borrowed mapping in the same space, and an owned mapping cannot alias any other mapping. Without a reference-counted shared-frame object, allowing either case could leave a live mapping pointing at a released frame. Cross-address-space sharing still requires a future explicit lifetime protocol.
+
+The user null page is excluded from address-space intervals. The generic virtual allocator remains capable of representing address zero for non-process uses, but process address spaces must start at or above one page.
+
 ## Metadata registry prototype
 
 `include/dodo/mm/address_space.h` and `src/mm/address_space.c` now provide a host-testable metadata layer. It validates lower-half user mapping flags, a bounded reservation table, owner-scoped `USER_DATA` frames for owned mappings, borrowed-versus-owned policy, sorted mapping records, lookup, and removal bookkeeping. Writable mappings must also be NX; unsupported cache/global flags are rejected.
