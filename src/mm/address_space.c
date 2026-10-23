@@ -105,6 +105,17 @@ enum dodo_address_space_status dodo_address_space_record_mapped_page(
                 DODO_OWNED_FRAMES_OK || kind != DODO_FRAME_KIND_USER_DATA) {
             return DODO_ADDRESS_SPACE_OWNERSHIP_ERROR;
         }
+        /*
+         * One owned frame must have one owning mapping. Additional aliases may
+         * be recorded as borrowed, so teardown can never release the same frame
+         * twice through two ownership records.
+         */
+        for (uint32_t i = 0u; i < space->mapping_count; ++i) {
+            if (space->mappings[i].physical_address == physical_address &&
+                space->mappings[i].frame_policy == DODO_ADDRESS_SPACE_OWNED_FRAME) {
+                return DODO_ADDRESS_SPACE_OWNERSHIP_ERROR;
+            }
+        }
     }
     const enum dodo_vaddr_status reserve_status =
         dodo_vaddr_reserve(&space->virtual_space, virtual_address, DODO_VADDR_PAGE_SIZE);
