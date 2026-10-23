@@ -126,7 +126,8 @@ enum dodo_paging_status dodo_x86_64_map_page(
 /*
  * Query a present 4 KiB leaf in the active root without changing it. Outputs
  * are written only on success; huge-page walks are deliberately rejected.
- * Returned flags describe the leaf entry, not the effective permission after
+ * The two output pointers must be distinct. Returned flags describe the leaf
+ * entry, not the effective permission after
  * intersecting U/S, R/W, and NX bits across every ancestor.
  */
 enum dodo_paging_status dodo_x86_64_query_page(
