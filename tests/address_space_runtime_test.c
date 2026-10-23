@@ -271,6 +271,50 @@ static void test_duplicate_and_invalid_mapping_do_not_leak(void) {
            DODO_ADDRESS_SPACE_RUNTIME_OK);
 }
 
+static void test_hardware_metadata_mismatch_fails_closed(void) {
+    struct fixture f;
+    fixture_init(&f, 105u);
+    const uint64_t address = UINT64_C(0x401000);
+    assert(dodo_address_space_runtime_map(&f.runtime, address,
+        DODO_PAGE_USER_ACCESSIBLE) == DODO_ADDRESS_SPACE_RUNTIME_OK);
+    struct test_mapping *mapping = find_mapping(f.runtime.root_physical, address);
+    assert(mapping != NULL);
+    const uint64_t expected_physical = mapping->physical_address;
+    mapping->physical_address += DODO_PAGE_SIZE;
+    assert(dodo_address_space_runtime_unmap(&f.runtime, address) ==
+           DODO_ADDRESS_SPACE_RUNTIME_PAGING_ERROR);
+    assert(f.runtime.metadata.mapping_count == 1u);
+    mapping->physical_address = expected_physical;
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+}
+
+static void test_mapping_capacity_is_bounded_without_leaks(void) {
+    struct fixture f;
+    fixture_init(&f, 106u);
+    const uint64_t flags = DODO_PAGE_USER_ACCESSIBLE;
+    for (uint32_t i = 0u; i < DODO_ADDRESS_SPACE_MAX_MAPPINGS; ++i) {
+        const uint64_t address = UINT64_C(0x400000) +
+            (uint64_t)i * DODO_PAGE_SIZE;
+        assert(dodo_address_space_runtime_map(&f.runtime, address, flags) ==
+               DODO_ADDRESS_SPACE_RUNTIME_OK);
+    }
+    assert(f.runtime.metadata.mapping_count == DODO_ADDRESS_SPACE_MAX_MAPPINGS);
+    assert(dodo_address_space_runtime_map(&f.runtime, UINT64_C(0x700000), flags) ==
+           DODO_ADDRESS_SPACE_RUNTIME_CAPACITY);
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    uint32_t count = UINT32_MAX;
+    assert(dodo_owned_frames_count_owner(&f.frames, 106u, &count) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(count == 0u);
+    assert(f.allocator.allocated_pages == 0u);
+}
+
 static void test_destroy_refuses_active_root(void) {
     struct fixture f;
     fixture_init(&f, 104u);
@@ -286,6 +330,8 @@ int main(void) {
     test_create_map_unmap_destroy_reclaims_all_owned_frames();
     test_failed_root_switch_rolls_back_mapping_allocation();
     test_duplicate_and_invalid_mapping_do_not_leak();
+    test_hardware_metadata_mismatch_fails_closed();
+    test_mapping_capacity_is_bounded_without_leaks();
     test_destroy_refuses_active_root();
     puts("address-space runtime tests: ok");
     return 0;
