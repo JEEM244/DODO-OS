@@ -422,6 +422,19 @@ static void test_mapping_capacity_is_bounded_without_leaks(void) {
     assert(f.allocator.allocated_pages == 0u);
 }
 
+static void test_runtime_validator_rejects_stale_unused_table_slot(void) {
+    struct fixture f;
+    fixture_init(&f, 115u);
+    f.runtime.table_frames[0] = UINT64_C(0x123000);
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_INVALID_STATE);
+    f.runtime.table_frames[0] = 0u;
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+}
+
 static void test_runtime_rejects_borrowed_mapping_metadata(void) {
     struct fixture f;
     fixture_init(&f, 108u);
@@ -478,6 +491,7 @@ int main(void) {
     test_low_level_mapping_failure_rolls_back_owned_frames();
     test_hardware_metadata_mismatch_fails_closed();
     test_mapping_capacity_is_bounded_without_leaks();
+    test_runtime_validator_rejects_stale_unused_table_slot();
     test_runtime_rejects_borrowed_mapping_metadata();
     test_invalid_virtual_range_does_not_leak();
     test_destroy_refuses_active_root();
