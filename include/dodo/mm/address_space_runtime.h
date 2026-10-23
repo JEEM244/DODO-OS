@@ -42,6 +42,10 @@ enum dodo_address_space_runtime_status dodo_address_space_runtime_create(
 enum dodo_address_space_runtime_status dodo_address_space_runtime_validate(
     const struct dodo_address_space_runtime *runtime);
 
+/* Validate and activate this address space by loading its root into CR3. */
+enum dodo_address_space_runtime_status dodo_address_space_runtime_activate(
+    struct dodo_address_space_runtime *runtime);
+
 /* Allocate and map one owned user-data frame. Writable mappings must be NX. */
 enum dodo_address_space_runtime_status dodo_address_space_runtime_map(
     struct dodo_address_space_runtime *runtime,
