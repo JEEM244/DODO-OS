@@ -1074,6 +1074,20 @@ static void test_virtual_mapping(void) {
     }
     serial_write("DODO: live-root data-frame rejection self-check passed\n");
 
+    uint64_t aliased_self_test_frames[4] = {
+        bootstrap_reserved_frames[0],
+        bootstrap_reserved_frames[1],
+        bootstrap_reserved_frames[2],
+        bootstrap_reserved_frames[3]
+    };
+    const uint64_t first_frame_before_alias_test = aliased_self_test_frames[0];
+    status = dodo_x86_64_paging_self_test(
+        aliased_self_test_frames, &aliased_self_test_frames[0]);
+    if (status != DODO_PAGING_INVALID_ARGUMENT ||
+        aliased_self_test_frames[0] != first_frame_before_alias_test) {
+        report_boot_error("paging self-test accepted output aliasing its frame array");
+    }
+
     uint64_t mapped_virtual_address = 0;
     status = dodo_x86_64_paging_self_test(
         bootstrap_reserved_frames, &mapped_virtual_address);
