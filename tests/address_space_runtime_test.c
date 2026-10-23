@@ -571,6 +571,31 @@ static void test_null_page_mapping_is_rejected_without_allocation(void) {
            DODO_ADDRESS_SPACE_RUNTIME_OK);
 }
 
+static void test_noncanonical_mapping_address_is_rejected(void) {
+    struct fixture f;
+    fixture_init(&f, 123u);
+    assert(dodo_address_space_runtime_map(&f.runtime, UINT64_MAX,
+        DODO_PAGE_USER_ACCESSIBLE) ==
+        DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT);
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+}
+
+static void test_user_half_upper_boundary_is_exclusive(void) {
+    struct fixture f;
+    fixture_init(&f, 124u);
+    assert(dodo_address_space_runtime_map(&f.runtime,
+        DODO_X86_64_USER_ADDRESS_LIMIT,
+        DODO_PAGE_USER_ACCESSIBLE) ==
+        DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT);
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+}
+
 static void test_unaligned_mapping_address_allocates_nothing(void) {
     struct fixture f;
     fixture_init(&f, 119u);
@@ -674,6 +699,8 @@ int main(void) {
     test_runtime_validator_rejects_stale_unused_table_slot();
     test_runtime_rejects_borrowed_mapping_metadata();
     test_null_page_mapping_is_rejected_without_allocation();
+    test_noncanonical_mapping_address_is_rejected();
+    test_user_half_upper_boundary_is_exclusive();
     test_unaligned_mapping_address_allocates_nothing();
     test_out_of_range_mapping_address_allocates_nothing();
     test_invalid_mapping_flags_allocate_nothing();
