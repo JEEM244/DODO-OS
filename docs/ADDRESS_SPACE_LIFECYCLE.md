@@ -113,3 +113,7 @@ Before accepting a user leaf, verify every traversed PML4, PDPT, and PD entry pe
 ### No implicit huge-page support
 
 Treat present huge-page entries in user map/unmap traversal as a distinct unsupported condition until 2 MiB and 1 GiB mapping semantics, alignment, and teardown are separately implemented and tested.
+
+### Reservation-map agreement
+
+The virtual-range reservation table and hardware page tables must agree at every committed API boundary. Reservations are metadata only and must never be presented as proof that a page is mapped.
