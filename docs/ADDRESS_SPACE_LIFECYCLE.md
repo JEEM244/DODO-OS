@@ -193,3 +193,7 @@ Until a kernel heap exists, let the caller provide address-space object storage 
 ### No heap dependency
 
 The first lifecycle implementation must work without malloc, recursion-sized variable allocations, or unbounded metadata. Fixed capacities and deterministic rollback are required for bootstrap use.
+
+### Transactional reservation updates
+
+Virtual reservation updates should be staged or performed only at the final commit point. If mapping fails, callers must not need to infer whether the range was reserved.
