@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define DODO_FRAME_LEDGER_CAPACITY 256u
+#define DODO_FRAME_LEDGER_CAPACITY 512u
 #define DODO_FRAME_OWNER_INVALID UINT32_C(0)
 
 enum dodo_frame_kind {
