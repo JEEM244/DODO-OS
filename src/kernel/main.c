@@ -1200,6 +1200,23 @@ static void test_virtual_mapping(void) {
     }
     serial_write("DODO: noncanonical address rejection self-check passed\n");
 
+    frames_used = UINT64_MAX;
+    status = dodo_x86_64_map_page(mapped_virtual_address + 2u * DODO_PAGE_SIZE,
+        0u, 0u, NULL, 0u, &frames_used);
+    if (status != DODO_PAGING_INVALID_ADDRESS || frames_used != 0u) {
+        report_boot_error("mapper accepted physical frame zero");
+    }
+    uint64_t aliased_mapper_frames[1] = { bootstrap_reserved_frames[0] };
+    const uint64_t mapper_frame_before_alias_test = aliased_mapper_frames[0];
+    status = dodo_x86_64_map_page(mapped_virtual_address + 2u * DODO_PAGE_SIZE,
+        bootstrap_reserved_frames[4], 0u, aliased_mapper_frames, 1u,
+        &aliased_mapper_frames[0]);
+    if (status != DODO_PAGING_INVALID_ARGUMENT ||
+        aliased_mapper_frames[0] != mapper_frame_before_alias_test) {
+        report_boot_error("mapper accepted output aliasing its table-frame array");
+    }
+    serial_write("DODO: mapper argument-alias and null-frame checks passed\\n");
+
     /*
      * Map an additional page read-only. The direct-map alias remains writable,
      * so the contents can be initialized without violating the test mapping.
