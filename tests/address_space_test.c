@@ -34,6 +34,21 @@ static void fixture_init(struct fixture *f) {
                                    UINT64_C(0x800000)) == DODO_ADDRESS_SPACE_OK);
 }
 
+static void test_corrupt_metadata_fails_closed(void) {
+    struct fixture f;
+    fixture_init(&f);
+    f.space.mapping_count = 1u;
+    assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_INVALID_STATE);
+    assert(dodo_address_space_record_mapped_page(&f.space, UINT64_C(0x40c000),
+        UINT64_C(0x1000), DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE,
+        DODO_ADDRESS_SPACE_BORROWED_FRAME) == DODO_ADDRESS_SPACE_INVALID_STATE);
+    struct dodo_address_space_mapping out = { .virtual_address = UINT64_C(0xabc000) };
+    assert(dodo_address_space_lookup(&f.space, UINT64_C(0x40c000), &out) ==
+           DODO_ADDRESS_SPACE_INVALID_STATE);
+    assert(out.virtual_address == UINT64_C(0xabc000));
+    f.space.mapping_count = 0u;
+    assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OK);
+}
 static void test_null_arguments_are_rejected(void) {
     struct fixture f;
     fixture_init(&f);
@@ -222,6 +237,7 @@ static void test_lookup_preserves_output_on_miss(void) {
 }
 
 int main(void) {
+    test_corrupt_metadata_fails_closed();
     test_null_arguments_are_rejected();
     test_init_rejects_invalid_user_interval();
     test_init_and_empty_validation();
