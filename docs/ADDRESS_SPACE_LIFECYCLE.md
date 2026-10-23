@@ -177,3 +177,7 @@ Fill the virtual reservation table and ownership ledger to their documented limi
 ### Corrupted-ledger negative test
 
 Corrupt one ownership record in a host-only test fixture and verify validate, map, unmap, and destroy refuse to proceed destructively. Preserve caller outputs on rejection.
+
+### TLB reuse test
+
+After unmapping a private page, invalidate its translation before releasing or reusing its physical frame. Re-map the same virtual address to a different frame and verify the new content is observed.
