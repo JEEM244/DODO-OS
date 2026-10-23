@@ -97,3 +97,7 @@ For unmapping, clear the leaf entry, invalidate the local TLB translation, remov
 ### Local TLB invalidation
 
 The first implementation may use INVLPG for a single page while running on the owning CPU. Any future SMP implementation must add cross-CPU shootdown before reclaiming a frame.
+
+### Active-root exclusion
+
+Destroy must reject both the hardware-active CR3 root and any object marked ACTIVE. A successful switch must verify CR3 readback before updating software state.
