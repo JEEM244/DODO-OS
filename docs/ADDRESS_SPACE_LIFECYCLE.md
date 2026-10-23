@@ -125,3 +125,7 @@ Before allocating any frame, reserve enough ownership-record capacity for the wh
 ### Duplicate frame rejection
 
 An address-space ownership record must reject a physical frame already recorded for the same or another owner. Aliasing may be supported later through a separate reference-counted mapping object, not duplicate ownership.
+
+### Destroy validation preflight
+
+Run a full metadata and allocator-consistency validation before teardown starts. If validation fails, refuse destructive cleanup and report the exact inconsistency; do not guess which frames are safe to release.
