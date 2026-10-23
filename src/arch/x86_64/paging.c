@@ -872,6 +872,11 @@ enum dodo_paging_status dodo_x86_64_paging_self_test(
         !paging_initialized) {
         return DODO_PAGING_INVALID_ARGUMENT;
     }
+    for (uint64_t i = 0u; i < 4u; ++i) {
+        if (mapped_virtual_address == &frames[i]) {
+            return DODO_PAGING_INVALID_ARGUMENT;
+        }
+    }
 
     for (uint64_t i = 0; i < 4u; ++i) {
         if ((frames[i] & (DODO_PAGE_SIZE - 1u)) != 0u ||
