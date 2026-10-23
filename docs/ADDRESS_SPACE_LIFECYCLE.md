@@ -165,3 +165,7 @@ Create two inactive roots and map the same virtual address to different private 
 ### Active destroy negative test
 
 Attempt to destroy the root loaded in CR3 and verify rejection without changing CR3, page-table entries, owner records, or allocator counters.
+
+### Shared-kernel preservation test
+
+Create and destroy multiple user roots while checking representative kernel code, stack, and direct-map translations remain present and supervisor-only in each user root.
