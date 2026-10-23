@@ -69,3 +69,7 @@ Assign each live address space a nonzero monotonically allocated ID. IDs are dia
 ### Explicit object states
 
 Use a finite state machine such as EMPTY, BUILDING, READY, ACTIVE, and DESTROYING. Reject transitions not explicitly permitted; in particular, a partially built object must never be switchable into CR3.
+
+### Output initialization
+
+Initialize caller-visible output objects only after validating arguments. On any failed create operation, leave the output in a documented empty state and restore all acquired resources.
