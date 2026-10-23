@@ -178,6 +178,15 @@ static void test_owned_frame_cannot_have_two_owning_mappings(void) {
     assert(dodo_address_space_forget_unmapped_page(&f.space, UINT64_C(0x405000)) ==
            DODO_ADDRESS_SPACE_OK);
 }
+static void test_forget_rejects_missing_or_misaligned_page(void) {
+    struct fixture f;
+    fixture_init(&f);
+    assert(dodo_address_space_forget_unmapped_page(&f.space, UINT64_C(0x40b000)) ==
+           DODO_ADDRESS_SPACE_NOT_MAPPED);
+    assert(dodo_address_space_forget_unmapped_page(&f.space, UINT64_C(0x40b001)) ==
+           DODO_ADDRESS_SPACE_INVALID_ARGUMENT);
+    assert(f.space.mapping_count == 0u && f.space.virtual_space.count == 0u);
+}
 static void test_lookup_returns_exact_mapping(void) {
     struct fixture f;
     fixture_init(&f);
@@ -223,6 +232,7 @@ int main(void) {
     test_owned_mapping_requires_matching_frame_owner();
     test_writable_executable_mapping_is_rejected();
     test_owned_frame_cannot_have_two_owning_mappings();
+    test_forget_rejects_missing_or_misaligned_page();
     test_lookup_returns_exact_mapping();
     test_lookup_preserves_output_on_miss();
     puts("address-space metadata tests: ok");
