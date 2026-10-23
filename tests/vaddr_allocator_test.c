@@ -29,7 +29,19 @@ static void check_invariants(const struct dodo_vaddr_space *space) {
         }
     }
 }
+static void test_init_clears_stale_slots(void) {
+ struct dodo_vaddr_space s;
+ assert(dodo_vaddr_init(&s,0x10000,0x20000)==DODO_VADDR_OK);
+ s.allocated[DODO_VADDR_MAX_RANGES-1u].base=0x10000;
+ s.allocated[DODO_VADDR_MAX_RANGES-1u].length=PAGE;
+ assert(dodo_vaddr_init(&s,0x30000,0x40000)==DODO_VADDR_OK);
+ for(uint64_t i=0;i<DODO_VADDR_MAX_RANGES;++i) {
+  assert(s.allocated[i].base==0u && s.allocated[i].length==0u);
+ }
+}
+
 int main(void) {
+ test_init_clears_stale_slots();
  struct dodo_vaddr_space s; uint64_t a=0;
  assert(dodo_vaddr_init(&s,0x10000,0x20000)==DODO_VADDR_OK);
  assert(dodo_vaddr_validate(&s)==DODO_VADDR_OK);
