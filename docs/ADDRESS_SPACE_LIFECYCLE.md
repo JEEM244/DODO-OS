@@ -181,3 +181,7 @@ Corrupt one ownership record in a host-only test fixture and verify validate, ma
 ### TLB reuse test
 
 After unmapping a private page, invalidate its translation before releasing or reusing its physical frame. Re-map the same virtual address to a different frame and verify the new content is observed.
+
+### Status code separation
+
+Use status values that distinguish invalid arguments, malformed state, capacity exhaustion, allocation failure, mapping conflict, inactive-root requirements, and rollback failure. Do not collapse rollback failure into an ordinary allocation error.
