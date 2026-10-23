@@ -1115,14 +1115,23 @@ static void test_virtual_mapping(void) {
         queried_flags != expected_mapping_flags) {
         report_boot_error("read-only page-table query disagreed with installed mapping");
     }
-    uint64_t unchanged_physical_address = UINT64_C(0x1122334455667788);
-    uint64_t unchanged_flags = UINT64_C(0x8877665544332211);
-    status = dodo_x86_64_query_page(mapped_virtual_address + DODO_PAGE_SIZE,
-                                    &unchanged_physical_address, &unchanged_flags);
-    if (status != DODO_PAGING_NOT_MAPPED ||
-        unchanged_physical_address != UINT64_C(0x1122334455667788) ||
-        unchanged_flags != UINT64_C(0x8877665544332211)) {
-        report_boot_error("unmapped page query changed outputs or returned wrong status");
+    const uint64_t unmapped_offsets[] = {
+        DODO_PAGE_SIZE,
+        UINT64_C(0x200000),  /* Another page-directory slot. */
+        UINT64_C(0x40000000) /* Another page-directory-pointer slot. */
+    };
+    for (uint64_t i = 0u;
+         i < sizeof(unmapped_offsets) / sizeof(unmapped_offsets[0]); ++i) {
+        uint64_t unchanged_physical_address = UINT64_C(0x1122334455667788);
+        uint64_t unchanged_flags = UINT64_C(0x8877665544332211);
+        status = dodo_x86_64_query_page(
+            mapped_virtual_address + unmapped_offsets[i],
+            &unchanged_physical_address, &unchanged_flags);
+        if (status != DODO_PAGING_NOT_MAPPED ||
+            unchanged_physical_address != UINT64_C(0x1122334455667788) ||
+            unchanged_flags != UINT64_C(0x8877665544332211)) {
+            report_boot_error("unmapped page query changed outputs or returned wrong status");
+        }
     }
     serial_write("DODO: page-query success and failure invariants passed\n");
 
