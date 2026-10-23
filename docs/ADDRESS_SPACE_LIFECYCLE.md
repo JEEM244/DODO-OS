@@ -141,3 +141,7 @@ A user root may share supervisor-only kernel-half top-level entries, but the add
 ### Root release last
 
 Release the root frame only after the address space is inactive, all private leaf mappings are gone, all private lower-half tables are reclaimed, and software references to the object are detached.
+
+### Creation failure injection
+
+Host tests should inject allocation failure at every allocation index in address-space creation. Each run must prove that live physical-frame counts, ledger counts, and virtual reservations return to their pre-call values.
