@@ -117,3 +117,7 @@ Treat present huge-page entries in user map/unmap traversal as a distinct unsupp
 ### Reservation-map agreement
 
 The virtual-range reservation table and hardware page tables must agree at every committed API boundary. Reservations are metadata only and must never be presented as proof that a page is mapped.
+
+### Bounded ownership capacity
+
+Before allocating any frame, reserve enough ownership-record capacity for the whole operation or guarantee rollback for each allocation. Never allocate a frame and then lose its identity because the ledger is full.
