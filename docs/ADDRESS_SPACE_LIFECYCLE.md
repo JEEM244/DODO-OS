@@ -157,3 +157,7 @@ Test invalid address, absent leaf, malformed metadata, wrong owner, and unsuppor
 ### Repeated lifecycle stress
 
 Run deterministic create-map-unmap-destroy cycles across multiple owners and reuse the same virtual addresses. Validate the ownership ledger and physical allocator after every transition.
+
+### Two-root same-address test
+
+Create two inactive roots and map the same virtual address to different private physical frames. Switch between them and verify each root observes only its own test value.
