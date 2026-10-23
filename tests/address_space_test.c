@@ -176,6 +176,21 @@ static void test_null_arguments_are_rejected(void) {
     assert(dodo_address_space_forget_unmapped_page(NULL, UINT64_C(0x400000)) ==
         DODO_ADDRESS_SPACE_INVALID_ARGUMENT);
 }
+static void test_single_page_interval_at_first_user_page(void) {
+    struct fixture f;
+    make_usable_map(&f.usable, f.entries, &f.map, 8);
+    assert(dodo_phys_init(&f.allocator, &f.map) == DODO_PHYS_OK);
+    dodo_owned_frames_init(&f.frames, &f.allocator);
+    assert(dodo_address_space_init(&f.space, &f.frames, 77,
+        DODO_VADDR_PAGE_SIZE, 2u * DODO_VADDR_PAGE_SIZE) ==
+        DODO_ADDRESS_SPACE_OK);
+    assert(dodo_address_space_record_mapped_page(&f.space, DODO_VADDR_PAGE_SIZE,
+        UINT64_C(0x2000), DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE,
+        DODO_ADDRESS_SPACE_BORROWED_FRAME) == DODO_ADDRESS_SPACE_OK);
+    assert(dodo_address_space_record_mapped_page(&f.space, 2u * DODO_VADDR_PAGE_SIZE,
+        UINT64_C(0x3000), DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE,
+        DODO_ADDRESS_SPACE_BORROWED_FRAME) == DODO_ADDRESS_SPACE_RANGE_ERROR);
+}
 static void test_init_rejects_invalid_user_interval(void) {
     struct fixture f;
     make_usable_map(&f.usable, f.entries, &f.map, 8);
@@ -632,6 +647,7 @@ int main(void) {
     test_init_refuses_corrupt_frame_ledger();
     test_init_rejects_invalid_owner_id();
     test_null_arguments_are_rejected();
+    test_single_page_interval_at_first_user_page();
     test_init_rejects_invalid_user_interval();
     test_init_and_empty_validation();
     test_owned_mapping_record_and_forget();
