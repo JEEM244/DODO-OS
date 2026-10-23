@@ -1088,6 +1088,13 @@ static void test_virtual_mapping(void) {
         DODO_PAGING_INVALID_ARGUMENT) {
         report_boot_error("page query accepted null output pointers");
     }
+    uint64_t aliased_query_output = UINT64_C(0xabcdef0123456789);
+    if (dodo_x86_64_query_page(mapped_virtual_address,
+                               &aliased_query_output, &aliased_query_output) !=
+            DODO_PAGING_INVALID_ARGUMENT ||
+        aliased_query_output != UINT64_C(0xabcdef0123456789)) {
+        report_boot_error("page query accepted aliased output pointers");
+    }
     uint64_t invalid_query_physical = UINT64_C(0x12345000);
     uint64_t invalid_query_flags = UINT64_C(0x55aa);
     if (dodo_x86_64_query_page(mapped_virtual_address + 1u,
