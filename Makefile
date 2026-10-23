@@ -82,7 +82,7 @@ test-capability: $(CAPABILITY_TEST)
 	$(CAPABILITY_TEST)
 
 $(FRAME_LEDGER_TEST): src/mm/frame_ledger.c tests/frame_ledger_test.c include/dodo/mm/frame_ledger.h | $(BUILD_DIR)
-	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Iinclude \\
+	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Iinclude \
 		src/mm/frame_ledger.c tests/frame_ledger_test.c -o $@
 
 test-frame-ledger: $(FRAME_LEDGER_TEST)
