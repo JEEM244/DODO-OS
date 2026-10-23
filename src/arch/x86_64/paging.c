@@ -731,6 +731,54 @@ enum dodo_paging_status dodo_x86_64_map_page(
     return DODO_PAGING_OK;
 }
 
+enum dodo_paging_status dodo_x86_64_query_page(
+    uint64_t virtual_address,
+    uint64_t *physical_address,
+    uint64_t *flags) {
+    if (!paging_initialized || physical_address == 0 || flags == 0) {
+        return DODO_PAGING_INVALID_ARGUMENT;
+    }
+    if (!is_canonical(virtual_address) ||
+        (virtual_address & (DODO_PAGE_SIZE - 1u)) != 0u) {
+        return DODO_PAGING_INVALID_ADDRESS;
+    }
+
+    volatile uint64_t *table = 0;
+    enum dodo_paging_status status = get_root_table(&table);
+    if (status != DODO_PAGING_OK) {
+        return status;
+    }
+
+    const uint64_t indexes[3] = {
+        (virtual_address >> 39) & UINT64_C(0x1ff),
+        (virtual_address >> 30) & UINT64_C(0x1ff),
+        (virtual_address >> 21) & UINT64_C(0x1ff)
+    };
+    for (uint64_t level = 0; level < 3u; ++level) {
+        const uint64_t entry = table[indexes[level]];
+        if ((entry & DODO_PTE_PRESENT) == 0u) {
+            return DODO_PAGING_NOT_MAPPED;
+        }
+        if ((entry & DODO_PTE_PAGE_SIZE) != 0u) {
+            return DODO_PAGING_HUGE_PAGE_CONFLICT;
+        }
+        const uint64_t child_physical = entry & DODO_PTE_ADDRESS_MASK;
+        if (!physical_to_hhdm(child_physical, &table)) {
+            return DODO_PAGING_INVALID_HHDM;
+        }
+    }
+
+    const uint64_t leaf_index = (virtual_address >> 12) & UINT64_C(0x1ff);
+    const uint64_t leaf = table[leaf_index];
+    if ((leaf & DODO_PTE_PRESENT) == 0u) {
+        return DODO_PAGING_NOT_MAPPED;
+    }
+
+    *physical_address = leaf & DODO_PTE_ADDRESS_MASK;
+    *flags = leaf & DODO_PTE_ALLOWED_FLAGS;
+    return DODO_PAGING_OK;
+}
+
 enum dodo_paging_status dodo_x86_64_unmap_page(
     uint64_t virtual_address,
     uint64_t *physical_address,
