@@ -310,9 +310,16 @@ static void test_owner_id_cannot_be_reused_for_live_runtime(void) {
     struct fixture f;
     fixture_init(&f, 113u);
     struct dodo_address_space_runtime second_runtime;
+    uint32_t before = UINT32_MAX;
+    uint32_t after = UINT32_MAX;
+    assert(dodo_owned_frames_count_owner(&f.frames, 113u, &before) ==
+           DODO_OWNED_FRAMES_OK);
     assert(dodo_address_space_runtime_create(&second_runtime, &f.frames, 113u,
         UINT64_C(0x400000), UINT64_C(0x800000)) ==
         DODO_ADDRESS_SPACE_RUNTIME_OWNERSHIP_ERROR);
+    assert(dodo_owned_frames_count_owner(&f.frames, 113u, &after) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(after == before);
     assert(dodo_address_space_runtime_validate(&f.runtime) ==
            DODO_ADDRESS_SPACE_RUNTIME_OK);
     assert(dodo_address_space_runtime_destroy(&f.runtime) ==
