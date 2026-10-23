@@ -12,6 +12,7 @@ static uint64_t next_random(uint64_t *state) {
 }
 
 static void check_invariants(const struct dodo_vaddr_space *space) {
+    assert(dodo_vaddr_validate(space) == DODO_VADDR_OK);
     assert(space->count <= DODO_VADDR_MAX_RANGES);
     for (uint64_t i = 0; i < space->count; ++i) {
         const struct dodo_vaddr_range *range = &space->allocated[i];
