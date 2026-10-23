@@ -705,6 +705,26 @@ static void test_invalid_virtual_range_does_not_leak(void) {
            DODO_ADDRESS_SPACE_RUNTIME_OK);
 }
 
+static void test_runtime_activation_validates_and_switches_root(void) {
+    struct fixture f;
+    fixture_init(&f, 128u);
+    assert(active_root == kernel_root);
+    assert(dodo_address_space_runtime_activate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(active_root == f.runtime.root_physical);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_INVALID_STATE);
+    assert(dodo_x86_64_paging_switch_root(kernel_root) == DODO_PAGING_OK);
+    f.runtime.table_frame_count = DODO_ADDRESS_SPACE_RUNTIME_MAX_TABLE_FRAMES + 1u;
+    assert(dodo_address_space_runtime_activate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_INVALID_STATE);
+    f.runtime.table_frame_count = 0u;
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+}
+
 static void test_destroy_refuses_active_root(void) {
     struct fixture f;
     fixture_init(&f, 104u);
@@ -743,6 +763,7 @@ int main(void) {
     test_out_of_range_mapping_address_allocates_nothing();
     test_invalid_mapping_flags_allocate_nothing();
     test_invalid_virtual_range_does_not_leak();
+    test_runtime_activation_validates_and_switches_root();
     test_destroy_refuses_active_root();
     puts("address-space runtime tests: ok");
     return 0;
