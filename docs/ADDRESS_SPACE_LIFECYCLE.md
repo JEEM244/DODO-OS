@@ -93,3 +93,7 @@ For a new mapping, validate range and permissions first, acquire and record requ
 ### Unmap operation ordering
 
 For unmapping, clear the leaf entry, invalidate the local TLB translation, remove the virtual reservation, and release an owned leaf frame only after all preceding steps succeed.
+
+### Local TLB invalidation
+
+The first implementation may use INVLPG for a single page while running on the owning CPU. Any future SMP implementation must add cross-CPU shootdown before reclaiming a frame.
