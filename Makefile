@@ -40,6 +40,7 @@ HEADERS := include/dodo/boot/limine_protocol.h \
            include/dodo/kernel/capability.h \
            include/dodo/mm/frame_ledger.h \
            include/dodo/mm/owned_frames.h \
+           include/dodo/mm/vaddr.h \
            include/dodo/mm/address_space.h
 OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/capability.o $(BUILD_DIR)/gdt.o \
            $(BUILD_DIR)/idt.o $(BUILD_DIR)/timer.o $(BUILD_DIR)/keyboard.o $(BUILD_DIR)/console.o $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o \
