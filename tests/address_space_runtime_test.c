@@ -190,6 +190,23 @@ static void fixture_init(struct fixture *f, uint32_t owner) {
         DODO_ADDRESS_SPACE_RUNTIME_OK);
 }
 
+static void test_create_allocates_exactly_one_root_frame(void) {
+    struct fixture f;
+    fixture_init(&f, 125u);
+    uint32_t count = UINT32_MAX;
+    enum dodo_frame_kind kind = DODO_FRAME_KIND_UNUSED;
+    assert(dodo_owned_frames_count_owner(&f.frames, 125u, &count) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(count == 1u);
+    assert(dodo_owned_frames_get_kind(&f.frames, 125u,
+        f.runtime.root_physical, &kind) == DODO_OWNED_FRAMES_OK);
+    assert(kind == DODO_FRAME_KIND_ROOT);
+    assert(f.runtime.table_frame_count == 0u);
+    assert(f.runtime.metadata.mapping_count == 0u);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+}
+
 static void test_create_map_unmap_destroy_reclaims_all_owned_frames(void) {
     struct fixture f;
     fixture_init(&f, 101u);
@@ -681,6 +698,7 @@ static void test_destroy_refuses_active_root(void) {
 }
 
 int main(void) {
+    test_create_allocates_exactly_one_root_frame();
     test_create_map_unmap_destroy_reclaims_all_owned_frames();
     test_invalid_owner_id_allocates_nothing();
     test_invalid_runtime_range_allocates_nothing();
