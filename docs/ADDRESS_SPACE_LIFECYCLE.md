@@ -65,3 +65,7 @@ Until these gates pass, DODO must continue describing user isolation as a tested
 ### Stable address-space identity
 
 Assign each live address space a nonzero monotonically allocated ID. IDs are diagnostic identities, not physical addresses, and must not be reused while any task, capability, or log record can still refer to the old object.
+
+### Explicit object states
+
+Use a finite state machine such as EMPTY, BUILDING, READY, ACTIVE, and DESTROYING. Reject transitions not explicitly permitted; in particular, a partially built object must never be switchable into CR3.
