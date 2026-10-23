@@ -177,6 +177,7 @@ enum dodo_vaddr_status dodo_vaddr_release(
                 space->allocated[j - 1u] = space->allocated[j];
             }
             --space->count;
+            space->allocated[space->count] = (struct dodo_vaddr_range){0};
             return DODO_VADDR_OK;
         }
     }
