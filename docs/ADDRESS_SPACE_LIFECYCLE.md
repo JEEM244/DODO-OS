@@ -21,6 +21,11 @@ DODO can create and test separate user page-table roots, but cleanup currently r
 
 `dodo_vaddr_validate(const struct dodo_vaddr_space *)` is now a public validation entry point for the metadata-only low-half range allocator. It returns `DODO_VADDR_OK` only when the interval, reservation count, alignment, ordering, bounds, and non-overlap invariants are valid; malformed metadata returns `DODO_VADDR_INVALID_ARGUMENT`. This is a consistency check, not proof that hardware page tables match reservations, and it does not allocate or free physical memory. Host tests call it during the deterministic range-allocation stress loop and inject malformed overlapping records.
 
+## Metadata registry prototype
+
+`include/dodo/mm/address_space.h` and `src/mm/address_space.c` now provide a host-testable metadata layer. It validates lower-half user mapping flags, a bounded reservation table, owner-scoped `USER_DATA` frames for owned mappings, borrowed-versus-owned policy, sorted mapping records, lookup, and removal bookkeeping. Writable mappings must also be NX; unsupported cache/global flags are rejected.
+
+This prototype deliberately does **not** write page-table entries, switch CR3, invalidate TLB entries, allocate page-table frames, or destroy a page-table tree. The caller must first successfully install a mapping with the low-level paging API before recording it, and must unmap it before forgetting it. It is a bookkeeping prerequisite, not the reusable hardware address-space lifecycle requested by the full milestone.
 ## Suggested API boundary
 
 Use an opaque or tightly controlled address-space structure and return status codes, not raw assumptions:
