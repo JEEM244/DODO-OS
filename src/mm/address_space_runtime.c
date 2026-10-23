@@ -163,6 +163,24 @@ enum dodo_address_space_runtime_status dodo_address_space_runtime_activate(
         : DODO_ADDRESS_SPACE_RUNTIME_ROOT_SWITCH_ERROR;
 }
 
+enum dodo_address_space_runtime_status dodo_address_space_runtime_deactivate(
+    struct dodo_address_space_runtime *runtime,
+    uint64_t fallback_root_physical) {
+    const enum dodo_address_space_runtime_status status =
+        dodo_address_space_runtime_validate(runtime);
+    if (status != DODO_ADDRESS_SPACE_RUNTIME_OK) {
+        return status;
+    }
+    if (fallback_root_physical == 0u ||
+        fallback_root_physical == runtime->root_physical ||
+        dodo_x86_64_active_root_physical() != runtime->root_physical) {
+        return DODO_ADDRESS_SPACE_RUNTIME_INVALID_STATE;
+    }
+    return dodo_x86_64_paging_switch_root(fallback_root_physical) == DODO_PAGING_OK
+        ? DODO_ADDRESS_SPACE_RUNTIME_OK
+        : DODO_ADDRESS_SPACE_RUNTIME_ROOT_SWITCH_ERROR;
+}
+
 enum dodo_address_space_runtime_status dodo_address_space_runtime_map(
     struct dodo_address_space_runtime *runtime,
     uint64_t virtual_address,
