@@ -109,3 +109,7 @@ Reject user mappings that request global pages, unsupported cache attributes, no
 ### Ancestor permission audit
 
 Before accepting a user leaf, verify every traversed PML4, PDPT, and PD entry permits user access. If an ancestor is supervisor-only, reject the mapping rather than widening a shared or existing table.
+
+### No implicit huge-page support
+
+Treat present huge-page entries in user map/unmap traversal as a distinct unsupported condition until 2 MiB and 1 GiB mapping semantics, alignment, and teardown are separately implemented and tested.
