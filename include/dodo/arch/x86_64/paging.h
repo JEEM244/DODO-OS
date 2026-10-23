@@ -124,6 +124,15 @@ enum dodo_paging_status dodo_x86_64_map_page(
     uint64_t *frames_used);
 
 /*
+ * Query a present 4 KiB leaf in the active root without changing it. Outputs
+ * are written only on success; huge-page walks are deliberately rejected.
+ */
+enum dodo_paging_status dodo_x86_64_query_page(
+    uint64_t virtual_address,
+    uint64_t *physical_address,
+    uint64_t *flags);
+
+/*
  * Unmap a present 4 KiB leaf from the active root. User roots may only unmap
  * lower-half addresses because their higher-half page-table branches are shared
  * with the kernel. Returns the physical frame and leaf flags on success, but
