@@ -519,7 +519,7 @@ static void test_duplicate_and_invalid_mapping_do_not_leak(void) {
     assert(dodo_owned_frames_count_owner(&f.frames, 103u, &before) ==
            DODO_OWNED_FRAMES_OK);
     assert(dodo_address_space_runtime_map(&f.runtime, UINT64_C(0x401000), flags) ==
-           DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT);
+           DODO_ADDRESS_SPACE_RUNTIME_ALREADY_MAPPED);
     assert(dodo_address_space_runtime_map(&f.runtime, UINT64_C(0x402000),
         DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_WRITABLE) ==
         DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT);
