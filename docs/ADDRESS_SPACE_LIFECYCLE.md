@@ -189,3 +189,7 @@ Use status values that distinguish invalid arguments, malformed state, capacity 
 ### Caller-owned object storage
 
 Until a kernel heap exists, let the caller provide address-space object storage or allocate it from a documented fixed pool. Keep metadata storage separate from physical page-table frames so object lifetime is explicit.
+
+### No heap dependency
+
+The first lifecycle implementation must work without malloc, recursion-sized variable allocations, or unbounded metadata. Fixed capacities and deterministic rollback are required for bootstrap use.
