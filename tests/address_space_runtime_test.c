@@ -26,6 +26,7 @@ static uint64_t active_root = UINT64_C(0x8000);
 static const uint64_t kernel_root = UINT64_C(0x8000);
 static uint64_t fail_switch_to;
 static enum dodo_paging_status fail_map_status;
+static uint64_t fail_create_root;
 
 static struct test_root *find_root(uint64_t physical) {
     for (uint32_t i = 0u; i < TEST_ROOT_CAPACITY; ++i) {
@@ -56,7 +57,7 @@ uint64_t dodo_x86_64_kernel_root_physical(void) {
 
 enum dodo_paging_status dodo_x86_64_paging_create_user_root(uint64_t root) {
     if (root == 0u || root == active_root || root == kernel_root ||
-        (root & (DODO_PAGE_SIZE - 1u)) != 0u) {
+        root == fail_create_root || (root & (DODO_PAGE_SIZE - 1u)) != 0u) {
         return DODO_PAGING_INVALID_ADDRESS;
     }
     struct test_root *entry = find_root(root);
@@ -233,6 +234,41 @@ static void test_create_map_unmap_destroy_reclaims_all_owned_frames(void) {
     assert(f.allocator.allocated_pages == 0u);
 }
 
+static void test_user_root_creation_failure_releases_root_frame(void) {
+    struct fixture f;
+    make_map(&f.usable, f.entries, &f.map);
+    assert(dodo_phys_init(&f.allocator, &f.map) == DODO_PHYS_OK);
+    dodo_owned_frames_init(&f.frames, &f.allocator);
+    const uint64_t free_before = f.allocator.free_pages;
+    fail_create_root = UINT64_C(0x1000);
+    assert(dodo_address_space_runtime_create(&f.runtime, &f.frames, 110u,
+        UINT64_C(0x400000), UINT64_C(0x800000)) ==
+        DODO_ADDRESS_SPACE_RUNTIME_PAGING_ERROR);
+    fail_create_root = 0u;
+    uint32_t count = UINT32_MAX;
+    assert(dodo_owned_frames_count_owner(&f.frames, 110u, &count) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(count == 0u);
+    assert(f.allocator.free_pages == free_before);
+    assert(f.allocator.allocated_pages == 0u);
+}
+
+static void test_restore_switch_failure_keeps_mapping_owned(void) {
+    struct fixture f;
+    fixture_init(&f, 111u);
+    fail_switch_to = kernel_root;
+    assert(dodo_address_space_runtime_map(&f.runtime, UINT64_C(0x401000),
+        DODO_PAGE_USER_ACCESSIBLE) ==
+        DODO_ADDRESS_SPACE_RUNTIME_ROOT_SWITCH_ERROR);
+    assert(active_root == f.runtime.root_physical);
+    fail_switch_to = 0u;
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_x86_64_paging_switch_root(kernel_root) == DODO_PAGING_OK);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+}
+
 static void test_failed_root_switch_rolls_back_mapping_allocation(void) {
     struct fixture f;
     fixture_init(&f, 102u);
@@ -387,7 +423,9 @@ static void test_destroy_refuses_active_root(void) {
 
 int main(void) {
     test_create_map_unmap_destroy_reclaims_all_owned_frames();
+    test_user_root_creation_failure_releases_root_frame();
     test_failed_root_switch_rolls_back_mapping_allocation();
+    test_restore_switch_failure_keeps_mapping_owned();
     test_duplicate_and_invalid_mapping_do_not_leak();
     test_low_level_mapping_failure_rolls_back_owned_frames();
     test_hardware_metadata_mismatch_fails_closed();
