@@ -144,6 +144,19 @@ static void test_validate_detects_ledger_frame_freed_outside_adapter(void) {
     /* Simulate a caller bypassing ownership and freeing a tracked frame. */
     assert(dodo_phys_free_page(&allocator, frame) == DODO_PHYS_OK);
     assert(dodo_owned_frames_validate(&pool) == DODO_OWNED_FRAMES_ALLOCATOR_ERROR);
+
+    const uint64_t free_before = allocator.free_pages;
+    const uint64_t allocated_before = allocator.allocated_pages;
+    uint64_t output = UINT64_C(0xfeedface);
+    assert(dodo_owned_frames_alloc(&pool, 13, DODO_FRAME_KIND_USER_DATA,
+                                   &output) == DODO_OWNED_FRAMES_ALLOCATOR_ERROR);
+    assert(output == UINT64_C(0xfeedface));
+    assert(allocator.free_pages == free_before);
+    assert(allocator.allocated_pages == allocated_before);
+    assert(dodo_owned_frames_release(&pool, 12, frame) ==
+           DODO_OWNED_FRAMES_ALLOCATOR_ERROR);
+    assert(allocator.free_pages == free_before);
+    assert(allocator.allocated_pages == allocated_before);
 }
 
 static void test_ledger_capacity_failure_rolls_back_physical_frame(void) {
