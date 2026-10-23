@@ -34,6 +34,18 @@ static void fixture_init(struct fixture *f) {
                                    UINT64_C(0x800000)) == DODO_ADDRESS_SPACE_OK);
 }
 
+static void test_init_rejects_invalid_user_interval(void) {
+    struct fixture f;
+    make_usable_map(&f.usable, f.entries, &f.map, 8);
+    assert(dodo_phys_init(&f.allocator, &f.map) == DODO_PHYS_OK);
+    dodo_owned_frames_init(&f.frames, &f.allocator);
+    assert(dodo_address_space_init(&f.space, &f.frames, 77,
+        UINT64_C(0x800000), UINT64_C(0x400000)) ==
+        DODO_ADDRESS_SPACE_RANGE_ERROR);
+    assert(dodo_address_space_init(&f.space, &f.frames, 77,
+        UINT64_C(0x00007fffffff0000), UINT64_C(0x0000800000001000)) ==
+        DODO_ADDRESS_SPACE_RANGE_ERROR);
+}
 static void test_init_and_empty_validation(void) {
     struct fixture f;
     fixture_init(&f);
@@ -183,6 +195,7 @@ static void test_lookup_preserves_output_on_miss(void) {
 }
 
 int main(void) {
+    test_init_rejects_invalid_user_interval();
     test_init_and_empty_validation();
     test_owned_mapping_record_and_forget();
     test_borrowed_mapping_is_not_freed();
