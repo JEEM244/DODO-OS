@@ -61,6 +61,7 @@ Implementation note: before connecting the virtual-range allocator or enabling C
 - [x] Add allocation-failure injection during page-table cloning and verify rollback restores allocator counts.
 - [ ] Track table/frame ownership, reclaim the obsolete bootloader tree safely, and stress rollback failure paths.
 - [x] Add a bounded, host-tested low-half virtual-range allocator with first-fit allocation, explicit reservation/release, and overlap checks (metadata only; not yet wired to page tables).
+- [x] Expose a public virtual-range invariant validator and run it throughout deterministic allocation stress tests, including malformed overlapping reservation metadata (still metadata-only; not hardware mapping validation).
 - [ ] Build a full virtual-memory manager and guard-page support.
 - [ ] Define physical-frame release, ownership transfer, and lifetime rules.
 
