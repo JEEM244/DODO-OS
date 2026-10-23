@@ -137,3 +137,7 @@ Walk private page-table branches bottom-up. Remove user leaf mappings and invali
 ### Shared kernel mapping contract
 
 A user root may share supervisor-only kernel-half top-level entries, but the address-space owner must not record those shared descendants as private. The kernel remains responsible for their lifetime.
+
+### Root release last
+
+Release the root frame only after the address space is inactive, all private leaf mappings are gone, all private lower-half tables are reclaimed, and software references to the object are detached.
