@@ -185,6 +185,9 @@ static void test_init_rejects_invalid_user_interval(void) {
         UINT64_C(0x800000), UINT64_C(0x400000)) ==
         DODO_ADDRESS_SPACE_RANGE_ERROR);
     assert(dodo_address_space_init(&f.space, &f.frames, 77,
+        UINT64_C(0), UINT64_C(0x400000)) ==
+        DODO_ADDRESS_SPACE_RANGE_ERROR);
+    assert(dodo_address_space_init(&f.space, &f.frames, 77,
         UINT64_C(0x00007fffffff0000), UINT64_C(0x0000800000001000)) ==
         DODO_ADDRESS_SPACE_RANGE_ERROR);
 }
