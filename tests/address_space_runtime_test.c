@@ -251,6 +251,8 @@ static void test_create_map_unmap_destroy_reclaims_all_owned_frames(void) {
     assert(f.allocator.allocated_pages == 0u);
     assert(dodo_address_space_runtime_map(&f.runtime, UINT64_C(0x401000),
         DODO_PAGE_USER_ACCESSIBLE) == DODO_ADDRESS_SPACE_RUNTIME_INVALID_STATE);
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_INVALID_STATE);
 
     /* Reusing the same object is safe after a complete destroy. */
     assert(dodo_address_space_runtime_create(&f.runtime, &f.frames, 101u,
