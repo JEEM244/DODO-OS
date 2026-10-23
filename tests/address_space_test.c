@@ -503,6 +503,47 @@ static void test_forget_rejects_missing_or_misaligned_page(void) {
            DODO_ADDRESS_SPACE_INVALID_ARGUMENT);
     assert(f.space.mapping_count == 0u && f.space.virtual_space.count == 0u);
 }
+static uint64_t address_space_next_random(uint64_t *state) {
+    *state ^= *state << 13;
+    *state ^= *state >> 7;
+    *state ^= *state << 17;
+    return *state;
+}
+
+static void test_deterministic_mapping_lifecycle_stress(void) {
+    struct fixture f;
+    fixture_init(&f);
+    uint64_t state = UINT64_C(0x9e3779b97f4a7c15);
+    const uint64_t flags = DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE;
+    for (uint32_t i = 0u; i < DODO_ADDRESS_SPACE_MAX_MAPPINGS; ++i) {
+        uint64_t page = 0u;
+        int inserted = 0;
+        for (uint32_t attempt = 0u; attempt < 256u && !inserted; ++attempt) {
+            page = UINT64_C(0x400000) +
+                (address_space_next_random(&state) % UINT64_C(1024)) *
+                DODO_VADDR_PAGE_SIZE;
+            const enum dodo_address_space_status status =
+                dodo_address_space_record_mapped_page(&f.space, page,
+                    UINT64_C(0x2000), flags, DODO_ADDRESS_SPACE_BORROWED_FRAME);
+            if (status == DODO_ADDRESS_SPACE_OK) {
+                inserted = 1;
+            } else {
+                assert(status == DODO_ADDRESS_SPACE_ALREADY_MAPPED);
+            }
+        }
+        assert(inserted);
+        assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OK);
+    }
+    while (f.space.mapping_count > 0u) {
+        const uint32_t index = (uint32_t)(address_space_next_random(&state) %
+                                          f.space.mapping_count);
+        const uint64_t page = f.space.mappings[index].virtual_address;
+        assert(dodo_address_space_forget_unmapped_page(&f.space, page) ==
+               DODO_ADDRESS_SPACE_OK);
+        assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OK);
+    }
+    assert(f.space.virtual_space.count == 0u);
+}
 static void test_out_of_order_records_remain_sorted(void) {
     struct fixture f;
     fixture_init(&f);
@@ -616,6 +657,7 @@ int main(void) {
     test_writable_executable_mapping_is_rejected();
     test_owned_frame_cannot_have_two_owning_mappings();
     test_forget_rejects_missing_or_misaligned_page();
+    test_deterministic_mapping_lifecycle_stress();
     test_out_of_order_records_remain_sorted();
     test_mapping_capacity_fails_without_mutation();
     test_lookup_returns_exact_mapping();
