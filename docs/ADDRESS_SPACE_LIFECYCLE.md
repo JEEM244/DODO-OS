@@ -17,6 +17,10 @@ DODO can create and test separate user page-table roots, but cleanup currently r
 7. **No double release.** Teardown is idempotence-safe in the sense that a second destroy attempt is rejected without touching freed frames. Unknown, duplicate, or malformed ownership records fail validation.
 8. **Single-CPU first.** Document that the first implementation is not SMP-safe. Disable interrupts around transitions that mutate active-root and ownership state; SMP locking is a separate milestone.
 
+## Existing primitive now available
+
+`dodo_vaddr_validate(const struct dodo_vaddr_space *)` is now a public validation entry point for the metadata-only low-half range allocator. It returns `DODO_VADDR_OK` only when the interval, reservation count, alignment, ordering, bounds, and non-overlap invariants are valid; malformed metadata returns `DODO_VADDR_INVALID_ARGUMENT`. This is a consistency check, not proof that hardware page tables match reservations, and it does not allocate or free physical memory. Host tests call it during the deterministic range-allocation stress loop and inject malformed overlapping records.
+
 ## Suggested API boundary
 
 Use an opaque or tightly controlled address-space structure and return status codes, not raw assumptions:
