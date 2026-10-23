@@ -28,6 +28,7 @@ static void test_owned_allocation_lifecycle(void) {
 
     assert(dodo_phys_init(&allocator, &map) == DODO_PHYS_OK);
     dodo_owned_frames_init(&pool, &allocator);
+    assert(dodo_owned_frames_validate(&pool) == DODO_OWNED_FRAMES_OK);
     assert(allocator.free_pages == 8);
     assert(dodo_owned_frames_alloc(&pool, 7, DODO_FRAME_KIND_USER_DATA,
                                    &frame) == DODO_OWNED_FRAMES_OK);
@@ -38,6 +39,7 @@ static void test_owned_allocation_lifecycle(void) {
     assert(dodo_frame_ledger_count_owner(&pool.ledger, 7, &owned) ==
            DODO_FRAME_LEDGER_OK);
     assert(owned == 1);
+    assert(dodo_owned_frames_validate(&pool) == DODO_OWNED_FRAMES_OK);
     assert(dodo_owned_frames_release(&pool, 8, frame) ==
            DODO_OWNED_FRAMES_LEDGER_ERROR);
     assert(allocator.allocated_pages == 1 && allocator.free_pages == 7);
@@ -47,6 +49,7 @@ static void test_owned_allocation_lifecycle(void) {
     assert(dodo_owned_frames_release(&pool, 7, frame) ==
            DODO_OWNED_FRAMES_LEDGER_ERROR);
     assert(allocator.allocated_pages == 0 && allocator.free_pages == 8);
+    assert(dodo_owned_frames_validate(&pool) == DODO_OWNED_FRAMES_OK);
 
     uint64_t reused = 0;
     assert(dodo_owned_frames_alloc(&pool, 9, DODO_FRAME_KIND_PAGE_TABLE,
@@ -123,6 +126,26 @@ static void test_corrupt_ledger_prevents_release(void) {
     assert(allocator.allocated_pages == 1 && allocator.free_pages == 1);
 }
 
+static void test_validate_detects_ledger_frame_freed_outside_adapter(void) {
+    struct dodo_limine_memmap_entry usable;
+    struct dodo_limine_memmap_entry *entries[1];
+    struct dodo_limine_memmap_response map;
+    make_usable_map(&usable, entries, &map, 2);
+
+    struct dodo_phys_allocator allocator;
+    struct dodo_owned_frames pool;
+    uint64_t frame = 0;
+    assert(dodo_phys_init(&allocator, &map) == DODO_PHYS_OK);
+    dodo_owned_frames_init(&pool, &allocator);
+    assert(dodo_owned_frames_alloc(&pool, 12, DODO_FRAME_KIND_PAGE_TABLE,
+                                   &frame) == DODO_OWNED_FRAMES_OK);
+    assert(dodo_owned_frames_validate(&pool) == DODO_OWNED_FRAMES_OK);
+
+    /* Simulate a caller bypassing ownership and freeing a tracked frame. */
+    assert(dodo_phys_free_page(&allocator, frame) == DODO_PHYS_OK);
+    assert(dodo_owned_frames_validate(&pool) == DODO_OWNED_FRAMES_ALLOCATOR_ERROR);
+}
+
 static void test_ledger_capacity_failure_rolls_back_physical_frame(void) {
     const uint64_t pages = (uint64_t)DODO_FRAME_LEDGER_CAPACITY + 1u;
     struct dodo_limine_memmap_entry usable;
@@ -162,6 +185,7 @@ int main(void) {
     test_invalid_arguments_preserve_output();
     test_corrupt_ledger_fails_closed_before_allocation();
     test_corrupt_ledger_prevents_release();
+    test_validate_detects_ledger_frame_freed_outside_adapter();
     test_ledger_capacity_failure_rolls_back_physical_frame();
     puts("owned frame tests: ok");
     return 0;
