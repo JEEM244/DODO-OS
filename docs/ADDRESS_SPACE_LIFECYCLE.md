@@ -129,3 +129,7 @@ An address-space ownership record must reject a physical frame already recorded 
 ### Destroy validation preflight
 
 Run a full metadata and allocator-consistency validation before teardown starts. If validation fails, refuse destructive cleanup and report the exact inconsistency; do not guess which frames are safe to release.
+
+### Destroy postorder
+
+Walk private page-table branches bottom-up. Remove user leaf mappings and invalidate translations before freeing leaf frames; release a table only after no present entry refers to its child table.
