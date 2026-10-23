@@ -91,9 +91,14 @@ enum dodo_address_space_status dodo_address_space_validate(
             if (!owns_user_data_frame(space, mapping->physical_address)) {
                 return DODO_ADDRESS_SPACE_OWNERSHIP_ERROR;
             }
-            for (uint32_t j = i + 1u; j < space->mapping_count; ++j) {
-                if (space->mappings[j].frame_policy == DODO_ADDRESS_SPACE_OWNED_FRAME &&
+            for (uint32_t j = 0u; j < space->mapping_count; ++j) {
+                if (j != i &&
                     space->mappings[j].physical_address == mapping->physical_address) {
+                    /*
+                     * The owned mapping is the sole lifetime authority for this
+                     * frame. Any alias would outlive or depend on its release.
+                     * Alias management needs an explicit shared-reference model.
+                     */
                     return DODO_ADDRESS_SPACE_OWNERSHIP_ERROR;
                 }
             }
@@ -137,8 +142,7 @@ enum dodo_address_space_status dodo_address_space_record_mapped_page(
          * twice through two ownership records.
          */
         for (uint32_t i = 0u; i < space->mapping_count; ++i) {
-            if (space->mappings[i].physical_address == physical_address &&
-                space->mappings[i].frame_policy == DODO_ADDRESS_SPACE_OWNED_FRAME) {
+            if (space->mappings[i].physical_address == physical_address) {
                 return DODO_ADDRESS_SPACE_OWNERSHIP_ERROR;
             }
         }
