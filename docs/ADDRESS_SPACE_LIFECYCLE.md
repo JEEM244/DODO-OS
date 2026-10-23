@@ -201,3 +201,7 @@ Virtual reservation updates should be staged or performed only at the final comm
 ### Frame-kind requirements
 
 Use distinct frame kinds for roots, page-table pages, user data, and kernel stacks. Teardown must reject a record whose kind does not match the operation being performed.
+
+### Owner identity checks
+
+Every release operation must verify both owner ID and physical frame. A caller that knows a frame address but does not own it must not be able to free it through the address-space API.
