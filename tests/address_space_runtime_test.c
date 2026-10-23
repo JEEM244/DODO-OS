@@ -234,6 +234,19 @@ static void test_create_map_unmap_destroy_reclaims_all_owned_frames(void) {
     assert(f.allocator.allocated_pages == 0u);
 }
 
+static void test_invalid_runtime_range_allocates_nothing(void) {
+    struct fixture f;
+    make_map(&f.usable, f.entries, &f.map);
+    assert(dodo_phys_init(&f.allocator, &f.map) == DODO_PHYS_OK);
+    dodo_owned_frames_init(&f.frames, &f.allocator);
+    const uint64_t free_before = f.allocator.free_pages;
+    assert(dodo_address_space_runtime_create(&f.runtime, &f.frames, 114u,
+        UINT64_C(0x1000), UINT64_C(0x800000)) ==
+        DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT);
+    assert(f.allocator.free_pages == free_before);
+    assert(f.allocator.allocated_pages == 0u);
+}
+
 static void test_owner_id_cannot_be_reused_for_live_runtime(void) {
     struct fixture f;
     fixture_init(&f, 113u);
@@ -455,6 +468,7 @@ static void test_destroy_refuses_active_root(void) {
 
 int main(void) {
     test_create_map_unmap_destroy_reclaims_all_owned_frames();
+    test_invalid_runtime_range_allocates_nothing();
     test_owner_id_cannot_be_reused_for_live_runtime();
     test_user_root_creation_failure_releases_root_frame();
     test_failed_root_switch_rolls_back_mapping_allocation();
