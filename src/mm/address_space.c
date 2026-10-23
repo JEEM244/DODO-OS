@@ -79,6 +79,12 @@ enum dodo_address_space_status dodo_address_space_validate(
                     DODO_OWNED_FRAMES_OK || kind != DODO_FRAME_KIND_USER_DATA) {
                 return DODO_ADDRESS_SPACE_OWNERSHIP_ERROR;
             }
+            for (uint32_t j = i + 1u; j < space->mapping_count; ++j) {
+                if (space->mappings[j].frame_policy == DODO_ADDRESS_SPACE_OWNED_FRAME &&
+                    space->mappings[j].physical_address == mapping->physical_address) {
+                    return DODO_ADDRESS_SPACE_OWNERSHIP_ERROR;
+                }
+            }
         }
     }
     return DODO_ADDRESS_SPACE_OK;
