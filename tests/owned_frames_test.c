@@ -101,6 +101,28 @@ static void test_corrupt_ledger_fails_closed_before_allocation(void) {
     assert(allocator.allocated_pages == 0 && allocator.free_pages == 2);
 }
 
+static void test_corrupt_ledger_prevents_release(void) {
+    struct dodo_limine_memmap_entry usable;
+    struct dodo_limine_memmap_entry *entries[1];
+    struct dodo_limine_memmap_response map;
+    make_usable_map(&usable, entries, &map, 2);
+
+    struct dodo_phys_allocator allocator;
+    struct dodo_owned_frames pool;
+    uint64_t frame = 0;
+    assert(dodo_phys_init(&allocator, &map) == DODO_PHYS_OK);
+    dodo_owned_frames_init(&pool, &allocator);
+    assert(dodo_owned_frames_alloc(&pool, 5, DODO_FRAME_KIND_USER_DATA,
+                                   &frame) == DODO_OWNED_FRAMES_OK);
+    assert(allocator.allocated_pages == 1 && allocator.free_pages == 1);
+
+    /* Corrupt metadata and prove release does not free a still-owned frame. */
+    pool.ledger.count = 0;
+    assert(dodo_owned_frames_release(&pool, 5, frame) ==
+           DODO_OWNED_FRAMES_LEDGER_ERROR);
+    assert(allocator.allocated_pages == 1 && allocator.free_pages == 1);
+}
+
 static void test_ledger_capacity_failure_rolls_back_physical_frame(void) {
     const uint64_t pages = (uint64_t)DODO_FRAME_LEDGER_CAPACITY + 1u;
     struct dodo_limine_memmap_entry usable;
@@ -139,6 +161,7 @@ int main(void) {
     test_owned_allocation_lifecycle();
     test_invalid_arguments_preserve_output();
     test_corrupt_ledger_fails_closed_before_allocation();
+    test_corrupt_ledger_prevents_release();
     test_ledger_capacity_failure_rolls_back_physical_frame();
     puts("owned frame tests: ok");
     return 0;
