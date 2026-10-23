@@ -46,15 +46,16 @@ PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
 VADDR_TEST := $(BUILD_DIR)/vaddr_allocator_test
 TASK_TEST := $(BUILD_DIR)/task_scheduler_test
 CAPABILITY_TEST := $(BUILD_DIR)/capability_test
+FRAME_LEDGER_TEST := $(BUILD_DIR)/frame_ledger_test
 
-.PHONY: all kernel iso run verify verify-elf-layout qemu-smoke qemu-uefi-smoke qemu-keyboard-smoke qemu-panic-smoke test-phys test-vaddr test-task test-capability test clean check-tools
+.PHONY: all kernel iso run verify verify-elf-layout qemu-smoke qemu-uefi-smoke qemu-keyboard-smoke qemu-panic-smoke test-phys test-vaddr test-task test-capability test-frame-ledger test clean check-tools
 all: iso
 
 kernel: check-tools $(KERNEL_ELF)
 
 iso: check-tools $(ISO_IMAGE)
 
-test: test-phys test-vaddr test-task test-capability
+test: test-phys test-vaddr test-task test-capability test-frame-ledger
 
 # Full local acceptance pass. Requires the same Linux/QEMU tools as CI.
 verify:
@@ -79,6 +80,13 @@ $(CAPABILITY_TEST): src/kernel/capability.c tests/capability_test.c include/dodo
 
 test-capability: $(CAPABILITY_TEST)
 	$(CAPABILITY_TEST)
+
+$(FRAME_LEDGER_TEST): src/mm/frame_ledger.c tests/frame_ledger_test.c include/dodo/mm/frame_ledger.h | $(BUILD_DIR)
+	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Iinclude \\
+		src/mm/frame_ledger.c tests/frame_ledger_test.c -o $@
+
+test-frame-ledger: $(FRAME_LEDGER_TEST)
+	$(FRAME_LEDGER_TEST)
 
 verify-elf-layout: $(KERNEL_ELF)
 	python3 tests/verify_elf_layout.py $(KERNEL_ELF)
