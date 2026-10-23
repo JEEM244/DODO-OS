@@ -31,6 +31,7 @@ static void check_invariants(const struct dodo_vaddr_space *space) {
 int main(void) {
  struct dodo_vaddr_space s; uint64_t a=0;
  assert(dodo_vaddr_init(&s,0x10000,0x20000)==DODO_VADDR_OK);
+ assert(dodo_vaddr_validate(&s)==DODO_VADDR_OK);
  assert(dodo_vaddr_allocate(&s,2*PAGE,PAGE,&a)==DODO_VADDR_OK&&a==0x10000);
  assert(dodo_vaddr_allocate(&s,PAGE,2*PAGE,&a)==DODO_VADDR_OK&&a==0x12000);
  assert(dodo_vaddr_reserve(&s,0x11000,PAGE)==DODO_VADDR_OVERLAP);
@@ -61,13 +62,16 @@ int main(void) {
  }
  assert(s.count==DODO_VADDR_MAX_RANGES);
  assert(dodo_vaddr_reserve(&s,0x10000+DODO_VADDR_MAX_RANGES*2*PAGE,PAGE)==DODO_VADDR_CAPACITY);
+ assert(dodo_vaddr_validate(&s)==DODO_VADDR_OK);
  s.count=DODO_VADDR_MAX_RANGES+1u;
+ assert(dodo_vaddr_validate(&s)==DODO_VADDR_INVALID_ARGUMENT);
  assert(dodo_vaddr_reserve(&s,0x10000,PAGE)==DODO_VADDR_INVALID_ARGUMENT);
 
  assert(dodo_vaddr_init(&s,0x10000,0x20000)==DODO_VADDR_OK);
  s.count=1;
  s.allocated[0].base=0x10000;
  s.allocated[0].length=0;
+ assert(dodo_vaddr_validate(&s)==DODO_VADDR_INVALID_ARGUMENT);
  assert(dodo_vaddr_reserve(&s,0x12000,PAGE)==DODO_VADDR_INVALID_ARGUMENT);
 
  assert(dodo_vaddr_init(&s,0x10000,0x20000)==DODO_VADDR_OK);
