@@ -832,6 +832,7 @@ static void test_runtime_activation_validates_and_switches_root(void) {
     f.runtime.table_frame_count = DODO_ADDRESS_SPACE_RUNTIME_MAX_TABLE_FRAMES + 1u;
     assert(dodo_address_space_runtime_activate(&f.runtime) ==
            DODO_ADDRESS_SPACE_RUNTIME_INVALID_STATE);
+    assert(active_root == kernel_root);
     f.runtime.table_frame_count = 0u;
     assert(dodo_address_space_runtime_validate(&f.runtime) ==
            DODO_ADDRESS_SPACE_RUNTIME_OK);
