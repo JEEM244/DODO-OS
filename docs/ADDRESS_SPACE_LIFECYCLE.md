@@ -161,3 +161,7 @@ Run deterministic create-map-unmap-destroy cycles across multiple owners and reu
 ### Two-root same-address test
 
 Create two inactive roots and map the same virtual address to different private physical frames. Switch between them and verify each root observes only its own test value.
+
+### Active destroy negative test
+
+Attempt to destroy the root loaded in CR3 and verify rejection without changing CR3, page-table entries, owner records, or allocator counters.
