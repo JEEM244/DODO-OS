@@ -205,3 +205,7 @@ Use distinct frame kinds for roots, page-table pages, user data, and kernel stac
 ### Owner identity checks
 
 Every release operation must verify both owner ID and physical frame. A caller that knows a frame address but does not own it must not be able to free it through the address-space API.
+
+### Zeroed page-table frames
+
+Zero each newly allocated page-table frame before linking it into a reachable hierarchy. If zeroing or mapping prerequisites fail, keep it unreachable and roll back ownership.
