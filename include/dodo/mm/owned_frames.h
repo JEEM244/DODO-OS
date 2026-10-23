@@ -29,6 +29,11 @@ void dodo_owned_frames_init(struct dodo_owned_frames *pool,
 enum dodo_owned_frames_status dodo_owned_frames_validate(
     const struct dodo_owned_frames *pool);
 
+/* Inspect a frame's kind only when the requested owner actually owns it. */
+enum dodo_owned_frames_status dodo_owned_frames_get_kind(
+    const struct dodo_owned_frames *pool, uint32_t owner_id,
+    uint64_t physical_address, enum dodo_frame_kind *kind_out);
+
 /* Count a task/address-space owner's live frames after consistency checks. */
 enum dodo_owned_frames_status dodo_owned_frames_count_owner(
     const struct dodo_owned_frames *pool, uint32_t owner_id,
