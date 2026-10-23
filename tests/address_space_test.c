@@ -216,6 +216,23 @@ static void test_owned_mapping_record_and_forget(void) {
     assert(f.space.mapping_count == 0u && f.allocator.allocated_pages == 0u);
 }
 
+static void test_validation_rejects_borrowed_record_of_local_frame(void) {
+    struct fixture f;
+    fixture_init(&f);
+    uint64_t frame = 0;
+    assert(dodo_owned_frames_alloc(&f.frames, 77, DODO_FRAME_KIND_USER_DATA,
+                                   &frame) == DODO_OWNED_FRAMES_OK);
+    assert(dodo_address_space_record_mapped_page(&f.space, UINT64_C(0x41e000),
+        UINT64_C(0x2000), DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE,
+        DODO_ADDRESS_SPACE_BORROWED_FRAME) == DODO_ADDRESS_SPACE_OK);
+    f.space.mappings[0].physical_address = frame;
+    assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OWNERSHIP_ERROR);
+    f.space.mappings[0].physical_address = UINT64_C(0x2000);
+    assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OK);
+    assert(dodo_address_space_forget_unmapped_page(&f.space, UINT64_C(0x41e000)) ==
+           DODO_ADDRESS_SPACE_OK);
+    assert(dodo_owned_frames_release(&f.frames, 77, frame) == DODO_OWNED_FRAMES_OK);
+}
 static void test_locally_owned_frame_cannot_be_marked_borrowed(void) {
     struct fixture f;
     fixture_init(&f);
@@ -553,6 +570,7 @@ int main(void) {
     test_init_rejects_invalid_user_interval();
     test_init_and_empty_validation();
     test_owned_mapping_record_and_forget();
+    test_validation_rejects_borrowed_record_of_local_frame();
     test_locally_owned_frame_cannot_be_marked_borrowed();
     test_borrowed_alias_cannot_outlive_owned_mapping();
     test_borrowed_aliases_share_external_lifetime();
