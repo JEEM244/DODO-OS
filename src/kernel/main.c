@@ -1058,13 +1058,13 @@ static void test_virtual_mapping(void) {
         dodo_x86_64_active_root_physical() != new_root_physical) {
         report_boot_error("user-root creation accepted physical address zero");
     }
-    serial_write("DODO: null page-table root rejection self-check passed\\n");
+    serial_write("DODO: null page-table root rejection self-check passed\n");
 
     if (dodo_x86_64_active_root_physical() != new_root_physical ||
         dodo_x86_64_kernel_root_physical() != new_root_physical) {
         report_boot_error("active page-table root inspection disagreed with CR3");
     }
-    serial_write("DODO: active CR3 root inspection self-check passed\\n");
+    serial_write("DODO: active CR3 root inspection self-check passed\n");
 
     serial_write("DODO: DODO-owned page-table tree installed; root = ");
     serial_write_hex64(new_root_physical);
@@ -1217,7 +1217,7 @@ static void test_virtual_mapping(void) {
         aliased_mapper_frames[0] != mapper_frame_before_alias_test) {
         report_boot_error("mapper accepted output aliasing its table-frame array");
     }
-    serial_write("DODO: mapper argument-alias and null-frame checks passed\\n");
+    serial_write("DODO: mapper argument-alias and null-frame checks passed\n");
 
     /*
      * Map an additional page read-only. The direct-map alias remains writable,
@@ -1343,7 +1343,7 @@ static void test_user_mode_transitions(void) {
         dodo_x86_64_active_root_physical() != user_root_frame) {
         report_boot_error("could not activate isolated user root for mapping setup");
     }
-    serial_write("DODO: active user-root inspection self-check passed\\n");
+    serial_write("DODO: active user-root inspection self-check passed\n");
 
     uint64_t user_region_base = 0;
     paging_status = dodo_x86_64_find_unused_user_region(&user_region_base);
