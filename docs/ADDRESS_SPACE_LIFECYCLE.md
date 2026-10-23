@@ -77,3 +77,7 @@ Initialize caller-visible output objects only after validating arguments. On any
 ### Root-frame ownership
 
 A newly allocated root frame belongs to the address-space owner from the moment allocation succeeds. Record ownership immediately, before any later operation can fail.
+
+### Private table classification
+
+Distinguish private lower-half paging tables from shared higher-half kernel tables in metadata. Teardown may reclaim only tables explicitly recorded as private.
