@@ -48,6 +48,36 @@ enum dodo_owned_frames_status dodo_owned_frames_validate(
     return DODO_OWNED_FRAMES_OK;
 }
 
+enum dodo_owned_frames_status dodo_owned_frames_get_kind(
+    const struct dodo_owned_frames *pool, uint32_t owner_id,
+    uint64_t physical_address, enum dodo_frame_kind *kind_out) {
+    if (pool == NULL || owner_id == DODO_FRAME_OWNER_INVALID ||
+        physical_address == 0u ||
+        (physical_address & (DODO_PHYS_PAGE_SIZE - 1u)) != 0u ||
+        kind_out == NULL) {
+        return DODO_OWNED_FRAMES_INVALID_ARGUMENT;
+    }
+
+    const enum dodo_owned_frames_status validation =
+        dodo_owned_frames_validate(pool);
+    if (validation != DODO_OWNED_FRAMES_OK) {
+        return validation;
+    }
+
+    for (uint32_t i = 0u; i < DODO_FRAME_LEDGER_CAPACITY; ++i) {
+        const struct dodo_frame_record *record = &pool->ledger.records[i];
+        if (record->physical_address != physical_address) {
+            continue;
+        }
+        if (record->owner_id != owner_id) {
+            return DODO_OWNED_FRAMES_LEDGER_ERROR;
+        }
+        *kind_out = record->kind;
+        return DODO_OWNED_FRAMES_OK;
+    }
+    return DODO_OWNED_FRAMES_LEDGER_ERROR;
+}
+
 enum dodo_owned_frames_status dodo_owned_frames_count_owner(
     const struct dodo_owned_frames *pool, uint32_t owner_id,
     uint32_t *count_out) {
