@@ -85,3 +85,7 @@ Distinguish private lower-half paging tables from shared higher-half kernel tabl
 ### Mapping ownership policy
 
 Every user mapping must declare whether its leaf frame is owned by this address space or borrowed. Borrowed frames are unmapped but never freed by address-space teardown.
+
+### Map operation ordering
+
+For a new mapping, validate range and permissions first, acquire and record required table frames, then publish page-table entries, then commit the virtual reservation. Roll back in reverse order if any step fails.
