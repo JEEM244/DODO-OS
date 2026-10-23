@@ -551,6 +551,26 @@ static void test_runtime_rejects_borrowed_mapping_metadata(void) {
            DODO_ADDRESS_SPACE_RUNTIME_OK);
 }
 
+static void test_null_page_mapping_is_rejected_without_allocation(void) {
+    struct fixture f;
+    fixture_init(&f, 122u);
+    uint32_t before = 0u;
+    uint32_t after = UINT32_MAX;
+    assert(dodo_owned_frames_count_owner(&f.frames, 122u, &before) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(dodo_address_space_runtime_map(&f.runtime, 0u,
+        DODO_PAGE_USER_ACCESSIBLE) ==
+        DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT);
+    assert(dodo_address_space_runtime_map(&f.runtime, DODO_PAGE_SIZE,
+        DODO_PAGE_USER_ACCESSIBLE) ==
+        DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT);
+    assert(dodo_owned_frames_count_owner(&f.frames, 122u, &after) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(after == before);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+}
+
 static void test_unaligned_mapping_address_allocates_nothing(void) {
     struct fixture f;
     fixture_init(&f, 119u);
@@ -653,6 +673,7 @@ int main(void) {
     test_runtime_validator_checks_table_frame_kind();
     test_runtime_validator_rejects_stale_unused_table_slot();
     test_runtime_rejects_borrowed_mapping_metadata();
+    test_null_page_mapping_is_rejected_without_allocation();
     test_unaligned_mapping_address_allocates_nothing();
     test_out_of_range_mapping_address_allocates_nothing();
     test_invalid_mapping_flags_allocate_nothing();
