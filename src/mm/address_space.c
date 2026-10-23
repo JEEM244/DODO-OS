@@ -20,7 +20,10 @@ static int valid_mapping_values(uint64_t virtual_address, uint64_t physical_addr
         physical_address > DODO_ADDRESS_SPACE_PHYSICAL_MASK ||
         (flags & ~DODO_ADDRESS_SPACE_USER_FLAGS) != 0u ||
         (flags & DODO_PAGE_USER_ACCESSIBLE) == 0u ||
-        (flags & DODO_PAGE_GLOBAL) != 0u || !valid_frame_policy(policy)) {
+        (flags & DODO_PAGE_GLOBAL) != 0u ||
+        ((flags & DODO_PAGE_WRITABLE) != 0u &&
+         (flags & DODO_PAGE_NO_EXECUTE) == 0u) ||
+        !valid_frame_policy(policy)) {
         return 0;
     }
     return 1;
