@@ -148,6 +148,24 @@ static void test_owned_frame_cannot_have_two_owning_mappings(void) {
     assert(dodo_address_space_forget_unmapped_page(&f.space, UINT64_C(0x405000)) ==
            DODO_ADDRESS_SPACE_OK);
 }
+static void test_lookup_returns_exact_mapping(void) {
+    struct fixture f;
+    fixture_init(&f);
+    uint64_t frame = 0;
+    assert(dodo_owned_frames_alloc(&f.frames, 77, DODO_FRAME_KIND_USER_DATA,
+                                   &frame) == DODO_OWNED_FRAMES_OK);
+    const uint64_t flags = DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE;
+    assert(dodo_address_space_record_mapped_page(&f.space, UINT64_C(0x40a000),
+        frame, flags, DODO_ADDRESS_SPACE_OWNED_FRAME) == DODO_ADDRESS_SPACE_OK);
+    struct dodo_address_space_mapping out = {0};
+    assert(dodo_address_space_lookup(&f.space, UINT64_C(0x40a000), &out) ==
+           DODO_ADDRESS_SPACE_OK);
+    assert(out.virtual_address == UINT64_C(0x40a000));
+    assert(out.physical_address == frame && out.flags == flags);
+    assert(out.frame_policy == DODO_ADDRESS_SPACE_OWNED_FRAME);
+    assert(dodo_address_space_forget_unmapped_page(&f.space, UINT64_C(0x40a000)) ==
+           DODO_ADDRESS_SPACE_OK);
+}
 static void test_lookup_preserves_output_on_miss(void) {
     struct fixture f;
     fixture_init(&f);
@@ -173,6 +191,7 @@ int main(void) {
     test_owned_mapping_requires_matching_frame_owner();
     test_writable_executable_mapping_is_rejected();
     test_owned_frame_cannot_have_two_owning_mappings();
+    test_lookup_returns_exact_mapping();
     test_lookup_preserves_output_on_miss();
     puts("address-space metadata tests: ok");
     return 0;
