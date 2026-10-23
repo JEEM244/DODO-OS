@@ -550,6 +550,32 @@ static void test_low_level_mapping_failure_rolls_back_owned_frames(void) {
            DODO_ADDRESS_SPACE_RUNTIME_OK);
 }
 
+static void test_destroy_refuses_corrupted_hardware_mapping(void) {
+    struct fixture f;
+    fixture_init(&f, 136u);
+    const uint64_t address = UINT64_C(0x401000);
+    assert(dodo_address_space_runtime_map(&f.runtime, address,
+        DODO_PAGE_USER_ACCESSIBLE) == DODO_ADDRESS_SPACE_RUNTIME_OK);
+    struct test_mapping *mapping = find_mapping(f.runtime.root_physical, address);
+    assert(mapping != NULL);
+    const uint64_t original = mapping->physical_address;
+    mapping->physical_address += DODO_PAGE_SIZE;
+    uint32_t owner_count = 0u;
+    assert(dodo_owned_frames_count_owner(&f.frames, 136u, &owner_count) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_PAGING_ERROR);
+    assert(f.runtime.initialized == 1u);
+    uint32_t after_count = 0u;
+    assert(dodo_owned_frames_count_owner(&f.frames, 136u, &after_count) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(after_count == owner_count);
+    mapping->physical_address = original;
+    assert(dodo_x86_64_paging_switch_root(kernel_root) == DODO_PAGING_OK);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+}
+
 static void test_unmap_fails_closed_when_hardware_leaf_is_missing(void) {
     struct fixture f;
     fixture_init(&f, 135u);
@@ -923,6 +949,7 @@ int main(void) {
     test_read_only_executable_mapping_is_accepted();
     test_duplicate_and_invalid_mapping_do_not_leak();
     test_low_level_mapping_failure_rolls_back_owned_frames();
+    test_destroy_refuses_corrupted_hardware_mapping();
     test_unmap_fails_closed_when_hardware_leaf_is_missing();
     test_hardware_metadata_mismatch_fails_closed();
     test_mapping_capacity_is_bounded_without_leaks();
