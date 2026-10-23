@@ -74,6 +74,30 @@ static void test_invalid_arguments_preserve_output(void) {
                                    DODO_FRAME_KIND_USER_DATA, &output) ==
            DODO_OWNED_FRAMES_INVALID_ARGUMENT);
     assert(output == UINT64_C(0xfeedface));
+    assert(dodo_owned_frames_alloc(&pool, 1,
+                                   (enum dodo_frame_kind)99, &output) ==
+           DODO_OWNED_FRAMES_INVALID_ARGUMENT);
+    assert(output == UINT64_C(0xfeedface));
+    assert(allocator.allocated_pages == 0 && allocator.free_pages == 2);
+}
+
+static void test_corrupt_ledger_fails_closed_before_allocation(void) {
+    struct dodo_limine_memmap_entry usable;
+    struct dodo_limine_memmap_entry *entries[1];
+    struct dodo_limine_memmap_response map;
+    make_usable_map(&usable, entries, &map, 2);
+
+    struct dodo_phys_allocator allocator;
+    struct dodo_owned_frames pool;
+    assert(dodo_phys_init(&allocator, &map) == DODO_PHYS_OK);
+    dodo_owned_frames_init(&pool, &allocator);
+
+    /* Deliberately violate count-vs-record consistency. */
+    pool.ledger.count = 1;
+    uint64_t output = UINT64_C(0xfeedface);
+    assert(dodo_owned_frames_alloc(&pool, 1, DODO_FRAME_KIND_USER_DATA,
+                                   &output) == DODO_OWNED_FRAMES_LEDGER_ERROR);
+    assert(output == UINT64_C(0xfeedface));
     assert(allocator.allocated_pages == 0 && allocator.free_pages == 2);
 }
 
@@ -114,6 +138,7 @@ static void test_ledger_capacity_failure_rolls_back_physical_frame(void) {
 int main(void) {
     test_owned_allocation_lifecycle();
     test_invalid_arguments_preserve_output();
+    test_corrupt_ledger_fails_closed_before_allocation();
     test_ledger_capacity_failure_rolls_back_physical_frame();
     puts("owned frame tests: ok");
     return 0;
