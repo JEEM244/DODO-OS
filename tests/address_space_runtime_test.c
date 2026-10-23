@@ -422,6 +422,33 @@ static void test_mapping_capacity_is_bounded_without_leaks(void) {
     assert(f.allocator.allocated_pages == 0u);
 }
 
+static void test_runtime_validator_checks_root_frame_kind(void) {
+    struct fixture f;
+    fixture_init(&f, 117u);
+    const uint64_t root = f.runtime.root_physical;
+    enum dodo_frame_kind original_kind = DODO_FRAME_KIND_UNUSED;
+    assert(dodo_owned_frames_get_kind(&f.frames, 117u, root, &original_kind) ==
+           DODO_OWNED_FRAMES_OK);
+    for (uint32_t i = 0u; i < DODO_FRAME_LEDGER_CAPACITY; ++i) {
+        if (f.frames.ledger.records[i].physical_address == root) {
+            f.frames.ledger.records[i].kind = DODO_FRAME_KIND_PAGE_TABLE;
+            break;
+        }
+    }
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OWNERSHIP_ERROR);
+    for (uint32_t i = 0u; i < DODO_FRAME_LEDGER_CAPACITY; ++i) {
+        if (f.frames.ledger.records[i].physical_address == root) {
+            f.frames.ledger.records[i].kind = original_kind;
+            break;
+        }
+    }
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+}
+
 static void test_runtime_validator_checks_table_frame_kind(void) {
     struct fixture f;
     fixture_init(&f, 116u);
@@ -520,6 +547,7 @@ int main(void) {
     test_low_level_mapping_failure_rolls_back_owned_frames();
     test_hardware_metadata_mismatch_fails_closed();
     test_mapping_capacity_is_bounded_without_leaks();
+    test_runtime_validator_checks_root_frame_kind();
     test_runtime_validator_checks_table_frame_kind();
     test_runtime_validator_rejects_stale_unused_table_slot();
     test_runtime_rejects_borrowed_mapping_metadata();
