@@ -76,6 +76,16 @@ int main(void) {
  assert(dodo_vaddr_reserve(&s,0x12000,PAGE)==DODO_VADDR_INVALID_ARGUMENT);
 
  /* Public validation rejects overlapping/corrupted reservation metadata. */
+ assert(dodo_vaddr_validate(NULL)==DODO_VADDR_INVALID_ARGUMENT);
+ assert(dodo_vaddr_init(&s,0x10000,0x20000)==DODO_VADDR_OK);
+ assert(dodo_vaddr_reserve(&s,0x12000,PAGE)==DODO_VADDR_OK);
+ s.allocated[0].base=0x20000;
+ assert(dodo_vaddr_validate(&s)==DODO_VADDR_INVALID_ARGUMENT);
+ s.allocated[0].base=0x12000;
+ s.allocated[0].length=PAGE+1u;
+ assert(dodo_vaddr_validate(&s)==DODO_VADDR_INVALID_ARGUMENT);
+ s.allocated[0].length=PAGE;
+ assert(dodo_vaddr_validate(&s)==DODO_VADDR_OK);
  assert(dodo_vaddr_init(&s,0x10000,0x20000)==DODO_VADDR_OK);
  s.count=2;
  s.allocated[0].base=0x10000;
