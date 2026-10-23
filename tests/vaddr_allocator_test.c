@@ -29,6 +29,16 @@ static void check_invariants(const struct dodo_vaddr_space *space) {
         }
     }
 }
+static void test_release_clears_vacated_slot(void) {
+ struct dodo_vaddr_space s;
+ assert(dodo_vaddr_init(&s,0x10000,0x20000)==DODO_VADDR_OK);
+ assert(dodo_vaddr_reserve(&s,0x12000,PAGE)==DODO_VADDR_OK);
+ assert(dodo_vaddr_release(&s,0x12000,PAGE)==DODO_VADDR_OK);
+ assert(s.count==0u);
+ assert(s.allocated[0].base==0u && s.allocated[0].length==0u);
+ assert(dodo_vaddr_validate(&s)==DODO_VADDR_OK);
+}
+
 static void test_init_clears_stale_slots(void) {
  struct dodo_vaddr_space s;
  assert(dodo_vaddr_init(&s,0x10000,0x20000)==DODO_VADDR_OK);
@@ -41,6 +51,7 @@ static void test_init_clears_stale_slots(void) {
 }
 
 int main(void) {
+ test_release_clears_vacated_slot();
  test_init_clears_stale_slots();
  struct dodo_vaddr_space s; uint64_t a=0;
  assert(dodo_vaddr_init(&s,0x10000,0x20000)==DODO_VADDR_OK);
