@@ -73,6 +73,7 @@ Implementation note: before connecting the virtual-range allocator or enabling C
 - [x] Verify user mappings stay absent from the kernel root and cannot read the tested supervisor-only kernel address.
 - [x] Create two user roots concurrently and verify the second root faults when it reads a lower-half page mapped only in the first.
 - [x] Tear down the two test roots after returning to kernel CR3, free their explicitly tracked code/stack/private-table/root frames, and verify allocator counters return to baseline.
+- [x] Add a bounded frame-ownership ledger primitive and host tests for duplicate frames, invalid alignment, owner mismatch, capacity exhaustion, and corrupted metadata; the primitive is not yet connected to paging or the physical allocator.
 - [ ] Replace the test-specific cleanup list with a reusable address-space creation/switch/teardown API that tracks all owned frames and handles partial failures.
 - [ ] Connect the virtual-range allocator to page mapping and owned page-table lifecycle operations.
 - [ ] Replace global one-shot test state with per-thread/per-process trap context and independent kernel stacks.
