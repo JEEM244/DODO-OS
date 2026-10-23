@@ -46,7 +46,7 @@ enum dodo_address_space_runtime_status dodo_address_space_runtime_validate(
 enum dodo_address_space_runtime_status dodo_address_space_runtime_activate(
     struct dodo_address_space_runtime *runtime);
 
-/* Switch away from this active root to a distinct, valid fallback root. */
+/* Switch an active user root back to the kernel root. */
 enum dodo_address_space_runtime_status dodo_address_space_runtime_deactivate(
     struct dodo_address_space_runtime *runtime,
     uint64_t fallback_root_physical);
