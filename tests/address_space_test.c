@@ -96,6 +96,22 @@ static void test_invalid_flags_and_duplicate_virtual_page(void) {
            DODO_ADDRESS_SPACE_OK);
 }
 
+static void test_owned_frame_cannot_have_two_owning_mappings(void) {
+    struct fixture f;
+    fixture_init(&f);
+    uint64_t frame = 0;
+    assert(dodo_owned_frames_alloc(&f.frames, 77, DODO_FRAME_KIND_USER_DATA,
+                                   &frame) == DODO_OWNED_FRAMES_OK);
+    assert(dodo_address_space_record_mapped_page(&f.space, UINT64_C(0x405000),
+        frame, DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE,
+        DODO_ADDRESS_SPACE_OWNED_FRAME) == DODO_ADDRESS_SPACE_OK);
+    assert(dodo_address_space_record_mapped_page(&f.space, UINT64_C(0x406000),
+        frame, DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE,
+        DODO_ADDRESS_SPACE_OWNED_FRAME) == DODO_ADDRESS_SPACE_OWNERSHIP_ERROR);
+    assert(f.space.mapping_count == 1u && f.space.virtual_space.count == 1u);
+    assert(dodo_address_space_forget_unmapped_page(&f.space, UINT64_C(0x405000)) ==
+           DODO_ADDRESS_SPACE_OK);
+}
 static void test_lookup_preserves_output_on_miss(void) {
     struct fixture f;
     fixture_init(&f);
@@ -117,6 +133,7 @@ int main(void) {
     test_owned_mapping_record_and_forget();
     test_borrowed_mapping_is_not_freed();
     test_invalid_flags_and_duplicate_virtual_page();
+    test_owned_frame_cannot_have_two_owning_mappings();
     test_lookup_preserves_output_on_miss();
     puts("address-space metadata tests: ok");
     return 0;
