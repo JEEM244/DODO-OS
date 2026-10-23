@@ -101,3 +101,7 @@ The first implementation may use INVLPG for a single page while running on the o
 ### Active-root exclusion
 
 Destroy must reject both the hardware-active CR3 root and any object marked ACTIVE. A successful switch must verify CR3 readback before updating software state.
+
+### Permission validation
+
+Reject user mappings that request global pages, unsupported cache attributes, noncanonical addresses, ranges crossing the user limit, or writable-executable permissions when the policy forbids them. Never silently mask invalid caller flags into a weaker request.
