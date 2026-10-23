@@ -1048,6 +1048,12 @@ static void test_virtual_mapping(void) {
         report_boot_error("could not clone and activate DODO's page-table tree");
     }
 
+    if (dodo_x86_64_active_root_physical() != new_root_physical ||
+        dodo_x86_64_kernel_root_physical() != new_root_physical) {
+        report_boot_error("active page-table root inspection disagreed with CR3");
+    }
+    serial_write("DODO: active CR3 root inspection self-check passed\\n");
+
     serial_write("DODO: DODO-owned page-table tree installed; root = ");
     serial_write_hex64(new_root_physical);
     serial_write("\nDODO: page-table frames cloned = ");
