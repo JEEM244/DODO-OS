@@ -37,16 +37,19 @@ HEADERS := include/dodo/boot/limine_protocol.h \
            include/dodo/arch/x86_64/paging.h \
            include/dodo/arch/x86_64/user_mode.h \
            include/dodo/kernel/task.h \
-           include/dodo/kernel/capability.h
+           include/dodo/kernel/capability.h \\
+           include/dodo/mm/frame_ledger.h \\
+           include/dodo/mm/owned_frames.h
 OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/capability.o $(BUILD_DIR)/gdt.o \
            $(BUILD_DIR)/idt.o $(BUILD_DIR)/timer.o $(BUILD_DIR)/keyboard.o $(BUILD_DIR)/console.o $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o \
            $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/paging_test.o \
-           $(BUILD_DIR)/user_mode.o
+           $(BUILD_DIR)/user_mode.o $(BUILD_DIR)/frame_ledger.o $(BUILD_DIR)/owned_frames.o
 PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
 VADDR_TEST := $(BUILD_DIR)/vaddr_allocator_test
 TASK_TEST := $(BUILD_DIR)/task_scheduler_test
 CAPABILITY_TEST := $(BUILD_DIR)/capability_test
 FRAME_LEDGER_TEST := $(BUILD_DIR)/frame_ledger_test
+OWNED_FRAMES_TEST := $(BUILD_DIR)/owned_frames_test
 
 .PHONY: all kernel iso run verify verify-elf-layout qemu-smoke qemu-uefi-smoke qemu-keyboard-smoke qemu-panic-smoke test-phys test-vaddr test-task test-capability test-frame-ledger test clean check-tools
 all: iso
@@ -55,7 +58,7 @@ kernel: check-tools $(KERNEL_ELF)
 
 iso: check-tools $(ISO_IMAGE)
 
-test: test-phys test-vaddr test-task test-capability test-frame-ledger
+test: test-phys test-vaddr test-task test-capability test-frame-ledger test-owned-frames
 
 # Full local acceptance pass. Requires the same Linux/QEMU tools as CI.
 verify:
@@ -87,6 +90,19 @@ $(FRAME_LEDGER_TEST): src/mm/frame_ledger.c tests/frame_ledger_test.c include/do
 
 test-frame-ledger: $(FRAME_LEDGER_TEST)
 	$(FRAME_LEDGER_TEST)
+
+$(BUILD_DIR)/frame_ledger.o: src/mm/frame_ledger.c include/dodo/mm/frame_ledger.h | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/owned_frames.o: src/mm/owned_frames.c include/dodo/mm/owned_frames.h include/dodo/mm/frame_ledger.h include/dodo/mm/phys.h | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OWNED_FRAMES_TEST): src/mm/phys.c src/mm/frame_ledger.c src/mm/owned_frames.c tests/owned_frames_test.c $(HEADERS) | $(BUILD_DIR)
+	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Iinclude \\
+		src/mm/phys.c src/mm/frame_ledger.c src/mm/owned_frames.c tests/owned_frames_test.c -o $@
+
+test-owned-frames: $(OWNED_FRAMES_TEST)
+	$(OWNED_FRAMES_TEST)
 
 verify-elf-layout: $(KERNEL_ELF)
 	python3 tests/verify_elf_layout.py $(KERNEL_ELF)
