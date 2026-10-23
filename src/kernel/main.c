@@ -1302,6 +1302,15 @@ static void test_user_mode_transitions(void) {
         serial_write("\n");
         report_boot_error("could not find an empty user PML4 slot");
     }
+    uint64_t empty_root_query_frame = UINT64_C(0x12345000);
+    uint64_t empty_root_query_flags = UINT64_C(0x55aa);
+    paging_status = dodo_x86_64_query_page(user_region_base,
+        &empty_root_query_frame, &empty_root_query_flags);
+    if (paging_status != DODO_PAGING_NOT_MAPPED ||
+        empty_root_query_frame != UINT64_C(0x12345000) ||
+        empty_root_query_flags != UINT64_C(0x55aa)) {
+        report_boot_error("empty user root query failed to preserve output parameters");
+    }
 
     volatile uint8_t *user_code =
         (volatile uint8_t *)dodo_x86_64_hhdm_pointer(user_code_frame);
