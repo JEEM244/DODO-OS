@@ -1830,6 +1830,14 @@ static void test_user_mode_transitions(void) {
         active_root_leaf != second_user_code_frame) {
         report_boot_error("active-root rejection damaged existing user mappings");
     }
+    uint64_t removed_frame_query = UINT64_MAX;
+    uint64_t removed_flags_query = UINT64_MAX;
+    paging_status = dodo_x86_64_query_page(second_user_code_virtual,
+        &removed_frame_query, &removed_flags_query);
+    if (paging_status != DODO_PAGING_NOT_MAPPED ||
+        removed_frame_query != UINT64_MAX || removed_flags_query != UINT64_MAX) {
+        report_boot_error("page query still found a leaf after successful unmap");
+    }
     paging_status = dodo_x86_64_map_page(
         second_user_code_virtual, second_user_code_frame,
         DODO_PAGE_USER_ACCESSIBLE, NULL, 0u, &frames_used);
