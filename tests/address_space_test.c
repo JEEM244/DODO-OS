@@ -60,6 +60,29 @@ static void test_frame_pool_corruption_propagates_as_ownership_error(void) {
     f.allocator.allocated_pages = 0u;
     assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OK);
 }
+static void test_validation_detects_duplicate_owned_frame_corruption(void) {
+    struct fixture f;
+    fixture_init(&f);
+    uint64_t first = 0;
+    uint64_t second = 0;
+    assert(dodo_owned_frames_alloc(&f.frames, 77, DODO_FRAME_KIND_USER_DATA,
+                                   &first) == DODO_OWNED_FRAMES_OK);
+    assert(dodo_owned_frames_alloc(&f.frames, 77, DODO_FRAME_KIND_USER_DATA,
+                                   &second) == DODO_OWNED_FRAMES_OK);
+    const uint64_t flags = DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE;
+    assert(dodo_address_space_record_mapped_page(&f.space, UINT64_C(0x418000),
+        first, flags, DODO_ADDRESS_SPACE_OWNED_FRAME) == DODO_ADDRESS_SPACE_OK);
+    assert(dodo_address_space_record_mapped_page(&f.space, UINT64_C(0x419000),
+        second, flags, DODO_ADDRESS_SPACE_OWNED_FRAME) == DODO_ADDRESS_SPACE_OK);
+    f.space.mappings[1].physical_address = first;
+    assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OWNERSHIP_ERROR);
+    f.space.mappings[1].physical_address = second;
+    assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OK);
+    assert(dodo_address_space_forget_unmapped_page(&f.space, UINT64_C(0x419000)) ==
+           DODO_ADDRESS_SPACE_OK);
+    assert(dodo_address_space_forget_unmapped_page(&f.space, UINT64_C(0x418000)) ==
+           DODO_ADDRESS_SPACE_OK);
+}
 static void test_reservation_and_mapping_addresses_must_match(void) {
     struct fixture f;
     fixture_init(&f);
@@ -454,6 +477,7 @@ static void test_lookup_preserves_output_on_miss(void) {
 int main(void) {
     test_external_free_is_detected_before_metadata_mutation();
     test_frame_pool_corruption_propagates_as_ownership_error();
+    test_validation_detects_duplicate_owned_frame_corruption();
     test_reservation_and_mapping_addresses_must_match();
     test_corrupt_mapping_flags_are_rejected();
     test_stale_unused_mapping_slot_is_rejected();
