@@ -34,6 +34,21 @@ static void fixture_init(struct fixture *f) {
                                    UINT64_C(0x800000)) == DODO_ADDRESS_SPACE_OK);
 }
 
+static void test_external_free_is_detected_before_metadata_mutation(void) {
+    struct fixture f;
+    fixture_init(&f);
+    uint64_t frame = 0;
+    assert(dodo_owned_frames_alloc(&f.frames, 77, DODO_FRAME_KIND_USER_DATA,
+                                   &frame) == DODO_OWNED_FRAMES_OK);
+    assert(dodo_address_space_record_mapped_page(&f.space, UINT64_C(0x417000),
+        frame, DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE,
+        DODO_ADDRESS_SPACE_OWNED_FRAME) == DODO_ADDRESS_SPACE_OK);
+    assert(dodo_phys_free_page(&f.allocator, frame) == DODO_PHYS_OK);
+    assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OWNERSHIP_ERROR);
+    assert(dodo_address_space_forget_unmapped_page(&f.space, UINT64_C(0x417000)) ==
+        DODO_ADDRESS_SPACE_OWNERSHIP_ERROR);
+    assert(f.space.mapping_count == 1u && f.space.virtual_space.count == 1u);
+}
 static void test_frame_pool_corruption_propagates_as_ownership_error(void) {
     struct fixture f;
     fixture_init(&f);
@@ -428,6 +443,7 @@ static void test_lookup_preserves_output_on_miss(void) {
 }
 
 int main(void) {
+    test_external_free_is_detected_before_metadata_mutation();
     test_frame_pool_corruption_propagates_as_ownership_error();
     test_reservation_and_mapping_addresses_must_match();
     test_corrupt_mapping_flags_are_rejected();
