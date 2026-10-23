@@ -712,6 +712,18 @@ static void test_runtime_activation_validates_and_switches_root(void) {
     assert(dodo_address_space_runtime_activate(&f.runtime) ==
            DODO_ADDRESS_SPACE_RUNTIME_OK);
     assert(active_root == f.runtime.root_physical);
+    assert(dodo_address_space_runtime_deactivate(&f.runtime,
+        f.runtime.root_physical) == DODO_ADDRESS_SPACE_RUNTIME_INVALID_STATE);
+    assert(active_root == f.runtime.root_physical);
+    assert(dodo_address_space_runtime_deactivate(&f.runtime, kernel_root) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(active_root == kernel_root);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+
+    fixture_init(&f, 129u);
+    assert(dodo_address_space_runtime_activate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
     assert(dodo_address_space_runtime_destroy(&f.runtime) ==
            DODO_ADDRESS_SPACE_RUNTIME_INVALID_STATE);
     assert(dodo_x86_64_paging_switch_root(kernel_root) == DODO_PAGING_OK);
