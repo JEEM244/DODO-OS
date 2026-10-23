@@ -309,6 +309,24 @@ static void test_forget_rejects_missing_or_misaligned_page(void) {
            DODO_ADDRESS_SPACE_INVALID_ARGUMENT);
     assert(f.space.mapping_count == 0u && f.space.virtual_space.count == 0u);
 }
+static void test_out_of_order_records_remain_sorted(void) {
+    struct fixture f;
+    fixture_init(&f);
+    const uint64_t flags = DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE;
+    assert(dodo_address_space_record_mapped_page(&f.space, UINT64_C(0x420000),
+        UINT64_C(0x2000), flags, DODO_ADDRESS_SPACE_BORROWED_FRAME) ==
+        DODO_ADDRESS_SPACE_OK);
+    assert(dodo_address_space_record_mapped_page(&f.space, UINT64_C(0x410000),
+        UINT64_C(0x3000), flags, DODO_ADDRESS_SPACE_BORROWED_FRAME) ==
+        DODO_ADDRESS_SPACE_OK);
+    assert(f.space.mappings[0].virtual_address == UINT64_C(0x410000));
+    assert(f.space.mappings[1].virtual_address == UINT64_C(0x420000));
+    assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OK);
+    assert(dodo_address_space_forget_unmapped_page(&f.space, UINT64_C(0x420000)) ==
+        DODO_ADDRESS_SPACE_OK);
+    assert(dodo_address_space_forget_unmapped_page(&f.space, UINT64_C(0x410000)) ==
+        DODO_ADDRESS_SPACE_OK);
+}
 static void test_mapping_capacity_fails_without_mutation(void) {
     struct fixture f;
     fixture_init(&f);
@@ -389,6 +407,7 @@ int main(void) {
     test_writable_executable_mapping_is_rejected();
     test_owned_frame_cannot_have_two_owning_mappings();
     test_forget_rejects_missing_or_misaligned_page();
+    test_out_of_order_records_remain_sorted();
     test_mapping_capacity_fails_without_mutation();
     test_lookup_returns_exact_mapping();
     test_lookup_preserves_output_on_miss();
