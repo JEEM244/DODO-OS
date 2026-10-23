@@ -89,3 +89,7 @@ Every user mapping must declare whether its leaf frame is owned by this address 
 ### Map operation ordering
 
 For a new mapping, validate range and permissions first, acquire and record required table frames, then publish page-table entries, then commit the virtual reservation. Roll back in reverse order if any step fails.
+
+### Unmap operation ordering
+
+For unmapping, clear the leaf entry, invalidate the local TLB translation, remove the virtual reservation, and release an owned leaf frame only after all preceding steps succeed.
