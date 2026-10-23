@@ -8,6 +8,16 @@ static enum dodo_address_space_runtime_status map_paging_status(
         DODO_ADDRESS_SPACE_RUNTIME_PAGING_ERROR;
 }
 
+static int valid_runtime_mapping_flags(uint64_t flags) {
+    const uint64_t allowed = DODO_PAGE_WRITABLE |
+        DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE;
+    return (flags & ~allowed) == 0u &&
+        (flags & DODO_PAGE_USER_ACCESSIBLE) != 0u &&
+        (flags & DODO_PAGE_GLOBAL) == 0u &&
+        ((flags & DODO_PAGE_WRITABLE) == 0u ||
+         (flags & DODO_PAGE_NO_EXECUTE) != 0u);
+}
+
 static enum dodo_address_space_runtime_status map_owned_status(
     enum dodo_owned_frames_status status) {
     return status == DODO_OWNED_FRAMES_OK ? DODO_ADDRESS_SPACE_RUNTIME_OK :
@@ -156,6 +166,19 @@ enum dodo_address_space_runtime_status dodo_address_space_runtime_map(
     if (runtime->table_frame_count >
         DODO_ADDRESS_SPACE_RUNTIME_MAX_TABLE_FRAMES - 3u) {
         return DODO_ADDRESS_SPACE_RUNTIME_CAPACITY;
+    }
+    if (!valid_runtime_mapping_flags(flags) ||
+        (virtual_address & (DODO_VADDR_PAGE_SIZE - 1u)) != 0u) {
+        return DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT;
+    }
+    struct dodo_vaddr_space virtual_probe = runtime->metadata.virtual_space;
+    const enum dodo_vaddr_status reserve_probe = dodo_vaddr_reserve(
+        &virtual_probe, virtual_address, DODO_VADDR_PAGE_SIZE);
+    if (reserve_probe == DODO_VADDR_CAPACITY) {
+        return DODO_ADDRESS_SPACE_RUNTIME_CAPACITY;
+    }
+    if (reserve_probe != DODO_VADDR_OK) {
+        return DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT;
     }
 
     uint64_t data_frame = 0u;
