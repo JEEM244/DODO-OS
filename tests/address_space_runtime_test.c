@@ -232,6 +232,16 @@ static void test_create_map_unmap_destroy_reclaims_all_owned_frames(void) {
     assert(owner_count == 0u);
     assert(f.allocator.free_pages == total_pages);
     assert(f.allocator.allocated_pages == 0u);
+
+    /* Reusing the same object is safe after a complete destroy. */
+    assert(dodo_address_space_runtime_create(&f.runtime, &f.frames, 101u,
+        UINT64_C(0x400000), UINT64_C(0x800000)) ==
+        DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(f.allocator.free_pages == total_pages);
 }
 
 static void test_invalid_owner_id_allocates_nothing(void) {
