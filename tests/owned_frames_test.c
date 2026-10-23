@@ -39,6 +39,16 @@ static void test_owned_allocation_lifecycle(void) {
     assert(dodo_owned_frames_count_owner(&pool, 7, &owned) ==
            DODO_OWNED_FRAMES_OK);
     assert(owned == 1);
+    enum dodo_frame_kind kind = DODO_FRAME_KIND_UNUSED;
+    assert(dodo_owned_frames_get_kind(&pool, 7, frame, &kind) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(kind == DODO_FRAME_KIND_USER_DATA);
+    kind = DODO_FRAME_KIND_UNUSED;
+    assert(dodo_owned_frames_get_kind(&pool, 8, frame, &kind) ==
+           DODO_OWNED_FRAMES_LEDGER_ERROR);
+    assert(kind == DODO_FRAME_KIND_UNUSED);
+    assert(dodo_owned_frames_get_kind(&pool, 7, frame, NULL) ==
+           DODO_OWNED_FRAMES_INVALID_ARGUMENT);
     assert(dodo_owned_frames_count_owner(&pool, 8, &owned) ==
            DODO_OWNED_FRAMES_OK);
     assert(owned == 0);
@@ -152,6 +162,10 @@ static void test_owner_count_fails_closed_on_corruption(void) {
     assert(dodo_owned_frames_count_owner(&pool, 21, &count) ==
            DODO_OWNED_FRAMES_LEDGER_ERROR);
     assert(count == UINT32_C(0xfeed));
+    enum dodo_frame_kind kind = DODO_FRAME_KIND_UNUSED;
+    assert(dodo_owned_frames_get_kind(&pool, 21, frame, &kind) ==
+           DODO_OWNED_FRAMES_LEDGER_ERROR);
+    assert(kind == DODO_FRAME_KIND_UNUSED);
     assert(allocator.allocated_pages == 1 && allocator.free_pages == 1);
 
     assert(dodo_owned_frames_count_owner(&pool, DODO_FRAME_OWNER_INVALID,
