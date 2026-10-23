@@ -73,3 +73,7 @@ Use a finite state machine such as EMPTY, BUILDING, READY, ACTIVE, and DESTROYIN
 ### Output initialization
 
 Initialize caller-visible output objects only after validating arguments. On any failed create operation, leave the output in a documented empty state and restore all acquired resources.
+
+### Root-frame ownership
+
+A newly allocated root frame belongs to the address-space owner from the moment allocation succeeds. Record ownership immediately, before any later operation can fail.
