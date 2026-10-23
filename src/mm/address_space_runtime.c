@@ -207,6 +207,9 @@ enum dodo_address_space_runtime_status dodo_address_space_runtime_map(
     if (reserve_probe == DODO_VADDR_CAPACITY) {
         return DODO_ADDRESS_SPACE_RUNTIME_CAPACITY;
     }
+    if (reserve_probe == DODO_VADDR_OVERLAP) {
+        return DODO_ADDRESS_SPACE_RUNTIME_ALREADY_MAPPED;
+    }
     if (reserve_probe != DODO_VADDR_OK) {
         return DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT;
     }
