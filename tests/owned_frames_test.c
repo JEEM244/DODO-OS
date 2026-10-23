@@ -36,9 +36,12 @@ static void test_owned_allocation_lifecycle(void) {
     assert(allocator.free_pages == 7 && allocator.allocated_pages == 1);
 
     uint32_t owned = 0;
-    assert(dodo_frame_ledger_count_owner(&pool.ledger, 7, &owned) ==
-           DODO_FRAME_LEDGER_OK);
+    assert(dodo_owned_frames_count_owner(&pool, 7, &owned) ==
+           DODO_OWNED_FRAMES_OK);
     assert(owned == 1);
+    assert(dodo_owned_frames_count_owner(&pool, 8, &owned) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(owned == 0);
     assert(dodo_owned_frames_validate(&pool) == DODO_OWNED_FRAMES_OK);
     assert(dodo_owned_frames_release(&pool, 8, frame) ==
            DODO_OWNED_FRAMES_LEDGER_ERROR);
@@ -46,6 +49,10 @@ static void test_owned_allocation_lifecycle(void) {
 
     assert(dodo_owned_frames_release(&pool, 7, frame) == DODO_OWNED_FRAMES_OK);
     assert(allocator.allocated_pages == 0 && allocator.free_pages == 8);
+    owned = UINT32_C(0xfeed);
+    assert(dodo_owned_frames_count_owner(&pool, 7, &owned) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(owned == 0);
     assert(dodo_owned_frames_release(&pool, 7, frame) ==
            DODO_OWNED_FRAMES_LEDGER_ERROR);
     assert(allocator.allocated_pages == 0 && allocator.free_pages == 8);
