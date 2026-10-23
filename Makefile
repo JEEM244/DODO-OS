@@ -51,7 +51,7 @@ CAPABILITY_TEST := $(BUILD_DIR)/capability_test
 FRAME_LEDGER_TEST := $(BUILD_DIR)/frame_ledger_test
 OWNED_FRAMES_TEST := $(BUILD_DIR)/owned_frames_test
 
-.PHONY: all kernel iso run verify verify-elf-layout qemu-smoke qemu-uefi-smoke qemu-keyboard-smoke qemu-panic-smoke test-phys test-vaddr test-task test-capability test-frame-ledger test clean check-tools
+.PHONY: all kernel iso run verify verify-elf-layout qemu-smoke qemu-uefi-smoke qemu-keyboard-smoke qemu-panic-smoke test-phys test-vaddr test-task test-capability test-frame-ledger test-owned-frames test clean check-tools
 all: iso
 
 kernel: check-tools $(KERNEL_ELF)
