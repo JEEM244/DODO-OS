@@ -209,3 +209,7 @@ Every release operation must verify both owner ID and physical frame. A caller t
 ### Zeroed page-table frames
 
 Zero each newly allocated page-table frame before linking it into a reachable hierarchy. If zeroing or mapping prerequisites fail, keep it unreachable and roll back ownership.
+
+### No root mutation before validation
+
+Validate the target root frame and its expected ownership kind before writing any root entries or loading it into CR3. Reject roots that alias the active root or a shared kernel object.
