@@ -34,6 +34,17 @@ static void fixture_init(struct fixture *f) {
                                    UINT64_C(0x800000)) == DODO_ADDRESS_SPACE_OK);
 }
 
+static void test_frame_pool_corruption_propagates_as_ownership_error(void) {
+    struct fixture f;
+    fixture_init(&f);
+    f.allocator.allocated_pages = DODO_PHYS_MAX_TRACKED_PAGES + 1u;
+    assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OWNERSHIP_ERROR);
+    assert(dodo_address_space_record_mapped_page(&f.space, UINT64_C(0x40d000),
+        UINT64_C(0x1000), DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE,
+        DODO_ADDRESS_SPACE_BORROWED_FRAME) == DODO_ADDRESS_SPACE_OWNERSHIP_ERROR);
+    f.allocator.allocated_pages = 0u;
+    assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OK);
+}
 static void test_corrupt_metadata_fails_closed(void) {
     struct fixture f;
     fixture_init(&f);
@@ -237,6 +248,7 @@ static void test_lookup_preserves_output_on_miss(void) {
 }
 
 int main(void) {
+    test_frame_pool_corruption_propagates_as_ownership_error();
     test_corrupt_metadata_fails_closed();
     test_null_arguments_are_rejected();
     test_init_rejects_invalid_user_interval();
