@@ -93,6 +93,13 @@ enum dodo_address_space_runtime_status dodo_address_space_runtime_validate(
         return DODO_ADDRESS_SPACE_RUNTIME_OWNERSHIP_ERROR;
     }
 
+    for (uint32_t i = runtime->table_frame_count;
+         i < DODO_ADDRESS_SPACE_RUNTIME_MAX_TABLE_FRAMES; ++i) {
+        if (runtime->table_frames[i] != 0u) {
+            return DODO_ADDRESS_SPACE_RUNTIME_INVALID_STATE;
+        }
+    }
+
     for (uint32_t i = 0u; i < runtime->table_frame_count; ++i) {
         if (runtime->table_frames[i] == 0u ||
             runtime->table_frames[i] == runtime->root_physical ||
@@ -349,6 +356,9 @@ enum dodo_address_space_runtime_status dodo_address_space_runtime_destroy(
         return DODO_ADDRESS_SPACE_RUNTIME_OWNERSHIP_ERROR;
     }
 
+    for (uint32_t i = 0u; i < DODO_ADDRESS_SPACE_RUNTIME_MAX_TABLE_FRAMES; ++i) {
+        runtime->table_frames[i] = 0u;
+    }
     runtime->metadata.initialized = 0u;
     runtime->root_physical = 0u;
     runtime->table_frame_count = 0u;
