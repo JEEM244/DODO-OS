@@ -714,6 +714,8 @@ static void test_runtime_activation_validates_and_switches_root(void) {
     assert(active_root == f.runtime.root_physical);
     assert(dodo_address_space_runtime_deactivate(&f.runtime,
         f.runtime.root_physical) == DODO_ADDRESS_SPACE_RUNTIME_INVALID_STATE);
+    assert(dodo_address_space_runtime_deactivate(&f.runtime,
+        UINT64_C(0x9000)) == DODO_ADDRESS_SPACE_RUNTIME_INVALID_STATE);
     assert(active_root == f.runtime.root_physical);
     assert(dodo_address_space_runtime_deactivate(&f.runtime, kernel_root) ==
            DODO_ADDRESS_SPACE_RUNTIME_OK);
