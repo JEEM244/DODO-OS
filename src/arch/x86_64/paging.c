@@ -405,7 +405,8 @@ enum dodo_paging_status dodo_x86_64_paging_switch_root(
         return DODO_PAGING_INVALID_ARGUMENT;
     }
 
-    if ((new_root_physical & (DODO_PAGE_SIZE - 1u)) != 0u ||
+    if (new_root_physical == 0u ||
+        (new_root_physical & (DODO_PAGE_SIZE - 1u)) != 0u ||
         new_root_physical > DODO_PTE_ADDRESS_MASK) {
         return DODO_PAGING_INVALID_ADDRESS;
     }
