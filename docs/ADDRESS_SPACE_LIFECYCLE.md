@@ -217,3 +217,7 @@ Validate the target root frame and its expected ownership kind before writing an
 ### Switch transition protocol
 
 Switching roots should validate READY state, root alignment, physical-address bounds, and shared kernel mapping assumptions before writing CR3. Update software active-state metadata only after CR3 readback succeeds.
+
+### Interrupt critical sections
+
+For the single-CPU implementation, protect multi-step updates to active-root state and ownership records from local interrupt re-entry where required. This is not a substitute for SMP locks or remote TLB shootdown.
