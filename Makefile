@@ -37,8 +37,8 @@ HEADERS := include/dodo/boot/limine_protocol.h \
            include/dodo/arch/x86_64/paging.h \
            include/dodo/arch/x86_64/user_mode.h \
            include/dodo/kernel/task.h \
-           include/dodo/kernel/capability.h \\
-           include/dodo/mm/frame_ledger.h \\
+           include/dodo/kernel/capability.h \
+           include/dodo/mm/frame_ledger.h \
            include/dodo/mm/owned_frames.h
 OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/capability.o $(BUILD_DIR)/gdt.o \
            $(BUILD_DIR)/idt.o $(BUILD_DIR)/timer.o $(BUILD_DIR)/keyboard.o $(BUILD_DIR)/console.o $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o \
@@ -98,7 +98,7 @@ $(BUILD_DIR)/owned_frames.o: src/mm/owned_frames.c include/dodo/mm/owned_frames.
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OWNED_FRAMES_TEST): src/mm/phys.c src/mm/frame_ledger.c src/mm/owned_frames.c tests/owned_frames_test.c $(HEADERS) | $(BUILD_DIR)
-	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Iinclude \\
+	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Iinclude \
 		src/mm/phys.c src/mm/frame_ledger.c src/mm/owned_frames.c tests/owned_frames_test.c -o $@
 
 test-owned-frames: $(OWNED_FRAMES_TEST)
