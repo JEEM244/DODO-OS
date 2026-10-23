@@ -14,8 +14,17 @@ enum dodo_owned_frames_status dodo_owned_frames_alloc(
     struct dodo_owned_frames *pool, uint32_t owner_id,
     enum dodo_frame_kind kind, uint64_t *physical_address) {
     if (pool == NULL || pool->allocator == NULL ||
-        physical_address == NULL || owner_id == DODO_FRAME_OWNER_INVALID) {
+        physical_address == NULL || owner_id == DODO_FRAME_OWNER_INVALID ||
+        kind < DODO_FRAME_KIND_USER_DATA || kind > DODO_FRAME_KIND_ROOT) {
         return DODO_OWNED_FRAMES_INVALID_ARGUMENT;
+    }
+
+    /*
+     * Fail closed if ownership metadata is already corrupt. Do not allocate a
+     * physical page when the ledger cannot safely accept or describe it.
+     */
+    if (dodo_frame_ledger_validate(&pool->ledger) != DODO_FRAME_LEDGER_OK) {
+        return DODO_OWNED_FRAMES_LEDGER_ERROR;
     }
 
     uint64_t frame = 0;
