@@ -186,8 +186,7 @@ static void fixture_init(struct fixture *f, uint32_t owner) {
 static void test_create_map_unmap_destroy_reclaims_all_owned_frames(void) {
     struct fixture f;
     fixture_init(&f, 101u);
-    const uint64_t initial_free = f.allocator.free_pages;
-    const uint64_t initial_allocated = f.allocator.allocated_pages;
+    const uint64_t total_pages = UINT64_C(2048);
     const uint64_t flags = DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_WRITABLE |
                            DODO_PAGE_NO_EXECUTE;
 
@@ -224,8 +223,8 @@ static void test_create_map_unmap_destroy_reclaims_all_owned_frames(void) {
     assert(dodo_owned_frames_count_owner(&f.frames, 101u, &owner_count) ==
            DODO_OWNED_FRAMES_OK);
     assert(owner_count == 0u);
-    assert(f.allocator.free_pages == initial_free);
-    assert(f.allocator.allocated_pages == initial_allocated);
+    assert(f.allocator.free_pages == total_pages);
+    assert(f.allocator.allocated_pages == 0u);
 }
 
 static void test_failed_root_switch_rolls_back_mapping_allocation(void) {
