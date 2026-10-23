@@ -250,6 +250,6 @@ The wrapper supports:
 - Retain intermediate page-table frames after unmap because the current low-level unmapper does not prune empty tables.
 - Destroy an inactive address space by unmapping every recorded leaf, releasing owned data frames, then releasing retained table frames and the root.
 
-The ownership ledger capacity is now 512 records so the bootstrap registry can represent a root, user pages, and a bounded set of retained page-table frames. The runtime refuses new mappings before its table-frame tracking array can overflow.
+The ownership ledger capacity is now 512 records so the bootstrap registry can represent a root, user pages, and a bounded set of retained page-table frames. The runtime also exposes validated activation (load the user root into CR3) and guarded deactivation (switch an active user root back to the kernel root). This is a building block for a future scheduler, not a context switch: it does not save registers, change stacks, or schedule tasks. The runtime refuses new mappings before its table-frame tracking array can overflow.
 
 This remains a prototype, not a process manager: it is single-CPU, has no reference-counted shared user frames, does not reclaim empty intermediate tables on each unmap, and does not provide scheduler/context-switch integration. The boot self-check and host mock tests cover ordinary lifecycle, rollback, metadata/hardware mismatch, capacity, and teardown. A passing CI/QEMU run is still required before treating it as verified.
