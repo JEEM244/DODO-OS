@@ -58,6 +58,9 @@ enum dodo_vaddr_status dodo_vaddr_init(
     space->start = start;
     space->end = end;
     space->count = 0;
+    for (uint64_t i = 0u; i < DODO_VADDR_MAX_RANGES; ++i) {
+        space->allocated[i] = (struct dodo_vaddr_range){0};
+    }
     return DODO_VADDR_OK;
 }
 
