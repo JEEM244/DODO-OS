@@ -1084,6 +1084,10 @@ static void test_virtual_mapping(void) {
         report_boot_error("virtual page mapping self-test failed");
     }
 
+    if (dodo_x86_64_query_page(mapped_virtual_address, NULL, NULL) !=
+        DODO_PAGING_INVALID_ARGUMENT) {
+        report_boot_error("page query accepted null output pointers");
+    }
     uint64_t queried_physical_address = UINT64_MAX;
     uint64_t queried_flags = UINT64_MAX;
     status = dodo_x86_64_query_page(mapped_virtual_address,
