@@ -355,6 +355,10 @@ enum dodo_address_space_runtime_status dodo_address_space_runtime_destroy(
     if (dodo_x86_64_paging_switch_root(previous_root) != DODO_PAGING_OK) {
         return DODO_ADDRESS_SPACE_RUNTIME_ROOT_SWITCH_ERROR;
     }
+    status = dodo_address_space_runtime_validate(runtime);
+    if (status != DODO_ADDRESS_SPACE_RUNTIME_OK) {
+        return status;
+    }
 
     /* Preflight every retained table frame before releasing any of them. */
     for (uint32_t i = 0u; i < runtime->table_frame_count; ++i) {
