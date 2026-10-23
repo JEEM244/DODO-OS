@@ -368,7 +368,8 @@ enum dodo_paging_status dodo_x86_64_paging_create_user_root(
      * caller may accidentally ask to "create" the active user root; zeroing
      * it would destroy the very mappings used to return safely to the kernel.
      */
-    if ((user_root_physical & (DODO_PAGE_SIZE - 1u)) != 0u ||
+    if (user_root_physical == 0u ||
+        (user_root_physical & (DODO_PAGE_SIZE - 1u)) != 0u ||
         user_root_physical > DODO_PTE_ADDRESS_MASK ||
         user_root_physical == kernel_root_table_physical ||
         user_root_physical == root_table_physical) {
