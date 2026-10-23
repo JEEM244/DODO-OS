@@ -536,6 +536,29 @@ static void test_runtime_rejects_borrowed_mapping_metadata(void) {
            DODO_ADDRESS_SPACE_RUNTIME_OK);
 }
 
+static void test_invalid_mapping_flags_allocate_nothing(void) {
+    struct fixture f;
+    fixture_init(&f, 118u);
+    uint32_t before = 0u;
+    uint32_t after = UINT32_MAX;
+    assert(dodo_owned_frames_count_owner(&f.frames, 118u, &before) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(dodo_address_space_runtime_map(&f.runtime, UINT64_C(0x401000),
+        DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_WRITABLE) ==
+        DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT);
+    assert(dodo_address_space_runtime_map(&f.runtime, UINT64_C(0x401000),
+        DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_GLOBAL) ==
+        DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT);
+    assert(dodo_address_space_runtime_map(&f.runtime, UINT64_C(0x401000),
+        DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_CACHE_DISABLE) ==
+        DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT);
+    assert(dodo_owned_frames_count_owner(&f.frames, 118u, &after) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(after == before);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+}
+
 static void test_invalid_virtual_range_does_not_leak(void) {
     struct fixture f;
     fixture_init(&f, 109u);
@@ -580,6 +603,7 @@ int main(void) {
     test_runtime_validator_checks_table_frame_kind();
     test_runtime_validator_rejects_stale_unused_table_slot();
     test_runtime_rejects_borrowed_mapping_metadata();
+    test_invalid_mapping_flags_allocate_nothing();
     test_invalid_virtual_range_does_not_leak();
     test_destroy_refuses_active_root();
     puts("address-space runtime tests: ok");
