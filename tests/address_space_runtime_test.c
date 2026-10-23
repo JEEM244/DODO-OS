@@ -265,6 +265,22 @@ static void test_create_map_unmap_destroy_reclaims_all_owned_frames(void) {
     assert(f.allocator.free_pages == total_pages);
 }
 
+static void test_malformed_runtime_ranges_allocate_nothing(void) {
+    struct fixture f;
+    make_map(&f.usable, f.entries, &f.map);
+    assert(dodo_phys_init(&f.allocator, &f.map) == DODO_PHYS_OK);
+    dodo_owned_frames_init(&f.frames, &f.allocator);
+    const uint64_t free_before = f.allocator.free_pages;
+    assert(dodo_address_space_runtime_create(&f.runtime, &f.frames, 137u,
+        UINT64_C(0x400001), UINT64_C(0x800000)) ==
+        DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT);
+    assert(dodo_address_space_runtime_create(&f.runtime, &f.frames, 138u,
+        UINT64_C(0x400000), UINT64_MAX) ==
+        DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT);
+    assert(f.allocator.free_pages == free_before);
+    assert(f.allocator.allocated_pages == 0u);
+}
+
 static void test_invalid_owner_id_allocates_nothing(void) {
     struct fixture f;
     make_map(&f.usable, f.entries, &f.map);
@@ -939,6 +955,7 @@ static void test_destroy_refuses_active_root(void) {
 int main(void) {
     test_create_allocates_exactly_one_root_frame();
     test_create_map_unmap_destroy_reclaims_all_owned_frames();
+    test_malformed_runtime_ranges_allocate_nothing();
     test_invalid_owner_id_allocates_nothing();
     test_invalid_runtime_range_allocates_nothing();
     test_distinct_owners_can_have_independent_roots();
