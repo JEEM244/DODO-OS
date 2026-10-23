@@ -1337,9 +1337,11 @@ static void test_user_mode_transitions(void) {
 
     const uint64_t kernel_root_frame = dodo_x86_64_kernel_root_physical();
     if (kernel_root_frame == 0u ||
-        dodo_x86_64_paging_switch_root(user_root_frame) != DODO_PAGING_OK) {
+        dodo_x86_64_paging_switch_root(user_root_frame) != DODO_PAGING_OK ||
+        dodo_x86_64_active_root_physical() != user_root_frame) {
         report_boot_error("could not activate isolated user root for mapping setup");
     }
+    serial_write("DODO: active user-root inspection self-check passed\\n");
 
     uint64_t user_region_base = 0;
     paging_status = dodo_x86_64_find_unused_user_region(&user_region_base);
@@ -1640,7 +1642,8 @@ static void test_user_mode_transitions(void) {
     }
 
     /* Restore the kernel root before calling the assembly transition stub. */
-    if (dodo_x86_64_paging_switch_root(kernel_root_frame) != DODO_PAGING_OK) {
+    if (dodo_x86_64_paging_switch_root(kernel_root_frame) != DODO_PAGING_OK ||
+        dodo_x86_64_active_root_physical() != kernel_root_frame) {
         report_boot_error("could not restore kernel page-table root before CPL3 entry");
     }
 
