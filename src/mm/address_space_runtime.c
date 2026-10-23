@@ -326,8 +326,10 @@ enum dodo_address_space_runtime_status dodo_address_space_runtime_unmap(
         virtual_address, &actual_physical, &actual_flags);
     if (paging_status != DODO_PAGING_OK ||
         actual_physical != mapping.physical_address || actual_flags != mapping.flags) {
-        (void)dodo_x86_64_paging_switch_root(previous_root);
-        return DODO_ADDRESS_SPACE_RUNTIME_PAGING_ERROR;
+        const int restore_failed =
+            dodo_x86_64_paging_switch_root(previous_root) != DODO_PAGING_OK;
+        return restore_failed ? DODO_ADDRESS_SPACE_RUNTIME_ROOT_SWITCH_ERROR :
+            DODO_ADDRESS_SPACE_RUNTIME_PAGING_ERROR;
     }
 
     paging_status = dodo_x86_64_unmap_page(virtual_address,
