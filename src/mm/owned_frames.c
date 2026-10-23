@@ -10,6 +10,44 @@ void dodo_owned_frames_init(struct dodo_owned_frames *pool,
     dodo_frame_ledger_init(&pool->ledger);
 }
 
+enum dodo_owned_frames_status dodo_owned_frames_validate(
+    const struct dodo_owned_frames *pool) {
+    if (pool == NULL || pool->allocator == NULL ||
+        pool->allocator->initialized == 0u ||
+        pool->allocator->allocated_pages > DODO_PHYS_MAX_TRACKED_PAGES) {
+        return DODO_OWNED_FRAMES_INVALID_ARGUMENT;
+    }
+
+    if (dodo_frame_ledger_validate(&pool->ledger) != DODO_FRAME_LEDGER_OK) {
+        return DODO_OWNED_FRAMES_LEDGER_ERROR;
+    }
+
+    /*
+     * The physical allocator may also contain frames owned by other bootstrap
+     * subsystems, so validate the ledger-to-allocator direction only.
+     */
+    for (uint32_t i = 0u; i < DODO_FRAME_LEDGER_CAPACITY; ++i) {
+        const struct dodo_frame_record *record = &pool->ledger.records[i];
+        if (record->kind == DODO_FRAME_KIND_UNUSED) {
+            continue;
+        }
+
+        int found = 0;
+        for (uint64_t j = 0u; j < pool->allocator->allocated_pages; ++j) {
+            if (pool->allocator->allocated_frames[j] ==
+                record->physical_address) {
+                found = 1;
+                break;
+            }
+        }
+        if (!found) {
+            return DODO_OWNED_FRAMES_ALLOCATOR_ERROR;
+        }
+    }
+
+    return DODO_OWNED_FRAMES_OK;
+}
+
 enum dodo_owned_frames_status dodo_owned_frames_alloc(
     struct dodo_owned_frames *pool, uint32_t owner_id,
     enum dodo_frame_kind kind, uint64_t *physical_address) {
