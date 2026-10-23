@@ -42,6 +42,8 @@ The virtual-range tests are compiled with UndefinedBehaviorSanitizer and exercis
 
 The virtual-range allocator does not map pages or own physical frames. Passing these host tests does not establish that real process address spaces are isolated or safely reclaimed.
 
+The page-query API returns leaf-entry flags only. Security decisions about effective permissions must also account for the ancestor page-table entries; do not treat a leaf U/S bit as a complete permission audit.
+
 The kernel paging self-check also queries the live 4 KiB mapping without mutating it, verifies the physical frame and flags, and confirms that invalid, unaligned, non-canonical, and unmapped queries preserve output parameters on failure.
 
 The host suite also includes a metadata-only address-space registry test. It checks user-range reservations, mapping flags (including W^X), owned versus borrowed frame bookkeeping, ownership-kind checks, sorted records, lookup, corruption rejection, and capacity exhaustion. This registry does not touch hardware page tables; the full create/switch/unmap/destroy lifecycle remains unfinished.
