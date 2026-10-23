@@ -101,8 +101,10 @@ enum dodo_address_space_status dodo_address_space_record_mapped_page(
         !valid_mapping_values(virtual_address, physical_address, flags, frame_policy)) {
         return DODO_ADDRESS_SPACE_INVALID_ARGUMENT;
     }
-    if (dodo_address_space_validate(space) != DODO_ADDRESS_SPACE_OK) {
-        return DODO_ADDRESS_SPACE_INVALID_STATE;
+    const enum dodo_address_space_status validation =
+        dodo_address_space_validate(space);
+    if (validation != DODO_ADDRESS_SPACE_OK) {
+        return validation;
     }
     if (space->mapping_count >= DODO_ADDRESS_SPACE_MAX_MAPPINGS) {
         return DODO_ADDRESS_SPACE_CAPACITY;
@@ -158,8 +160,10 @@ enum dodo_address_space_status dodo_address_space_forget_unmapped_page(
     if (space == NULL || (virtual_address & (DODO_VADDR_PAGE_SIZE - 1u)) != 0u) {
         return DODO_ADDRESS_SPACE_INVALID_ARGUMENT;
     }
-    if (dodo_address_space_validate(space) != DODO_ADDRESS_SPACE_OK) {
-        return DODO_ADDRESS_SPACE_INVALID_STATE;
+    const enum dodo_address_space_status validation =
+        dodo_address_space_validate(space);
+    if (validation != DODO_ADDRESS_SPACE_OK) {
+        return validation;
     }
     uint32_t position = 0u;
     while (position < space->mapping_count &&
@@ -199,8 +203,10 @@ enum dodo_address_space_status dodo_address_space_lookup(
         (virtual_address & (DODO_VADDR_PAGE_SIZE - 1u)) != 0u) {
         return DODO_ADDRESS_SPACE_INVALID_ARGUMENT;
     }
-    if (dodo_address_space_validate(space) != DODO_ADDRESS_SPACE_OK) {
-        return DODO_ADDRESS_SPACE_INVALID_STATE;
+    const enum dodo_address_space_status validation =
+        dodo_address_space_validate(space);
+    if (validation != DODO_ADDRESS_SPACE_OK) {
+        return validation;
     }
     for (uint32_t i = 0u; i < space->mapping_count; ++i) {
         if (space->mappings[i].virtual_address == virtual_address) {
