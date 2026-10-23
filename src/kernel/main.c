@@ -10,6 +10,8 @@
 #include "dodo/arch/x86_64/user_mode.h"
 #include "dodo/boot/limine_protocol.h"
 #include "dodo/mm/phys.h"
+#include "dodo/mm/owned_frames.h"
+#include "dodo/mm/address_space_runtime.h"
 #include "dodo/kernel/capability.h"
 
 #define COM1_PORT 0x3F8u
@@ -2112,6 +2114,46 @@ static void test_exception_handler(void) {
  * This milestone validates the handoff, installs the early exception IDT,
  * exercises the physical page-frame allocator, and tests INT3 recovery.
  */
+
+static void test_integrated_address_space_runtime(void) {
+    struct dodo_owned_frames owned_frames;
+    struct dodo_address_space_runtime runtime;
+    const uint32_t owner_id = UINT32_C(0xD0D0);
+    const uint64_t free_before = physical_allocator.free_pages;
+    const uint64_t allocated_before = physical_allocator.allocated_pages;
+    uint32_t owner_count = UINT32_MAX;
+
+    dodo_owned_frames_init(&owned_frames, &physical_allocator);
+    if (dodo_address_space_runtime_create(&runtime, &owned_frames, owner_id,
+            UINT64_C(0x40000000), UINT64_C(0x41000000)) !=
+            DODO_ADDRESS_SPACE_RUNTIME_OK) {
+        report_boot_error("integrated address-space creation failed");
+    }
+    const uint64_t flags = DODO_PAGE_USER_ACCESSIBLE;
+    if (dodo_address_space_runtime_map(&runtime, UINT64_C(0x40001000), flags) !=
+            DODO_ADDRESS_SPACE_RUNTIME_OK ||
+        dodo_address_space_runtime_map(&runtime, UINT64_C(0x40002000), flags) !=
+            DODO_ADDRESS_SPACE_RUNTIME_OK ||
+        dodo_address_space_runtime_unmap(&runtime, UINT64_C(0x40001000)) !=
+            DODO_ADDRESS_SPACE_RUNTIME_OK ||
+        dodo_address_space_runtime_map(&runtime, UINT64_C(0x40001000), flags) !=
+            DODO_ADDRESS_SPACE_RUNTIME_OK ||
+        dodo_address_space_runtime_validate(&runtime) !=
+            DODO_ADDRESS_SPACE_RUNTIME_OK) {
+        report_boot_error("integrated address-space map/unmap lifecycle failed");
+    }
+    if (dodo_address_space_runtime_destroy(&runtime) !=
+            DODO_ADDRESS_SPACE_RUNTIME_OK ||
+        dodo_owned_frames_count_owner(&owned_frames, owner_id, &owner_count) !=
+            DODO_OWNED_FRAMES_OK ||
+        owner_count != 0u ||
+        physical_allocator.free_pages != free_before ||
+        physical_allocator.allocated_pages != allocated_before) {
+        report_boot_error("integrated address-space teardown leaked owned frames");
+    }
+    serial_write("DODO: integrated address-space lifecycle self-check passed\n");
+}
+
 __attribute__((noreturn))
 void kernel_main(void) {
     serial_init();
@@ -2149,6 +2191,7 @@ void kernel_main(void) {
     test_capability_policy();
     test_exception_handler();
     reclaim_bootloader_memory();
+    test_integrated_address_space_runtime();
     serial_write("DODO: all kernel bootstrap self-checks passed\n");
     dodo_x86_64_timer_init();
     dodo_x86_64_keyboard_init();
