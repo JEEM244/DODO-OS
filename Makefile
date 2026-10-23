@@ -301,6 +301,7 @@ qemu-smoke: $(ISO_IMAGE)
 	grep -Fq "DODO: IDT breakpoint self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: exception handler resumed after INT3" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: capability deny-by-default self-check passed" $(BUILD_DIR)/qemu-serial.log; \
+	grep -Fq "DODO: integrated address-space lifecycle self-check passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO: all kernel bootstrap self-checks passed" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "DODO OS interactive serial console" $(BUILD_DIR)/qemu-serial.log; \
 	grep -Fq "Commands:" $(BUILD_DIR)/qemu-serial.log; \
