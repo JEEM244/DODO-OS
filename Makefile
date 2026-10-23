@@ -39,26 +39,29 @@ HEADERS := include/dodo/boot/limine_protocol.h \
            include/dodo/kernel/task.h \
            include/dodo/kernel/capability.h \
            include/dodo/mm/frame_ledger.h \
-           include/dodo/mm/owned_frames.h
+           include/dodo/mm/owned_frames.h \
+           include/dodo/mm/address_space.h
 OBJECTS := $(BUILD_DIR)/main.o $(BUILD_DIR)/phys.o $(BUILD_DIR)/capability.o $(BUILD_DIR)/gdt.o \
            $(BUILD_DIR)/idt.o $(BUILD_DIR)/timer.o $(BUILD_DIR)/keyboard.o $(BUILD_DIR)/console.o $(BUILD_DIR)/paging.o $(BUILD_DIR)/entry.o \
            $(BUILD_DIR)/interrupts.o $(BUILD_DIR)/paging_test.o \
-           $(BUILD_DIR)/user_mode.o $(BUILD_DIR)/frame_ledger.o $(BUILD_DIR)/owned_frames.o
+           $(BUILD_DIR)/user_mode.o $(BUILD_DIR)/frame_ledger.o $(BUILD_DIR)/owned_frames.o \
+           $(BUILD_DIR)/address_space.o
 PHYS_TEST := $(BUILD_DIR)/phys_allocator_test
 VADDR_TEST := $(BUILD_DIR)/vaddr_allocator_test
 TASK_TEST := $(BUILD_DIR)/task_scheduler_test
 CAPABILITY_TEST := $(BUILD_DIR)/capability_test
 FRAME_LEDGER_TEST := $(BUILD_DIR)/frame_ledger_test
 OWNED_FRAMES_TEST := $(BUILD_DIR)/owned_frames_test
+ADDRESS_SPACE_TEST := $(BUILD_DIR)/address_space_test
 
-.PHONY: all kernel iso run verify verify-elf-layout qemu-smoke qemu-uefi-smoke qemu-keyboard-smoke qemu-panic-smoke test-phys test-vaddr test-task test-capability test-frame-ledger test-owned-frames test clean check-tools
+.PHONY: all kernel iso run verify verify-elf-layout qemu-smoke qemu-uefi-smoke qemu-keyboard-smoke qemu-panic-smoke test-phys test-vaddr test-task test-capability test-frame-ledger test-owned-frames test-address-space test clean check-tools
 all: iso
 
 kernel: check-tools $(KERNEL_ELF)
 
 iso: check-tools $(ISO_IMAGE)
 
-test: test-phys test-vaddr test-task test-capability test-frame-ledger test-owned-frames
+test: test-phys test-vaddr test-task test-capability test-frame-ledger test-owned-frames test-address-space
 
 # Full local acceptance pass. Requires the same Linux/QEMU tools as CI.
 verify:
@@ -96,6 +99,16 @@ $(BUILD_DIR)/frame_ledger.o: src/mm/frame_ledger.c include/dodo/mm/frame_ledger.
 
 $(BUILD_DIR)/owned_frames.o: src/mm/owned_frames.c include/dodo/mm/owned_frames.h include/dodo/mm/frame_ledger.h include/dodo/mm/phys.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/address_space.o: src/mm/address_space.c include/dodo/mm/address_space.h include/dodo/mm/owned_frames.h include/dodo/mm/vaddr.h | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(ADDRESS_SPACE_TEST): src/mm/phys.c src/mm/frame_ledger.c src/mm/owned_frames.c src/mm/vaddr.c src/mm/address_space.c tests/address_space_test.c $(HEADERS) | $(BUILD_DIR)
+	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Iinclude \
+		src/mm/phys.c src/mm/frame_ledger.c src/mm/owned_frames.c src/mm/vaddr.c src/mm/address_space.c tests/address_space_test.c -o $@
+
+test-address-space: $(ADDRESS_SPACE_TEST)
+	$(ADDRESS_SPACE_TEST)
 
 $(OWNED_FRAMES_TEST): src/mm/phys.c src/mm/frame_ledger.c src/mm/owned_frames.c tests/owned_frames_test.c $(HEADERS) | $(BUILD_DIR)
 	$(HOST_CC) -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Iinclude \
