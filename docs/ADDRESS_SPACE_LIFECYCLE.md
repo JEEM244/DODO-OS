@@ -185,3 +185,7 @@ After unmapping a private page, invalidate its translation before releasing or r
 ### Status code separation
 
 Use status values that distinguish invalid arguments, malformed state, capacity exhaustion, allocation failure, mapping conflict, inactive-root requirements, and rollback failure. Do not collapse rollback failure into an ordinary allocation error.
+
+### Caller-owned object storage
+
+Until a kernel heap exists, let the caller provide address-space object storage or allocate it from a documented fixed pool. Keep metadata storage separate from physical page-table frames so object lifetime is explicit.
