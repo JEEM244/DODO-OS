@@ -169,3 +169,7 @@ Attempt to destroy the root loaded in CR3 and verify rejection without changing 
 ### Shared-kernel preservation test
 
 Create and destroy multiple user roots while checking representative kernel code, stack, and direct-map translations remain present and supervisor-only in each user root.
+
+### Capacity exhaustion test
+
+Fill the virtual reservation table and ownership ledger to their documented limits. The next operation must return a capacity status without modifying existing records or leaking frames.
