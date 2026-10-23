@@ -61,3 +61,7 @@ These names describe the intended contract, not functions currently present in t
 6. Only then build owned task stacks and CPU context switching on top of the lifecycle API.
 
 Until these gates pass, DODO must continue describing user isolation as a tested prototype rather than a complete process-isolation system.
+
+### Stable address-space identity
+
+Assign each live address space a nonzero monotonically allocated ID. IDs are diagnostic identities, not physical addresses, and must not be reused while any task, capability, or log record can still refer to the old object.
