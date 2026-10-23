@@ -34,6 +34,24 @@ static void fixture_init(struct fixture *f) {
                                    UINT64_C(0x800000)) == DODO_ADDRESS_SPACE_OK);
 }
 
+static void test_null_arguments_are_rejected(void) {
+    struct fixture f;
+    fixture_init(&f);
+    assert(dodo_address_space_init(NULL, &f.frames, 77,
+        UINT64_C(0x400000), UINT64_C(0x800000)) ==
+        DODO_ADDRESS_SPACE_INVALID_ARGUMENT);
+    assert(dodo_address_space_init(&f.space, NULL, 77,
+        UINT64_C(0x400000), UINT64_C(0x800000)) ==
+        DODO_ADDRESS_SPACE_INVALID_ARGUMENT);
+    assert(dodo_address_space_validate(NULL) == DODO_ADDRESS_SPACE_INVALID_STATE);
+    assert(dodo_address_space_lookup(&f.space, UINT64_C(0x400000), NULL) ==
+        DODO_ADDRESS_SPACE_INVALID_ARGUMENT);
+    assert(dodo_address_space_record_mapped_page(NULL, UINT64_C(0x400000),
+        UINT64_C(0x1000), DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE,
+        DODO_ADDRESS_SPACE_BORROWED_FRAME) == DODO_ADDRESS_SPACE_INVALID_ARGUMENT);
+    assert(dodo_address_space_forget_unmapped_page(NULL, UINT64_C(0x400000)) ==
+        DODO_ADDRESS_SPACE_INVALID_ARGUMENT);
+}
 static void test_init_rejects_invalid_user_interval(void) {
     struct fixture f;
     make_usable_map(&f.usable, f.entries, &f.map, 8);
@@ -195,6 +213,7 @@ static void test_lookup_preserves_output_on_miss(void) {
 }
 
 int main(void) {
+    test_null_arguments_are_rejected();
     test_init_rejects_invalid_user_interval();
     test_init_and_empty_validation();
     test_owned_mapping_record_and_forget();
