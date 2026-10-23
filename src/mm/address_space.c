@@ -22,6 +22,17 @@ static int owns_user_data_frame(const struct dodo_address_space *space,
     return 0;
 }
 
+static int frame_owned_by_space(const struct dodo_address_space *space,
+                                 uint64_t physical_address) {
+    for (uint32_t i = 0u; i < DODO_FRAME_LEDGER_CAPACITY; ++i) {
+        const struct dodo_frame_record *record = &space->frames->ledger.records[i];
+        if (record->physical_address == physical_address) {
+            return record->owner_id == space->owner_id;
+        }
+    }
+    return 0;
+}
+
 static int valid_mapping_values(uint64_t virtual_address, uint64_t physical_address,
                                 uint64_t flags,
                                 enum dodo_address_space_frame_policy policy) {
@@ -95,6 +106,10 @@ enum dodo_address_space_status dodo_address_space_validate(
                        mapping->virtual_address)) {
             return DODO_ADDRESS_SPACE_INVALID_STATE;
         }
+        if (mapping->frame_policy == DODO_ADDRESS_SPACE_BORROWED_FRAME &&
+            frame_owned_by_space(space, mapping->physical_address)) {
+            return DODO_ADDRESS_SPACE_OWNERSHIP_ERROR;
+        }
         if (mapping->frame_policy == DODO_ADDRESS_SPACE_OWNED_FRAME) {
             if (!owns_user_data_frame(space, mapping->physical_address)) {
                 return DODO_ADDRESS_SPACE_OWNERSHIP_ERROR;
@@ -139,6 +154,10 @@ enum dodo_address_space_status dodo_address_space_record_mapped_page(
     }
     if (space->mapping_count >= DODO_ADDRESS_SPACE_MAX_MAPPINGS) {
         return DODO_ADDRESS_SPACE_CAPACITY;
+    }
+    if (frame_policy == DODO_ADDRESS_SPACE_BORROWED_FRAME &&
+        frame_owned_by_space(space, physical_address)) {
+        return DODO_ADDRESS_SPACE_OWNERSHIP_ERROR;
     }
     if (frame_policy == DODO_ADDRESS_SPACE_OWNED_FRAME) {
         if (!owns_user_data_frame(space, physical_address)) {
