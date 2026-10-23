@@ -845,6 +845,23 @@ static void test_runtime_activation_validates_and_switches_root(void) {
            DODO_ADDRESS_SPACE_RUNTIME_OK);
 }
 
+static void test_deactivation_switch_failure_preserves_user_root(void) {
+    struct fixture f;
+    fixture_init(&f, 134u);
+    assert(dodo_address_space_runtime_activate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    fail_switch_to = kernel_root;
+    assert(dodo_address_space_runtime_deactivate(&f.runtime, kernel_root) ==
+           DODO_ADDRESS_SPACE_RUNTIME_ROOT_SWITCH_ERROR);
+    assert(active_root == f.runtime.root_physical);
+    fail_switch_to = 0u;
+    assert(dodo_address_space_runtime_deactivate(&f.runtime, kernel_root) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(active_root == kernel_root);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+}
+
 static void test_activation_switch_failure_preserves_current_root(void) {
     struct fixture f;
     fixture_init(&f, 133u);
@@ -901,6 +918,7 @@ int main(void) {
     test_invalid_mapping_flags_allocate_nothing();
     test_invalid_virtual_range_does_not_leak();
     test_runtime_activation_validates_and_switches_root();
+    test_deactivation_switch_failure_preserves_user_root();
     test_activation_switch_failure_preserves_current_root();
     test_destroy_refuses_active_root();
     puts("address-space runtime tests: ok");
