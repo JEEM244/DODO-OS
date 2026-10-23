@@ -388,8 +388,10 @@ enum dodo_address_space_runtime_status dodo_address_space_runtime_destroy(
                 DODO_PAGING_OK ||
             dodo_address_space_forget_unmapped_page(&runtime->metadata,
                 virtual_address) != DODO_ADDRESS_SPACE_OK) {
-            (void)dodo_x86_64_paging_switch_root(previous_root);
-            return DODO_ADDRESS_SPACE_RUNTIME_PAGING_ERROR;
+            const int restore_failed =
+                dodo_x86_64_paging_switch_root(previous_root) != DODO_PAGING_OK;
+            return restore_failed ? DODO_ADDRESS_SPACE_RUNTIME_ROOT_SWITCH_ERROR :
+                DODO_ADDRESS_SPACE_RUNTIME_PAGING_ERROR;
         }
     }
 
