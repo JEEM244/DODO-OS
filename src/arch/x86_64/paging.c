@@ -735,7 +735,8 @@ enum dodo_paging_status dodo_x86_64_query_page(
     uint64_t virtual_address,
     uint64_t *physical_address,
     uint64_t *flags) {
-    if (!paging_initialized || physical_address == 0 || flags == 0) {
+    if (!paging_initialized || physical_address == 0 || flags == 0 ||
+        physical_address == flags) {
         return DODO_PAGING_INVALID_ARGUMENT;
     }
     if (!is_canonical(virtual_address) ||
