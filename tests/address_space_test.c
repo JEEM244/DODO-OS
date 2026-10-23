@@ -45,6 +45,17 @@ static void test_frame_pool_corruption_propagates_as_ownership_error(void) {
     f.allocator.allocated_pages = 0u;
     assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OK);
 }
+static void test_reservation_and_mapping_addresses_must_match(void) {
+    struct fixture f;
+    fixture_init(&f);
+    assert(dodo_address_space_record_mapped_page(&f.space, UINT64_C(0x415000),
+        UINT64_C(0x1000), DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE,
+        DODO_ADDRESS_SPACE_BORROWED_FRAME) == DODO_ADDRESS_SPACE_OK);
+    f.space.mappings[0].virtual_address = UINT64_C(0x416000);
+    assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_INVALID_STATE);
+    f.space.mappings[0].virtual_address = UINT64_C(0x415000);
+    assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OK);
+}
 static void test_corrupt_mapping_flags_are_rejected(void) {
     struct fixture f;
     fixture_init(&f);
@@ -408,6 +419,7 @@ static void test_lookup_preserves_output_on_miss(void) {
 
 int main(void) {
     test_frame_pool_corruption_propagates_as_ownership_error();
+    test_reservation_and_mapping_addresses_must_match();
     test_corrupt_mapping_flags_are_rejected();
     test_stale_unused_mapping_slot_is_rejected();
     test_corrupt_metadata_fails_closed();
