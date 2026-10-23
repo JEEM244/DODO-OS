@@ -361,6 +361,37 @@ static void test_restore_switch_failure_keeps_mapping_owned(void) {
            DODO_ADDRESS_SPACE_RUNTIME_OK);
 }
 
+static void test_mapping_allocation_failure_leaves_runtime_unchanged(void) {
+    struct fixture f;
+    f.usable.base = UINT64_C(0x1000);
+    f.usable.length = DODO_PHYS_PAGE_SIZE;
+    f.usable.type = DODO_LIMINE_MEMMAP_USABLE;
+    f.entries[0] = &f.usable;
+    f.map.revision = 0u;
+    f.map.entry_count = 1u;
+    f.map.entries = f.entries;
+    assert(dodo_phys_init(&f.allocator, &f.map) == DODO_PHYS_OK);
+    dodo_owned_frames_init(&f.frames, &f.allocator);
+    assert(dodo_address_space_runtime_create(&f.runtime, &f.frames, 130u,
+        UINT64_C(0x400000), UINT64_C(0x800000)) ==
+        DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(f.allocator.allocated_pages == 1u);
+    assert(dodo_address_space_runtime_map(&f.runtime, UINT64_C(0x401000),
+        DODO_PAGE_USER_ACCESSIBLE) ==
+        DODO_ADDRESS_SPACE_RUNTIME_OWNERSHIP_ERROR);
+    assert(f.runtime.metadata.mapping_count == 0u);
+    assert(f.runtime.table_frame_count == 0u);
+    uint32_t count = UINT32_MAX;
+    assert(dodo_owned_frames_count_owner(&f.frames, 130u, &count) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(count == 1u);
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(f.allocator.allocated_pages == 0u);
+}
+
 static void test_failed_root_switch_rolls_back_mapping_allocation(void) {
     struct fixture f;
     fixture_init(&f, 102u);
@@ -767,6 +798,7 @@ int main(void) {
     test_distinct_owners_can_have_independent_roots();
     test_owner_id_cannot_be_reused_for_live_runtime();
     test_user_root_creation_failure_releases_root_frame();
+    test_mapping_allocation_failure_leaves_runtime_unchanged();
     test_failed_root_switch_rolls_back_mapping_allocation();
     test_restore_switch_failure_keeps_mapping_owned();
     test_unmap_restore_failure_keeps_metadata_consistent();
