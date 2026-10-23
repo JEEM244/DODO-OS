@@ -81,3 +81,7 @@ A newly allocated root frame belongs to the address-space owner from the moment 
 ### Private table classification
 
 Distinguish private lower-half paging tables from shared higher-half kernel tables in metadata. Teardown may reclaim only tables explicitly recorded as private.
+
+### Mapping ownership policy
+
+Every user mapping must declare whether its leaf frame is owned by this address space or borrowed. Borrowed frames are unmapped but never freed by address-space teardown.
