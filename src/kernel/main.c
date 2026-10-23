@@ -1097,6 +1097,13 @@ static void test_virtual_mapping(void) {
         invalid_query_flags != UINT64_C(0x55aa)) {
         report_boot_error("unaligned page query changed output parameters");
     }
+    if (dodo_x86_64_query_page(UINT64_C(0x0000800000000000),
+                               &invalid_query_physical, &invalid_query_flags) !=
+            DODO_PAGING_INVALID_ADDRESS ||
+        invalid_query_physical != UINT64_C(0x12345000) ||
+        invalid_query_flags != UINT64_C(0x55aa)) {
+        report_boot_error("non-canonical page query changed output parameters");
+    }
     uint64_t queried_physical_address = UINT64_MAX;
     uint64_t queried_flags = UINT64_MAX;
     status = dodo_x86_64_query_page(mapped_virtual_address,
