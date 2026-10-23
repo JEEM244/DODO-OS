@@ -37,6 +37,12 @@ static int valid_space(const struct dodo_vaddr_space *space) {
         }
         previous_end = range_end;
     }
+    for (uint64_t i = space->count; i < DODO_VADDR_MAX_RANGES; ++i) {
+        if (space->allocated[i].base != 0u ||
+            space->allocated[i].length != 0u) {
+            return 0;
+        }
+    }
     return 1;
 }
 
