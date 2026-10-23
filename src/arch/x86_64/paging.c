@@ -345,6 +345,18 @@ uint64_t dodo_x86_64_kernel_root_physical(void) {
     return kernel_root_table_physical;
 }
 
+uint64_t dodo_x86_64_active_root_physical(void) {
+    if (!paging_initialized) {
+        return 0u;
+    }
+    /* CR3 is authoritative; refresh the cached root after external switches. */
+    const uint64_t hardware_root = read_cr3() & DODO_PTE_ADDRESS_MASK;
+    if (hardware_root != root_table_physical) {
+        root_table_physical = hardware_root;
+    }
+    return root_table_physical;
+}
+
 enum dodo_paging_status dodo_x86_64_paging_create_user_root(
     uint64_t user_root_physical) {
     if (!paging_initialized || kernel_root_table_physical == 0u) {
