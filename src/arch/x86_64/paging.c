@@ -642,6 +642,13 @@ enum dodo_paging_status dodo_x86_64_map_page(
         return DODO_PAGING_INVALID_ARGUMENT;
     }
 
+    if (page_table_frames != 0) {
+        for (uint64_t i = 0u; i < page_table_frame_count; ++i) {
+            if (frames_used == &page_table_frames[i]) {
+                return DODO_PAGING_INVALID_ARGUMENT;
+            }
+        }
+    }
     *frames_used = 0;
 
     /*
@@ -656,6 +663,7 @@ enum dodo_paging_status dodo_x86_64_map_page(
 
     if (!is_canonical(virtual_address) ||
         (virtual_address & (DODO_PAGE_SIZE - 1u)) != 0u ||
+        physical_address == 0u ||
         (physical_address & (DODO_PAGE_SIZE - 1u)) != 0u ||
         physical_address > DODO_PTE_ADDRESS_MASK ||
         (flags & ~DODO_PTE_ALLOWED_FLAGS) != 0u ||
