@@ -34,6 +34,10 @@ struct dodo_vaddr_space {
     struct dodo_vaddr_range allocated[DODO_VADDR_MAX_RANGES];
 };
 
+/* Validate all bounds, reservations, ordering, and non-overlap invariants. */
+enum dodo_vaddr_status dodo_vaddr_validate(
+    const struct dodo_vaddr_space *space);
+
 /* Initialize an aligned, non-empty interval wholly below the user-half limit. */
 enum dodo_vaddr_status dodo_vaddr_init(
     struct dodo_vaddr_space *space, uint64_t start, uint64_t end);
