@@ -61,8 +61,10 @@ enum dodo_owned_frames_status dodo_owned_frames_alloc(
      * Fail closed if ownership metadata is already corrupt. Do not allocate a
      * physical page when the ledger cannot safely accept or describe it.
      */
-    if (dodo_frame_ledger_validate(&pool->ledger) != DODO_FRAME_LEDGER_OK) {
-        return DODO_OWNED_FRAMES_LEDGER_ERROR;
+    const enum dodo_owned_frames_status validation =
+        dodo_owned_frames_validate(pool);
+    if (validation != DODO_OWNED_FRAMES_OK) {
+        return validation;
     }
 
     uint64_t frame = 0;
@@ -91,6 +93,12 @@ enum dodo_owned_frames_status dodo_owned_frames_release(
         owner_id == DODO_FRAME_OWNER_INVALID || physical_address == 0u ||
         (physical_address & (DODO_PHYS_PAGE_SIZE - 1u)) != 0u) {
         return DODO_OWNED_FRAMES_INVALID_ARGUMENT;
+    }
+
+    const enum dodo_owned_frames_status validation =
+        dodo_owned_frames_validate(pool);
+    if (validation != DODO_OWNED_FRAMES_OK) {
+        return validation;
     }
 
     enum dodo_frame_kind kind;
