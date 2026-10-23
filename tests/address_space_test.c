@@ -213,7 +213,7 @@ static void test_owned_mapping_record_and_forget(void) {
     assert(f.space.mapping_count == 0u && f.allocator.allocated_pages == 0u);
 }
 
-static void test_borrowed_alias_does_not_duplicate_ownership(void) {
+static void test_borrowed_alias_cannot_outlive_owned_mapping(void) {
     struct fixture f;
     fixture_init(&f);
     uint64_t frame = 0;
@@ -224,11 +224,9 @@ static void test_borrowed_alias_does_not_duplicate_ownership(void) {
         DODO_ADDRESS_SPACE_OWNED_FRAME) == DODO_ADDRESS_SPACE_OK);
     assert(dodo_address_space_record_mapped_page(&f.space, UINT64_C(0x411000),
         frame, DODO_PAGE_USER_ACCESSIBLE | DODO_PAGE_NO_EXECUTE,
-        DODO_ADDRESS_SPACE_BORROWED_FRAME) == DODO_ADDRESS_SPACE_OK);
+        DODO_ADDRESS_SPACE_BORROWED_FRAME) == DODO_ADDRESS_SPACE_OWNERSHIP_ERROR);
     assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OK);
-    assert(dodo_address_space_forget_unmapped_page(&f.space, UINT64_C(0x411000)) ==
-           DODO_ADDRESS_SPACE_OK);
-    assert(f.allocator.allocated_pages == 1u);
+    assert(f.space.mapping_count == 1u && f.allocator.allocated_pages == 1u);
     assert(dodo_address_space_forget_unmapped_page(&f.space, UINT64_C(0x410000)) ==
            DODO_ADDRESS_SPACE_OK);
     assert(f.allocator.allocated_pages == 0u);
@@ -489,7 +487,7 @@ int main(void) {
     test_init_rejects_invalid_user_interval();
     test_init_and_empty_validation();
     test_owned_mapping_record_and_forget();
-    test_borrowed_alias_does_not_duplicate_ownership();
+    test_borrowed_alias_cannot_outlive_owned_mapping();
     test_borrowed_mapping_is_not_freed();
     test_invalid_flags_and_duplicate_virtual_page();
     test_kernel_half_address_is_rejected_for_user_metadata();
