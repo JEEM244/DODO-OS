@@ -107,6 +107,15 @@ static void test_corrupt_metadata_fails_closed(void) {
     f.space.mapping_count = 0u;
     assert(dodo_address_space_validate(&f.space) == DODO_ADDRESS_SPACE_OK);
 }
+static void test_init_requires_initialized_physical_allocator(void) {
+    struct dodo_phys_allocator allocator = {0};
+    struct dodo_owned_frames frames;
+    struct dodo_address_space space;
+    dodo_owned_frames_init(&frames, &allocator);
+    assert(dodo_address_space_init(&space, &frames, 77,
+        UINT64_C(0x400000), UINT64_C(0x800000)) ==
+        DODO_ADDRESS_SPACE_OWNERSHIP_ERROR);
+}
 static void test_init_refuses_corrupt_frame_ledger(void) {
     struct fixture f;
     make_usable_map(&f.usable, f.entries, &f.map, 8);
@@ -449,6 +458,7 @@ int main(void) {
     test_corrupt_mapping_flags_are_rejected();
     test_stale_unused_mapping_slot_is_rejected();
     test_corrupt_metadata_fails_closed();
+    test_init_requires_initialized_physical_allocator();
     test_init_refuses_corrupt_frame_ledger();
     test_init_rejects_invalid_owner_id();
     test_null_arguments_are_rejected();
