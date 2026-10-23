@@ -34,6 +34,8 @@ This roadmap tracks implemented behavior, not just intended features. A checked 
 
 ## M2 — Memory
 
+Implementation note: before connecting the virtual-range allocator or enabling CPU context switching, follow [the address-space lifecycle contract](ADDRESS_SPACE_LIFECYCLE.md). It defines ownership, rollback, active-CR3 protection, and required host/QEMU acceptance tests; it is a design contract, not an implemented API.
+
 - [x] Parse and validate the bootloader memory map.
 - [x] Implement a bootstrap physical page-frame allocator for complete 4 KiB usable frames.
 - [x] Test alignment, exhaustion, null/malformed entries, overflow, and overlapping usable ranges.
