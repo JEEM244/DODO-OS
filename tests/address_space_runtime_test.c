@@ -25,6 +25,7 @@ static struct test_mapping mappings[TEST_MAPPING_CAPACITY];
 static uint64_t active_root = UINT64_C(0x8000);
 static const uint64_t kernel_root = UINT64_C(0x8000);
 static uint64_t fail_switch_to;
+static enum dodo_paging_status fail_map_status;
 
 static struct test_root *find_root(uint64_t physical) {
     for (uint32_t i = 0u; i < TEST_ROOT_CAPACITY; ++i) {
@@ -98,6 +99,11 @@ enum dodo_paging_status dodo_x86_64_map_page(
         return DODO_PAGING_INVALID_ARGUMENT;
     }
     *frames_used = 0u;
+    if (fail_map_status != DODO_PAGING_OK) {
+        const enum dodo_paging_status injected = fail_map_status;
+        fail_map_status = DODO_PAGING_OK;
+        return injected;
+    }
     if (find_mapping(active_root, virtual_address) != NULL) {
         return DODO_PAGING_ALREADY_MAPPED;
     }
@@ -271,6 +277,26 @@ static void test_duplicate_and_invalid_mapping_do_not_leak(void) {
            DODO_ADDRESS_SPACE_RUNTIME_OK);
 }
 
+static void test_low_level_mapping_failure_rolls_back_owned_frames(void) {
+    struct fixture f;
+    fixture_init(&f, 107u);
+    uint32_t before = 0u;
+    assert(dodo_owned_frames_count_owner(&f.frames, 107u, &before) ==
+           DODO_OWNED_FRAMES_OK);
+    fail_map_status = DODO_PAGING_NO_TABLE_FRAMES;
+    assert(dodo_address_space_runtime_map(&f.runtime, UINT64_C(0x401000),
+        DODO_PAGE_USER_ACCESSIBLE) == DODO_ADDRESS_SPACE_RUNTIME_PAGING_ERROR);
+    uint32_t after = UINT32_MAX;
+    assert(dodo_owned_frames_count_owner(&f.frames, 107u, &after) ==
+           DODO_OWNED_FRAMES_OK);
+    assert(after == before);
+    assert(f.runtime.metadata.mapping_count == 0u);
+    assert(dodo_address_space_runtime_validate(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+    assert(dodo_address_space_runtime_destroy(&f.runtime) ==
+           DODO_ADDRESS_SPACE_RUNTIME_OK);
+}
+
 static void test_hardware_metadata_mismatch_fails_closed(void) {
     struct fixture f;
     fixture_init(&f, 105u);
@@ -330,6 +356,7 @@ int main(void) {
     test_create_map_unmap_destroy_reclaims_all_owned_frames();
     test_failed_root_switch_rolls_back_mapping_allocation();
     test_duplicate_and_invalid_mapping_do_not_leak();
+    test_low_level_mapping_failure_rolls_back_owned_frames();
     test_hardware_metadata_mismatch_fails_closed();
     test_mapping_capacity_is_bounded_without_leaks();
     test_destroy_refuses_active_root();
