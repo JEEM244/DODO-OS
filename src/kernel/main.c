@@ -1084,6 +1084,28 @@ static void test_virtual_mapping(void) {
         report_boot_error("virtual page mapping self-test failed");
     }
 
+    uint64_t queried_physical_address = UINT64_MAX;
+    uint64_t queried_flags = UINT64_MAX;
+    status = dodo_x86_64_query_page(mapped_virtual_address,
+                                    &queried_physical_address, &queried_flags);
+    const uint64_t expected_mapping_flags = DODO_PAGE_WRITABLE |
+        (dodo_x86_64_nx_enabled() ? DODO_PAGE_NO_EXECUTE : 0u);
+    if (status != DODO_PAGING_OK ||
+        queried_physical_address != bootstrap_reserved_frames[3] ||
+        queried_flags != expected_mapping_flags) {
+        report_boot_error("read-only page-table query disagreed with installed mapping");
+    }
+    uint64_t unchanged_physical_address = UINT64_C(0x1122334455667788);
+    uint64_t unchanged_flags = UINT64_C(0x8877665544332211);
+    status = dodo_x86_64_query_page(mapped_virtual_address + DODO_PAGE_SIZE,
+                                    &unchanged_physical_address, &unchanged_flags);
+    if (status != DODO_PAGING_NOT_MAPPED ||
+        unchanged_physical_address != UINT64_C(0x1122334455667788) ||
+        unchanged_flags != UINT64_C(0x8877665544332211)) {
+        report_boot_error("unmapped page query changed outputs or returned wrong status");
+    }
+    serial_write("DODO: page-query success and failure invariants passed\n");
+
     shared_kernel_test_virtual_address = mapped_virtual_address;
     serial_write("DODO: virtual page mapping self-check passed; VA = ");
     serial_write_hex64(mapped_virtual_address);
