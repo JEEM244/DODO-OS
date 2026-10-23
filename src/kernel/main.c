@@ -1048,6 +1048,16 @@ static void test_virtual_mapping(void) {
         report_boot_error("could not clone and activate DODO's page-table tree");
     }
 
+    if (dodo_x86_64_paging_switch_root(0u) != DODO_PAGING_INVALID_ADDRESS ||
+        dodo_x86_64_active_root_physical() != new_root_physical) {
+        report_boot_error("page-table switch accepted a null root or changed CR3");
+    }
+    if (dodo_x86_64_paging_create_user_root(0u) != DODO_PAGING_INVALID_ADDRESS ||
+        dodo_x86_64_active_root_physical() != new_root_physical) {
+        report_boot_error("user-root creation accepted physical address zero");
+    }
+    serial_write("DODO: null page-table root rejection self-check passed\\n");
+
     if (dodo_x86_64_active_root_physical() != new_root_physical ||
         dodo_x86_64_kernel_root_physical() != new_root_physical) {
         report_boot_error("active page-table root inspection disagreed with CR3");
