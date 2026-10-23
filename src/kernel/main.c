@@ -1829,6 +1829,13 @@ static void test_user_mode_transitions(void) {
         report_boot_error("user-root creation accepted the active CR3 root");
     }
 
+    uint64_t aliased_unmap_output = UINT64_C(0xabcdef0123456789);
+    paging_status = dodo_x86_64_unmap_page(second_user_code_virtual,
+        &aliased_unmap_output, &aliased_unmap_output);
+    if (paging_status != DODO_PAGING_INVALID_ARGUMENT ||
+        aliased_unmap_output != UINT64_C(0xabcdef0123456789)) {
+        report_boot_error("unmap accepted aliased output pointers");
+    }
     uint64_t active_root_leaf = UINT64_MAX;
     uint64_t active_root_flags = UINT64_MAX;
     paging_status = dodo_x86_64_unmap_page(
