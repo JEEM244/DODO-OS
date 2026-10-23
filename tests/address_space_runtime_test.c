@@ -815,6 +815,11 @@ static void test_runtime_activation_validates_and_switches_root(void) {
     assert(dodo_address_space_runtime_deactivate(&f.runtime,
         UINT64_C(0x9000)) == DODO_ADDRESS_SPACE_RUNTIME_INVALID_STATE);
     assert(active_root == f.runtime.root_physical);
+    f.runtime.table_frame_count = DODO_ADDRESS_SPACE_RUNTIME_MAX_TABLE_FRAMES + 1u;
+    assert(dodo_address_space_runtime_deactivate(&f.runtime, kernel_root) ==
+           DODO_ADDRESS_SPACE_RUNTIME_INVALID_STATE);
+    assert(active_root == f.runtime.root_physical);
+    f.runtime.table_frame_count = 0u;
     assert(dodo_address_space_runtime_deactivate(&f.runtime, kernel_root) ==
            DODO_ADDRESS_SPACE_RUNTIME_OK);
     assert(active_root == kernel_root);
