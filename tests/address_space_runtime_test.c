@@ -264,7 +264,7 @@ static void test_invalid_runtime_range_allocates_nothing(void) {
     dodo_owned_frames_init(&f.frames, &f.allocator);
     const uint64_t free_before = f.allocator.free_pages;
     assert(dodo_address_space_runtime_create(&f.runtime, &f.frames, 114u,
-        UINT64_C(0x1000), UINT64_C(0x800000)) ==
+        UINT64_C(0x0), UINT64_C(0x800000)) ==
         DODO_ADDRESS_SPACE_RUNTIME_INVALID_ARGUMENT);
     assert(f.allocator.free_pages == free_before);
     assert(f.allocator.allocated_pages == 0u);
